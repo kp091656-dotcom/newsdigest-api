@@ -9,7 +9,14 @@ export default async function handler(req, res) {
   // CNN Fear & Greed proxy
   if (endpoint === 'fgi') {
     try {
-      const r = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata');
+      const r = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://edition.cnn.com/',
+          'Accept': 'application/json',
+        }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       res.status(200).json(data);
     } catch(e) {
@@ -18,7 +25,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  // VIX + VIX Futures via Yahoo Finance
+  // VIX via Yahoo Finance
   if (endpoint === 'vix') {
     try {
       const symbols = ['^VIX', '^VVIX', '^VIX9D', '^VIX3M', '^VIX6M'];
