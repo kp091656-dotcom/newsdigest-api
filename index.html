@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NewsDigest.AI | AI 驅動財經新聞</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --border: #e4e2d9;
+    --border-dark: #c8c5b8;
+    --accent: #c8521a;
+    --accent2: #1a6bc8;
+    --accent3: #2a9d5c;
+    --text: #1a1a18;
+    --muted: #7a7870;
+    --card-bg: #ffffff;
+    --header-bg: #1a1a18;
+    --tag-bg: #f0ede4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.04) 1px, transparent 0);
+    background-size: 24px 24px;
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  header {
+    background: var(--header-bg);
+    padding: 0 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.25);
+    border-bottom: 1px solid rgba(200,82,26,0.4);
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: 1.35rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    letter-spacing: -0.02em;
+  }
+
+  .logo-badge {
+    background: var(--accent);
+    color: #fff;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: 3px;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+  }
+
+  .live-dot {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.4);
+  }
+
+  .live-dot::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: #4ade80;
+    border-radius: 50%;
+    animation: livePulse 2s infinite;
+    display: block;
+  }
+
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(74,222,128,0.4); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(74,222,128,0); }
+  }
+
+  nav { display: flex; align-items: center; gap: 0.2rem; }
+
+  .lang-btn {
+    background: none;
+    border: 1px solid transparent;
+    color: rgba(255,255,255,0.45);
+    padding: 0.3rem 0.65rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-family: 'IBM Plex Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .lang-btn:hover { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.15); }
+  .lang-btn.active { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); }
+
+  /* API Config Bar */
+  .api-config-bar {
+    background: linear-gradient(135deg, #fff8f0 0%, #fff5ee 100%);
+    border-bottom: 2px solid var(--accent);
+    padding: 0.65rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    box-shadow: 0 1px 8px rgba(200,82,26,0.08);
+  }
+
+  .api-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .api-config-bar label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--accent);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .api-input {
+    border: 1px solid var(--border-dark);
+    border-radius: 5px;
+    padding: 0.38rem 0.75rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    background: #fff;
+    color: var(--text);
+    outline: none;
+    width: 280px;
+    transition: border-color 0.15s;
+  }
+
+  .api-input:focus { border-color: var(--accent); }
+
+  .api-fetch-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 0.42rem 1.1rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .api-fetch-btn:hover { background: #b04516; }
+  .api-fetch-btn:disabled { background: var(--muted); cursor: not-allowed; }
+
+  .api-hint {
+    font-size: 0.68rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .api-hint a { color: var(--accent2); text-decoration: none; }
+  .api-hint a:hover { text-decoration: underline; }
+
+  .api-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #fff;
+  }
+
+  .api-status.ok { color: var(--accent3); border-color: #c8f0d8; background: #f0fdf6; }
+  .api-status.err { color: #e03030; border-color: #fdd; background: #fff5f5; }
+  .api-status.loading { color: var(--accent2); border-color: #c8dff8; background: #f0f6fe; }
+
+
+  /* Category bar */
+  .category-bar {
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    padding: 0 2.5rem;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+  }
+
+  .cat-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    padding: 0.85rem 1.1rem;
+    font-size: 0.78rem;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .cat-tab:hover { color: var(--text); }
+  .cat-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* Main Layout */
+  main {
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 2rem 2.5rem;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  /* Feed */
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+
+  .feed-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--text) 0%, #5a5850 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .feed-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  #newsFeed { display: flex; flex-direction: column; }
+
+  /* News Card */
+  /* Reading mode */
+  .news-card.expanded .card-read-more { display: block; }
+  .card-read-more { display: none; background: #faf9f5; border-top: 1px solid var(--border); padding: 1rem 1.3rem; font-size: 0.82rem; line-height: 1.75; color: var(--text); }
+  .card-expand-btn { background: none; border: none; color: var(--accent); font-size: 0.68rem; font-family: 'IBM Plex Mono', monospace; cursor: pointer; padding: 0; display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; transition: opacity 0.15s; }
+  .card-expand-btn:hover { opacity: 0.7; }
+  .news-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-top: none;
+    padding: 1.35rem 1.5rem;
+    cursor: default;
+    transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+    animation: cardIn 0.5s cubic-bezier(0.4,0,0.2,1) backwards;
+  }
+
+  .news-card:first-child { border-top: 1px solid var(--border); border-radius: 10px 10px 0 0; }
+  .news-card:last-child { border-radius: 0 0 10px 10px; }
+
+  .news-card::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background 0.18s;
+    border-radius: 3px 0 0 3px;
+  }
+
+  .news-card:hover { background: #fdfcf8; box-shadow: 0 4px 24px rgba(0,0,0,0.08); z-index: 1; transform: translateX(2px); }
+  .news-card:hover::after { background: var(--accent); }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .tag.technology { background: #e8f4fd; color: var(--accent2); }
+  .tag.business { background: #fdeee6; color: var(--accent); }
+  .tag.science { background: #f0eafd; color: #7c3aed; }
+  .tag.health { background: #e8fdf2; color: var(--accent3); }
+  .tag.general { background: var(--tag-bg); color: var(--muted); }
+  .tag.entertainment { background: #fef9e8; color: #b08000; }
+  .tag.market { background: #fff0e6; color: #c07000; }
+
+  .card-time { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; color: var(--muted); }
+  .card-source { font-size: 0.65rem; color: var(--muted); font-weight: 600; margin-left: auto; }
+  .pop-score { font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; color: var(--muted); background: #f5f3ee; border: 1px solid var(--border); border-radius: 3px; padding: 0.1rem 0.35rem; font-weight: 600; }
+  .pop-bar-wrap { display: flex; align-items: center; gap: 0.4rem; margin: 0.35rem 0 0.1rem; }
+  .pop-bar-track { flex: 1; height: 4px; background: #ede9e0; border-radius: 2px; overflow: hidden; }
+  .pop-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+  .pop-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.58rem; color: var(--muted); white-space: nowrap; }
+
+  .card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.08rem;
+    font-weight: 700;
+    line-height: 1.45;
+    margin-bottom: 0.55rem;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .card-desc {
+    font-size: 0.81rem;
+    color: #5a5850;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* AI Summary */
+  .ai-analysis-area {
+    margin-top: 0.8rem;
+    border-top: 1px dashed var(--border);
+    padding-top: 0.8rem;
+  }
+
+  .ai-analysis-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--accent2);
+    margin-bottom: 0.45rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .ai-analysis-text {
+    font-size: 0.81rem;
+    line-height: 1.65;
+    color: #4a4840;
+  }
+
+  .skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .skel-line {
+    height: 10px;
+    background: linear-gradient(90deg, #f0ede4 25%, #e4e1d8 50%, #f0ede4 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 3px;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .analyze-btn {
+    background: linear-gradient(135deg, #f0f6fe, #e8f4fd);
+    border: 1px solid #c8dff8;
+    border-radius: 6px;
+    padding: 0.38rem 0.9rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent2);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+
+  .analyze-btn:hover { background: #daeefe; border-color: var(--accent2); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(26,107,200,0.15); }
+  .analyze-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    font-size: 0.67rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .read-more {
+    margin-left: auto;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.67rem;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .read-more:hover { text-decoration: underline; }
+
+  /* Feed loading / empty */
+  .feed-state {
+    text-align: center;
+    padding: 3.5rem 1rem;
+    color: var(--muted);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .feed-state p { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
+  .feed-state small { font-size: 0.68rem; margin-top: 0.4rem; display: block; }
+
+  .load-more {
+    margin-top: 1rem;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.8rem;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .load-more:hover { border-color: var(--accent); color: var(--accent); background: #fff8f5; }
+
+  /* Sidebar */
+  .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .sidebar-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+
+  .sidebar-header {
+    padding: 0.72rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.63rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #faf9f5;
+  }
+
+  .sidebar-header span { color: var(--accent); font-weight: 500; }
+
+  .market-item {
+    padding: 0.68rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 0.75rem;
+    transition: background 0.12s;
+  }
+
+  .market-item:last-child { border-bottom: none; }
+  .market-item:hover { background: #faf9f5; }
+  .mkt-name { font-size: 0.8rem; font-weight: 600; }
+  .mkt-sub { font-size: 0.63rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  .mkt-val { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; font-weight: 500; text-align: right; }
+  .mkt-chg { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; text-align: right; }
+  .mkt-chg.up { color: var(--accent3); }
+  .mkt-chg.down { color: #e03030; }
+
+  .trend-item {
+    padding: 0.72rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0.7rem;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .trend-item:last-child { border-bottom: none; }
+  .trend-item:hover { background: #faf9f5; }
+
+  .trend-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--border-dark);
+    width: 18px;
+    flex-shrink: 0;
+    line-height: 1.2;
+  }
+
+  .trend-text { font-size: 0.77rem; line-height: 1.45; font-weight: 500; }
+  .trend-meta { font-size: 0.63rem; color: var(--muted); margin-top: 0.2rem; font-family: 'IBM Plex Mono', monospace; }
+
+  .daily-brief { padding: 1rem 1.1rem; }
+
+  .brief-ts {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .brief-text { font-size: 0.79rem; line-height: 1.72; color: #4a4840; }
+  .brief-text strong { color: var(--text); }
+
+  .brief-refresh {
+    margin-top: 0.75rem;
+    width: 100%;
+    background: none;
+    border: 1px solid var(--border);
+    padding: 0.38rem;
+    border-radius: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.63rem;
+    color: var(--accent2);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .brief-refresh:hover { background: #e8f4fd; border-color: var(--accent2); }
+  .imp-4 { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
+  .imp-3 { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+  .imp-2 { background: #f8fafc; color: #64748b; border: 1px solid #cbd5e1; }
+  .imp-1 { background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; }
+
+  @media (max-width: 960px) {
+    main { grid-template-columns: 1fr; padding: 1.25rem; }
+    .sidebar { display: none; }
+    .api-config-bar { padding: 0.6rem 1.25rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div style="display:flex;align-items:center;gap:1.25rem">
+    <div class="logo">NewsDigest<span style="color:var(--accent)">.</span>AI <span class="logo-badge">BETA</span></div>
+    <div class="live-dot">LIVE</div>
+  </div>
+  <nav>
+    <button class="lang-btn active" onclick="switchLang(this,'zh')">繁中</button>
+    <button class="lang-btn" onclick="switchLang(this,'zh')">简中</button>
+    <button class="lang-btn" onclick="switchLang(this,'en')">ENG</button>
+    <button class="lang-btn" onclick="switchLang(this,'ja')">日本語</button>
+    <button class="lang-btn" onclick="switchLang(this,'es')">ESP</button>
+  </nav>
+</header>
+
+<!-- API Config -->
+<div class="api-config-bar">
+  <div class="api-row">
+    <label>◆ 新聞來源</label>
+    <input class="api-input" id="marketauxKey" type="password" placeholder="Bloomberg · Reuters · CNBC · WSJ · FT（自動載入）" readonly style="opacity:0.5;cursor:default;">
+    <button class="api-fetch-btn" id="fetchBtn" onclick="fetchMarketaux()">載入財經新聞</button>
+    <span class="api-status" id="apiStatus">示範模式</span>
+    <span class="api-hint">透過 Vercel 伺服器自動轉接 · 每日 200 次</span>
+  </div>
+  <div class="api-row">
+    <label>◆ GROQ KEY</label>
+    <input class="api-input" id="groqKey" type="password" placeholder="Groq API Key（console.groq.com 免費申請，不需信用卡）">
+    <button class="api-fetch-btn" style="background:var(--accent2)" onclick="saveGroqKey()">儲存</button>
+    <span class="api-status" id="groqStatus">未設定</span>
+    <span class="api-hint">免費申請：<a href="https://console.groq.com/keys" target="_blank">console.groq.com</a> · 免費，不需信用卡</span>
+  </div>
+</div>
+
+
+<!-- Auto-refresh bar -->
+<div id="autoRefreshBar" style="display:none; background:linear-gradient(90deg,#f0fdf6,#e8fbf0); border-bottom:1px solid #c8f0d8; padding:0.45rem 2.5rem; align-items:center; gap:1rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#2a9d5c;">
+  <span>&#x27F3; 自動更新已啟動</span>
+  <span style="color:#1a1a18; font-weight:500;">下次更新：<span id="countdownDisplay">15:00</span></span>
+  <div style="flex:1; max-width:200px; height:4px; background:#e4e2d9; border-radius:2px; overflow:hidden;">
+    <div id="progressBar" style="height:100%; width:0%; background:#2a9d5c; border-radius:2px; transition:width 1s linear;"></div>
+  </div>
+  <button id="toggleRefreshBtn" onclick="toggleAutoRefresh()" style="background:none; border:1px solid #c8f0d8; border-radius:4px; padding:0.2rem 0.65rem; color:var(--accent); font-family:'IBM Plex Mono',monospace; font-size:0.65rem; cursor:pointer;">&#x23F8; 暫停</button>
+  <span id="lastRefreshTime" style="color:#7a7870;"></span>
+</div>
+
+<!-- Categories -->
+<div class="category-bar">
+  <button class="cat-tab active" data-cat="general">全部</button>
+  <button class="cat-tab" data-cat="tech">💻 科技</button>
+  <button class="cat-tab" data-cat="economy">📈 經濟</button>
+  <button class="cat-tab" data-cat="geopolitics">🌐 地緣政治</button>
+</div>
+
+<main>
+  <div>
+    <!-- 今日市場摘要 -->
+    <div id="marketSummaryBox" style="display:none;margin-bottom:1.5rem;background:#fff;border:1.5px solid var(--accent);border-radius:10px;overflow:hidden;">
+      <div style="background:var(--accent);padding:0.6rem 1.2rem;display:flex;align-items:center;justify-content:space-between;">
+        <span style="color:#fff;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;">◆ 今日市場摘要 · Groq AI</span>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span id="summaryTs" style="color:rgba(255,255,255,0.75);font-family:'IBM Plex Mono',monospace;font-size:0.62rem;"></span>
+          <button onclick="generateMarketSummary()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:0.65rem;padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">↻ 重新生成</button>
+        </div>
+      </div>
+      <div id="marketSummaryContent" style="padding:1.1rem 1.3rem;">
+        <div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:80%"></div></div>
+      </div>
+    </div>
+
+    <div class="feed-header">
+      <div class="feed-title">財經快訊</div>
+      <div class="feed-count" id="feedCount"></div>
+    </div>
+    <div id="newsFeed">
+      <div class="feed-state"><div class="spinner"></div><p>載入示範資料中…</p></div>
+    </div>
+    <button class="load-more" id="loadMoreBtn" style="display:none" onclick="loadMore()">載入更多 ↓</button>
+  </div>
+
+  <aside class="sidebar">
+    
+    <div class="sidebar-section">
+      <div class="sidebar-header">🇺🇸 美股簡報 <span>◆ Groq AI</span></div>
+      <div class="daily-brief">
+        <div class="brief-ts" id="briefTsTech"></div>
+        <div id="dailyBriefTech"><div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:65%"></div></div></div>
+        <button class="brief-refresh" onclick="generateBrief('us')">↻ 重新生成</button>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-header">🇹🇼 台股簡報 <span>◆ Groq AI</span></div>
+      <div class="daily-brief">
+        <div class="brief-ts" id="briefTsEcon"></div>
+        <div id="dailyBriefEcon"><div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:65%"></div></div></div>
+        <button class="brief-refresh" onclick="generateBrief('tw')">↻ 重新生成</button>
+      </div>
+    </div>
+
+    <!-- Fear & Greed Index -->
+    <div class="sidebar-section" id="fgiSection">
+      <div class="sidebar-header">📈 Fear &amp; Greed Index <span style="font-size:0.6rem;opacity:0.7;">· CNN 股市</span></div>
+      <div style="padding:1rem 1.1rem;">
+        <div id="fgiLoading" style="font-size:0.78rem;color:var(--muted);">載入中…</div>
+        <div id="fgiContent" style="display:none;">
+          <div style="text-align:center;margin-bottom:0.8rem;">
+            <svg viewBox="0 0 200 110" width="100%" style="max-width:220px;">
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#ede9e0" stroke-width="16" stroke-linecap="round"/>
+              <path id="fgiArc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#94a3b8" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 251"/>
+              <line id="fgiNeedle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="2.5" stroke-linecap="round" transform="rotate(0, 100, 100)"/>
+              <circle cx="100" cy="100" r="5" fill="#333"/>
+              <text x="14" y="118" font-size="7" fill="#ef4444" font-family="monospace">極度恐懼</text>
+              <text x="186" y="118" font-size="7" fill="#22c55e" font-family="monospace" text-anchor="end">極度貪婪</text>
+            </svg>
+            <div id="fgiScore" style="font-size:2.2rem;font-weight:800;font-family:'Playfair Display',serif;line-height:1;">—</div>
+            <div id="fgiLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.05em;margin-top:0.2rem;">—</div>
+          </div>
+          <div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.25rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fef2f2;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ef4444;font-weight:700;">極度恐懼</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ef4444;">0 – 24</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fff7ed;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#f97316;font-weight:700;">恐懼</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#f97316;">25 – 44</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fefce8;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ca8a04;font-weight:700;">中性</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ca8a04;">45 – 54</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#f0fdf4;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#16a34a;font-weight:700;">貪婪</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#16a34a;">55 – 74</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#dcfce7;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#15803d;font-weight:700;">極度貪婪</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#15803d;">75 – 100</span>
+            </div>
+          </div>
+          <div id="fgiTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-align:center;margin-top:0.6rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Crypto Fear & Greed -->
+    <div class="sidebar-section" id="fgiCryptoSection">
+      <div class="sidebar-header">₿ Fear &amp; Greed Index <span style="font-size:0.6rem;opacity:0.7;">· 加密貨幣</span></div>
+      <div style="padding:1rem 1.1rem;">
+        <div id="fgiCryptoLoading" style="font-size:0.78rem;color:var(--muted);">載入中…</div>
+        <div id="fgiCryptoContent" style="display:none;">
+          <div style="text-align:center;margin-bottom:0.8rem;">
+            <svg viewBox="0 0 200 110" width="100%" style="max-width:220px;">
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#ede9e0" stroke-width="16" stroke-linecap="round"/>
+              <path id="fgiCryptoArc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#94a3b8" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 251"/>
+              <line id="fgiCryptoNeedle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="2.5" stroke-linecap="round" transform="rotate(0, 100, 100)"/>
+              <circle cx="100" cy="100" r="5" fill="#333"/>
+              <text x="14" y="118" font-size="7" fill="#ef4444" font-family="monospace">極度恐懼</text>
+              <text x="186" y="118" font-size="7" fill="#22c55e" font-family="monospace" text-anchor="end">極度貪婪</text>
+            </svg>
+            <div id="fgiCryptoScore" style="font-size:2.2rem;font-weight:800;font-family:'Playfair Display',serif;line-height:1;">—</div>
+            <div id="fgiCryptoLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.05em;margin-top:0.2rem;">—</div>
+          </div>
+          <div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.25rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fef2f2;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ef4444;font-weight:700;">極度恐懼</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ef4444;">0 – 24</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fff7ed;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#f97316;font-weight:700;">恐懼</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#f97316;">25 – 44</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fefce8;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ca8a04;font-weight:700;">中性</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ca8a04;">45 – 54</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#f0fdf4;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#16a34a;font-weight:700;">貪婪</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#16a34a;">55 – 74</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#dcfce7;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#15803d;font-weight:700;">極度貪婪</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#15803d;">75 – 100</span>
+            </div>
+          </div>
+          <div id="fgiCryptoTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-align:center;margin-top:0.6rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIX 波動率儀表板 -->
+    <div class="sidebar-section" id="vixSection">
+      <div class="sidebar-header">📊 VIX 波動率 <span style="font-size:0.6rem;opacity:0.7;">· CBOE</span></div>
+      <div style="padding:0.8rem 1.1rem;">
+        <div id="vixLoading" style="font-size:0.78rem;color:var(--muted);">載入中…</div>
+        <div id="vixContent" style="display:none;">
+          <!-- Main VIX -->
+          <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.6rem;">
+            <div id="vixPrice" style="font-size:2rem;font-weight:800;font-family:'Playfair Display',serif;"></div>
+            <div id="vixChange" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;font-weight:700;"></div>
+          </div>
+          <div id="vixLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;font-weight:700;margin-bottom:0.8rem;"></div>
+          <!-- Term structure -->
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:0.3rem;letter-spacing:0.05em;">波動率期限結構</div>
+          <div id="vixTermStructure" style="display:flex;flex-direction:column;gap:0.2rem;"></div>
+          <div id="vixContango" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;margin-top:0.6rem;padding:0.3rem 0.5rem;border-radius:4px;text-align:center;"></div>
+          <div id="vixTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-align:center;margin-top:0.5rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-header">最新快訊 <span>TOP 5</span></div>
+      <div id="trending"></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+let groqApiKey = '';
+let allArticles = [];
+let displayedCount = 0;
+const PAGE_SIZE = 50;
+let currentLang = 'zh';
+let currentCat = 'general';
+
+// ── Static data ──
+const mockArticles = [
+  {title:'輝達 GTC 大會公布 Blackwell Ultra 架構，AI 算力提升 5 倍',source:'Reuters',publishedAt:new Date(Date.now()-3*60000).toISOString(),url:'#',description:'NVIDIA 執行長黃仁勳在 GTC 年度大會發表演說，宣布 Blackwell Ultra GPU 正式問世，訓練大型語言模型速度較前代提升近五倍，盤前股價大漲逾 7%。',category:'tech'},
+  {title:'美聯儲會議紀要釋放鴿派訊號，6 月降息概率攀升至 68%',source:'Bloomberg',publishedAt:new Date(Date.now()-11*60000).toISOString(),url:'#',description:'聯準會最新 FOMC 會議紀要顯示，多名官員擔憂高利率過度收緊，暗示降息窗口逐步開啟，債市殖利率應聲下滑。',category:'tech'},
+  {title:'台積電外資連三週買超，法人上調獲利預估逾每股 50 元',source:'MoneyDJ',publishedAt:new Date(Date.now()-28*60000).toISOString(),url:'#',description:'受惠於 AI 晶片需求強勁，台積電 ADR 大漲，外資法人連三週布局半導體，多家外資券商上調目標價。',category:'economy'},
+  {title:'比特幣突破 87,000 美元，鏈上數據顯示機構積累加速',source:'CoinDesk',publishedAt:new Date(Date.now()-45*60000).toISOString(),url:'#',description:'比特幣持續強勢，大戶地址持有量創六個月新高，ETF 資金淨流入連續第八日為正，市場情緒接近「極度貪婪」。',category:'geopolitics'},
+  {title:'OPEC+ 維持減產協議，地緣政治風險推升油價至 86 美元',source:'FT',publishedAt:new Date(Date.now()-72*60000).toISOString(),url:'#',description:'OPEC+ 決議維持現有減產配額，疊加中東局勢緊張，布蘭特原油突破每桶 86 美元，能源股普遍走強。',category:'geopolitics'},
+  {title:'OpenAI GPT-5 發布在即，多模態能力大幅躍升',source:'The Information',publishedAt:new Date(Date.now()-90*60000).toISOString(),url:'#',description:'知情人士透露 OpenAI 計劃本季末發布 GPT-5，具備更強推理與視覺理解能力，將對企業軟體市場帶來深遠影響。',category:'tech'},
+  {title:'歐盟 AI 法案正式生效，高風險系統需符合透明度要求',source:'Reuters',publishedAt:new Date(Date.now()-3*3600000).toISOString(),url:'#',description:'歐盟 AI 法案核心條款生效，要求高風險 AI 應用建立風險管理與透明度機制，違規最高罰全球年營收 3%。',category:'geopolitics'},
+  {title:'鴻海宣布與 NVIDIA 深化合作，AI 伺服器訂單大增',source:'經濟日報',publishedAt:new Date(Date.now()-4*3600000).toISOString(),url:'#',description:'鴻海精密宣布擴大與 NVIDIA 合作範疇，GB200 AI 伺服器出貨量預計倍增，法人預估下半年營收可望創歷史新高。',category:'economy'},
+];// ── Trending ──
+function renderTrending() {
+  // Show top 5 by popularity score
+  const items = allArticles.length > 0
+    ? [...allArticles].sort((a,b) => (b.popularityScore||0) - (a.popularityScore||0)).slice(0, 5)
+    : [];
+  if (!items.length) {
+    document.getElementById('trending').innerHTML = '<div style="padding:1rem 1.1rem;font-size:0.78rem;color:var(--muted)">載入新聞後自動更新</div>';
+    return;
+  }
+  document.getElementById('trending').innerHTML = items.map((a, i) =>
+    `<div class="trend-item">
+      <div class="trend-num">${i+1}</div>
+      <div>
+        <div class="trend-text">${a.url && a.url !== '#'
+          ? `<a href="${a.url}" target="_blank" style="color:inherit;text-decoration:none;">${a.title}</a>`
+          : a.title}</div>
+        <div class="trend-meta">${typeof a.source === 'string' ? a.source : (a.source?.name || '')} · ${timeAgo(a.publishedAt)}</div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+// ── Time ──
+function timeAgo(iso) {
+  const m = Math.floor((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return '剛剛';
+  if (m < 60) return `${m} 分鐘前`;
+  if (m < 1440) return `${Math.floor(m/60)} 小時前`;
+  return `${Math.floor(m/1440)} 天前`;
+}
+
+// ── Category label ──
+const catMap = {tech:{cls:'tech',label:'科技'},economy:{cls:'economy',label:'經濟'},geopolitics:{cls:'geopolitics',label:'地緣政治'},general:{cls:'general',label:'財經'}};
+function getTag(cat) { return catMap[cat] || catMap.general; }
+
+// ── Card ──
+function createCard(article, idx) {
+  const tag = getTag(article.category || 'general');
+  const id = `card-${idx}-${Date.now()}`;
+  const div = document.createElement('div');
+  div.className = 'news-card';
+  div.style.animationDelay = `${(idx % PAGE_SIZE) * 0.055}s`;
+  div.innerHTML = `
+    <div class="card-meta">
+      <span class="tag ${tag.cls}">${tag.label}</span>
+      <span class="card-time">${timeAgo(article.publishedAt)}</span>
+      ${(() => {
+        const s = article.popularityScore || 0;
+        if (s >= 95) return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.58rem;background:#fef2f2;color:#c81a1a;border:1px solid #fca5a5;border-radius:3px;padding:0.1rem 0.4rem;font-weight:600;">⚡ 重大</span>';
+        if (s >= 80) return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.58rem;background:#fff1e6;color:#c8521a;border:1px solid #f5c09a;border-radius:3px;padding:0.1rem 0.4rem;font-weight:600;">🔥 熱門</span>';
+        return '';
+      })()}
+      <span class="pop-score">${article.popularityScore > 0 ? article.popularityScore.toFixed(0) + ' 分' : '—'}</span>
+      <span class="card-source">${article.source?.name || ''}</span>
+    </div>
+    <div class="card-title">
+      ${article.url && article.url !== '#'
+        ? `<a href="${article.url}" target="_blank" style="color:inherit;text-decoration:none;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='inherit'">${article.title || ''}</a>`
+        : (article.title || '')}
+    </div>
+    ${(() => {
+      const s = article.popularityScore || 0;
+      if (s === 0) return '';
+      const pct = Math.min(s, 100);
+      const color = s >= 95 ? '#ef4444' : s >= 80 ? '#f97316' : s >= 60 ? '#eab308' : '#94a3b8';
+      const label = s >= 95 ? '極熱門' : s >= 80 ? '熱門' : s >= 60 ? '有熱度' : '一般';
+      return `<div class="pop-bar-wrap">
+        <div class="pop-bar-track"><div class="pop-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <span class="pop-label">${label} ${pct.toFixed(0)}%</span>
+      </div>`;
+    })()}
+    ${article.description ? `<div class="card-desc">${article.description}</div>` : ''}
+    <button class="card-expand-btn" onclick="toggleReadMode(this)">
+      <span class="expand-icon">▸</span> <span class="expand-label">展開閱讀摘要</span>
+    </button>
+    <div class="card-read-more">
+      <div class="read-loading" style="color:var(--muted);font-size:0.78rem;">⏳ 點擊展開後由 Groq AI 生成完整摘要…</div>
+      <div class="read-content" style="display:none;"></div>
+      <div class="read-original" style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px solid var(--border);">
+        ${article.url && article.url !== '#' ? `<a href="${article.url}" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:var(--accent2);">↗ 閱讀原文</a>` : ''}
+      </div>
+    </div>
+    <div class="ai-analysis-area">
+      <div class="ai-analysis-label">◆ Groq AI 分析</div>
+      <div id="sum-${id}">
+        <button class="analyze-btn" id="btn-${id}"
+          data-cardid="${id}"
+          data-title="${encodeURIComponent(article.title||'')}"
+          data-desc="${encodeURIComponent(article.description||'')}"
+          onclick="doSummarize(this.dataset.cardid, decodeURIComponent(this.dataset.title), decodeURIComponent(this.dataset.desc))">
+          ✦ 點擊生成 Groq AI 分析
+        </button>
+      </div>
+    </div>
+    <div class="card-footer">
+      <span>${typeof article.source === 'object' ? article.source?.name : article.source || ''}</span>
+      ${article.url && article.url !== '#'
+        ? `<span style="color:var(--border-dark)">·</span>
+           <span style="font-size:0.63rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${article.url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0]}</span>
+           <a class="read-more" href="${article.url}" target="_blank">閱讀原文 →</a>`
+        : '<span style="color:var(--muted);font-size:0.63rem">（無來源連結）</span>'}
+    </div>
+  `;
+  return div;
+}
+
+// ── Render feed ──
+function classifyArticle(title, description) {
+  const t = (title + ' ' + description).toLowerCase();
+  if (/war|sanction|tariff|trade war|geopolit|nato|military|russia|ukraine|taiwan strait|conflict|diplomatic|election|congress|white house|xi jinping|government|policy|regulation|antitrust|legislation|iran|north korea/.test(t)) return 'geopolitics';
+  if (/\bai\b|artificial intelligence|chatgpt|openai|nvidia|semiconductor|chip|llm|machine learning|apple|microsoft|google|alphabet|meta|amazon|tesla|software|hardware|cloud|cyber|quantum|robot|autonomous|electric vehicle|\bev\b|5g|biotech|tsmc|taiwan semi/.test(t)) return 'tech';
+  if (/fed|federal reserve|interest rate|inflation|gdp|recession|economy|treasury|earnings|revenue|profit|stock|market|nasdaq|s&p|dow|bond|yield|currency|dollar|euro|yen|oil|gold|crypto|bitcoin|etf|fund|invest|bank|finance|quarter|fiscal/.test(t)) return 'economy';
+  return 'general';
+}
+
+function renderFeed(articles) {
+  const feed = document.getElementById('newsFeed');
+  if (!articles.length) {
+    feed.innerHTML = '<div class="feed-state"><p>找不到相關新聞</p><small>請嘗試其他分類或重新載入</small></div>';
+    document.getElementById('loadMoreBtn').style.display = 'none';
+    document.getElementById('feedCount').textContent = '';
+    return;
+  }
+  const slice = articles.slice(0, PAGE_SIZE);
+  displayedCount = slice.length;
+  feed.innerHTML = '';
+  slice.forEach((a, i) => feed.appendChild(createCard(a, i)));
+  document.getElementById('feedCount').textContent = `顯示 ${displayedCount} / ${articles.length} 則`;
+  document.getElementById('loadMoreBtn').style.display = articles.length > PAGE_SIZE ? 'block' : 'none';
+}
+
+// ── Load more ──
+function loadMore() {
+  const filtered = getFiltered();
+  const next = filtered.slice(displayedCount, displayedCount + PAGE_SIZE);
+  const feed = document.getElementById('newsFeed');
+  next.forEach((a, i) => feed.appendChild(createCard(a, displayedCount + i)));
+  displayedCount += next.length;
+  document.getElementById('feedCount').textContent = `顯示 ${displayedCount} / ${filtered.length} 則`;
+  if (displayedCount >= filtered.length) document.getElementById('loadMoreBtn').style.display = 'none';
+}
+
+function getFiltered() {
+  let filtered = currentCat === 'general' ? allArticles : allArticles.filter(a => (a.category || 'general') === currentCat);
+  return filtered;
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('apiStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'api-status' + (type ? ' ' + type : '');
+}
+
+// ── News fetch: TheNewsAPI via Vercel proxy ──
+async function fetchMarketaux() {
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = '載入中…';
+  setStatus('連線中…', 'loading');
+  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在從 Bloomberg · Reuters · CNBC · WSJ · FT 載入新聞…</p></div>';
+
+  try {
+    // Fetch all+top pages concurrently via Vercel proxy
+    // Fetch 10 pages × 3 articles = up to 30 articles from Bloomberg/Reuters/CNBC/WSJ/FT
+    const reqs = [1,2,3,4,5,6,7,8,9,10].map(p =>
+      fetch(`https://newsdigest-api.vercel.app/api/news?page=${p}`).then(r=>r.json()).catch(()=>null)
+    );
+    const results = await Promise.all(reqs);
+
+    let articles = [];
+    for (const data of results) {
+      if (!data || data.error || !data.data?.length) continue;
+      for (const a of data.data) {
+        if (!a.description || a.description.trim().length < 30) continue;
+
+        // India blacklist
+        const indiaCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
+        if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata/i.test(indiaCheck)) continue;
+
+        // 過濾：必須是財經相關（放寬條件，來源已限定財經媒體）
+        const isBiz = /stock|market|trade|economy|finance|invest|bank|rate|inflation|gdp|earnings|crypto|bitcoin|tech|ai|chip|energy|oil|gold|bond|fund|fed|nasdaq|s&p|trump|tariff|sanction|china|taiwan|ukraine|russia|war|election|policy|microsoft|apple|google|amazon|nvidia|tesla|meta|revenue|profit|quarter|fiscal|merger|acquisition|ipo|valuation|shares|equity|debt|yield|currency|dollar|euro|yen|interest|central bank|monetary|fiscal|budget|deficit|surplus|export|import|supply chain|semiconductor|electric|battery|cloud|software|hardware|startup|venture|billion|trillion|million/i.test((a.title||'') + ' ' + (a.description||''));
+        if (!isBiz) continue;
+
+        articles.push({
+          title: a.title || '',
+          description: (a.description || '').slice(0, 300),
+          url: a.url || '#',
+          publishedAt: a.published_at || new Date().toISOString(),
+          source: a.source || '',
+          category: classifyArticle(a.title || '', a.description || ''),
+          popularityScore: 0,
+        });
+      }
+    }
+
+    // Deduplicate
+    const seen = new Set();
+    articles = articles.filter(a => { if (!a.title || seen.has(a.title)) return false; seen.add(a.title); return true; });
+
+    // Sort by time, rank-based score
+    articles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    articles = articles.slice(0, 50);
+    articles.forEach((a, i) => { a.popularityScore = Math.round(100 - (i / Math.max(articles.length-1,1)) * 90); });
+
+    if (!articles.length) throw new Error('未取得任何新聞，請稍後再試');
+
+    allArticles = articles;
+
+    const techCnt = articles.filter(a => a.category === 'tech').length;
+    const econCnt = articles.filter(a => a.category === 'economy').length;
+    const geoCnt  = articles.filter(a => a.category === 'geopolitics').length;
+    setStatus(`✓ 科技 ${techCnt} · 經濟 ${econCnt} · 地緣政治 ${geoCnt}`, 'ok');
+
+    renderFeed(getFiltered());
+    renderTrending();
+    generateBrief();
+
+    const now = new Date();
+    const lastEl = document.getElementById('lastRefreshTime');
+    if (lastEl) lastEl.textContent = '上次更新 ' + now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+    const savedGroq = groqApiKey || localStorage.getItem('nd_groq_key') || '';
+    if (savedGroq) {
+      groqApiKey = savedGroq;
+      document.getElementById('groqKey').value = savedGroq;
+      setGroqStatus('✓ 已啟用（已記住）', 'ok');
+      translateArticles();
+    }
+
+  } catch(e) {
+    setStatus(`✗ ${e.message}`, 'err');
+    document.getElementById('newsFeed').innerHTML = `<div class="feed-state"><p>載入失敗</p><small>${e.message}</small></div>`;
+    setTimeout(() => { allArticles = mockArticles; renderFeed(getFiltered()); }, 1000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '載入財經新聞';
+  }
+}
+
+
+// ── Translate articles to Traditional Chinese via Groq ──
+async function translateArticles() {
+  if (!groqApiKey || !allArticles.length) return;
+  setStatus('Groq 翻譯中…', 'loading');
+
+  const BATCH = 5;
+  let successCount = 0;
+
+  for (let i = 0; i < allArticles.length; i += BATCH) {
+    const batch = allArticles.slice(i, i + BATCH);
+    const lines = batch.map((a, j) =>
+      `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,80).replace(/[|]/g,' ')}`
+    ).join('\n');
+
+    try {
+      const prompt = `你是財經翻譯專員。將以下 ${batch.length} 則英文財經新聞翻譯成繁體中文。格式：每行 "編號. 標題 ||| 描述"，請按相同格式輸出繁體中文，不要加任何說明或 markdown。\n\n${lines}`;
+      const raw = await callGemini(prompt);
+      const outputLines = raw.trim().split('\n').filter(l => l.match(/^\d+\./));
+      outputLines.forEach(line => {
+        const numMatch = line.match(/^(\d+)\.\s*/);
+        if (!numMatch) return;
+        const idx = parseInt(numMatch[1]) - 1;
+        const rest = line.replace(/^\d+\.\s*/, '');
+        const parts = rest.split('|||');
+        const art = allArticles[i + idx];
+        if (!art) return;
+        if (parts[0]?.trim()) art.title = parts[0].trim();
+        if (parts[1]?.trim()) art.description = parts[1].trim();
+      });
+      successCount += batch.length;
+      setStatus(`Groq 翻譯中… ${successCount}/${allArticles.length}`, 'loading');
+    } catch(e) {
+      console.warn(`Translation batch ${i} failed:`, e.message);
+    }
+    if (i + BATCH < allArticles.length) await new Promise(r => setTimeout(r, 600));
+  }
+
+  setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
+  renderFeed(getFiltered());
+  renderTrending();
+  generateBrief();
+}
+
+// ── Market Summary ──
+async function generateMarketSummary() {
+  if (!groqApiKey || !allArticles.length) return;
+  const box = document.getElementById('marketSummaryBox');
+  const el = document.getElementById('marketSummaryContent');
+  const ts = document.getElementById('summaryTs');
+  box.style.display = 'block';
+  el.innerHTML = '<div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:80%"></div></div>';
+
+  const headlines = allArticles.slice(0, 20).map((a,i) => `${i+1}. ${a.title}`).join('\n');
+  const prompt = `你是專業財經編輯。根據以下今日 ${allArticles.length} 則財經新聞，用繁體中文整理出「今日市場 3-5 大重點」。每個重點用一行，格式：「• 重點標題：簡短說明（30字內）」只輸出重點列表，不要前言或結語。\n\n${headlines}`;
+
+  try {
+    const text = await callGemini(prompt);
+    const points = text.trim().split('\n').filter(l => l.trim());
+    el.innerHTML = points.map(p =>
+      `<div style="padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.82rem;line-height:1.6;color:var(--text);">${p.replace(/^[•\-\*]\s*/,'<span style="color:var(--accent);font-weight:700;margin-right:0.4rem;">◆</span>')}</div>`
+    ).join('');
+    ts.textContent = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}) + ' · Groq 生成';
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--muted);font-size:0.78rem;">生成失敗：${e.message}</span>`;
+  }
+}
+
+// ── Reading mode ──
+async function toggleReadMode(btn) {
+  const card = btn.closest('.news-card');
+  const panel = card.querySelector('.card-read-more');
+  const icon = btn.querySelector('.expand-icon');
+  const label = btn.querySelector('.expand-label');
+  const isOpen = card.classList.contains('expanded');
+
+  if (isOpen) {
+    card.classList.remove('expanded');
+    icon.textContent = '▸';
+    label.textContent = '展開閱讀摘要';
+    return;
+  }
+
+  card.classList.add('expanded');
+  icon.textContent = '▾';
+  label.textContent = '收合';
+
+  const readContent = panel.querySelector('.read-content');
+  const readLoading = panel.querySelector('.read-loading');
+
+  // Already generated
+  if (readContent.style.display !== 'none') return;
+
+  // Get article data from card
+  const titleEl = card.querySelector('.card-title');
+  const descEl = card.querySelector('.card-desc');
+  const title = titleEl?.textContent?.trim() || '';
+  const desc = descEl?.textContent?.trim() || '';
+
+  if (!groqApiKey) {
+    readLoading.textContent = '⚠ 請先設定 Groq API Key 以啟用閱讀模式';
+    return;
+  }
+
+  readLoading.textContent = '⏳ Groq AI 生成中…';
+
+  try {
+    const prompt = `你是財經記者。根據以下新聞標題和描述，用繁體中文撰寫一段完整的新聞摘要（150-200字），包含：事件背景、主要影響、市場反應。語氣專業客觀。
+
+標題：${title}
+描述：${desc}`;
+    const text = await callGemini(prompt);
+    readContent.innerHTML = `<p style="line-height:1.8;color:var(--text);">${text.trim()}</p>`;
+    readContent.style.display = 'block';
+    readLoading.style.display = 'none';
+  } catch(e) {
+    readLoading.textContent = `生成失敗：${e.message}`;
+  }
+}
+
+// ── AI: summarize via Gemini API ──
+async function callGemini(prompt) {
+  if (!groqApiKey) throw new Error('請先輸入並儲存 Groq API Key');
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${groqApiKey}`
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4096,
+      temperature: 0.7
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  return data.choices?.[0]?.message?.content || '無法生成內容。';
+}
+
+async function doSummarize(id, title, desc) {
+  const sumEl = document.getElementById(`sum-${id}`);
+  const btnEl = document.getElementById(`btn-${id}`);
+  if (btnEl) btnEl.disabled = true;
+
+  sumEl.innerHTML = `
+    <div class="ai-analysis-label" style="color:var(--accent2)">◆ Groq 分析中…</div>
+    <div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:70%"></div></div>
+  `;
+
+  try {
+    const prompt = `你是專業財經新聞編輯。根據以下新聞，用繁體中文寫 2-3 句精簡摘要，點出關鍵數據與市場影響。直接輸出摘要，無需標籤或前綴。
+
+標題：${title}
+內容：${desc || '（無詳細內容）'}`;
+
+    const text = await callGemini(prompt);
+    sumEl.innerHTML = `
+      <div class="ai-analysis-label">◆ Groq AI 分析 <span style="color:var(--accent3);margin-left:0.3rem">✓ 已生成</span></div>
+      <div class="ai-analysis-text">${text}</div>
+    `;
+  } catch(e) {
+    sumEl.innerHTML = `
+      <div class="ai-analysis-label" style="color:#e03030">◆ 失敗：${e.message}</div>
+      <button class="analyze-btn" onclick="doSummarize('${id}','${title.replace(/'/g,"&#39;")}','${desc.replace(/'/g,"&#39;")}')">↻ 重試</button>
+    `;
+    if (btnEl) btnEl.disabled = false;
+  }
+}
+
+// ── Claude: daily brief ──
+async function generateBrief(market) {
+  if (!market) {
+    await Promise.all([generateBrief('us'), generateBrief('tw')]);
+    return;
+  }
+
+  const isUS = market === 'us';
+  const elId = isUS ? 'dailyBriefTech' : 'dailyBriefEcon';
+  const tsId = isUS ? 'briefTsTech' : 'briefTsEcon';
+  const label = isUS ? '🇺🇸 美股' : '🇹🇼 台股';
+  const el = document.getElementById(elId);
+  const tsEl = document.getElementById(tsId);
+
+  const now = new Date();
+  tsEl.textContent = `◆ ${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} · Groq 生成`;
+  el.innerHTML = `<div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:55%"></div></div>`;
+
+  // Filter articles by market category + take top 8
+  // Use all articles — AI will summarize for the specific market context
+  const articles = allArticles.slice(0, 10);
+  const headlines = articles.map(a => a.title).filter(Boolean).join('\n');
+
+  const fallbacks = {
+    us: '今日美股科技股強勢領漲，AI 相關標的持續受到市場關注，聯準會政策走向備受矚目，投資人聚焦企業財報與總經數據。',
+    tw: '台股今日維持震盪整理，半導體族群表現強勁，外資動向與美股走勢為主要觀察重點，投資人持續關注供應鏈變化。'
+  };
+
+  if (!groqApiKey) {
+    el.innerHTML = `<div class="brief-text">${fallbacks[market]}<br><small style="color:var(--muted);font-size:0.68rem;margin-top:0.4rem;display:block">⚠ 請設定 Groq API Key 以啟用 AI 簡報</small></div>`;
+    return;
+  }
+
+  try {
+    const prompt = `你是專業財經分析師。根據以下今日財經新聞，從【${label}市場】角度，用繁體中文撰寫 80-100 字每日簡報，涵蓋：今日趨勢、主要驅動因素、需注意風險。直接輸出，無需標題。
+
+${headlines || '（今日暫無相關新聞）'}`;
+    const text = await Promise.race([
+      callGemini(prompt),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 15000))
+    ]);
+    el.innerHTML = `<div class="brief-text">${text || fallbacks[market]}</div>`;
+  } catch {
+    el.innerHTML = `<div class="brief-text">${fallbacks[market]}</div>`;
+  }
+}
+
+
+
+// ── Category switch ──
+document.querySelectorAll('.cat-tab').forEach(tab => {
+  tab.addEventListener('click', function () {
+    document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    currentCat = this.dataset.cat;
+    renderFeed(getFiltered());
+  });
+});
+
+// ── Lang switch ──
+function switchLang(btn, lang) {
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentLang = lang;
+}
+
+// ── Auto-refresh (15 min) ──
+const REFRESH_INTERVAL = 15 * 60;
+let countdownInterval = null;
+let countdown = 0;
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  countdown = REFRESH_INTERVAL;
+  updateCountdownUI();
+  document.getElementById('autoRefreshBar').style.display = 'flex';
+  const btn = document.getElementById('toggleRefreshBtn');
+  btn.textContent = '⏸ 暫停';
+  btn.style.color = 'var(--accent)';
+
+  countdownInterval = setInterval(() => {
+    countdown--;
+    updateCountdownUI();
+    if (countdown <= 0) {
+      const key = document.getElementById('gnewsKey').value.trim();
+      fetchMarketaux();
+      countdown = REFRESH_INTERVAL;
+    }
+  }, 1000);
+}
+
+function stopAutoRefresh() {
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+}
+
+function toggleAutoRefresh() {
+  const btn = document.getElementById('toggleRefreshBtn');
+  if (countdownInterval) {
+    stopAutoRefresh();
+    btn.textContent = '▶ 啟動';
+    btn.style.color = 'var(--accent3)';
+    document.getElementById('autoRefreshBar').style.opacity = '0.5';
+  } else {
+    startAutoRefresh();
+    document.getElementById('autoRefreshBar').style.opacity = '1';
+  }
+}
+
+function updateCountdownUI() {
+  const m = String(Math.floor(countdown / 60)).padStart(2, '0');
+  const s = String(countdown % 60).padStart(2, '0');
+  const el = document.getElementById('countdownDisplay');
+  if (el) el.textContent = m + ':' + s;
+  // progress bar
+  const pct = ((REFRESH_INTERVAL - countdown) / REFRESH_INTERVAL) * 100;
+  const bar = document.getElementById('progressBar');
+  if (bar) bar.style.width = pct + '%';
+}
+
+// ── Fear & Greed: colour helper ──
+function fgiRatingZH(score) {
+  if (score <= 24) return { label: '極度恐懼', color: '#ef4444' };
+  if (score <= 44) return { label: '恐懼',     color: '#f97316' };
+  if (score <= 54) return { label: '中性',     color: '#ca8a04' };
+  if (score <= 74) return { label: '貪婪',     color: '#16a34a' };
+  return                  { label: '極度貪婪', color: '#15803d' };
+}
+
+// ── CNN Fear & Greed (via CORS proxy) ──
+async function loadFearGreed() {
+  try {
+    const res = await fetch('https://newsdigest-api.vercel.app/api/news?endpoint=fgi');
+    const data = await res.json();
+    if (!data?.fear_and_greed) throw new Error('no data');
+
+    const now = data.fear_and_greed;
+    const score = Math.round(now.score);
+    const { label, color } = fgiRatingZH(score);
+
+    document.getElementById('fgiScore').textContent = score;
+    document.getElementById('fgiScore').style.color = color;
+    document.getElementById('fgiLabel').textContent = label;
+    document.getElementById('fgiLabel').style.color = color;
+
+    const arcLen = 251;
+    const filled = (score / 100) * arcLen;
+    document.getElementById('fgiArc').setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
+    document.getElementById('fgiArc').setAttribute('stroke', color);
+    document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${-90 + (score/100)*180}, 100, 100)`);
+
+    const ts = now.timestamp ? new Date(now.timestamp * 1000).toLocaleString('zh-TW', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    document.getElementById('fgiTs').textContent = '資料來源：CNN · ' + ts;
+    document.getElementById('fgiLoading').style.display = 'none';
+    document.getElementById('fgiContent').style.display = 'block';
+  } catch(e) {
+    document.getElementById('fgiLoading').textContent = '抓取失敗';
+    console.warn('CNN FGI error:', e.message);
+  }
+}
+
+// ── Crypto Fear & Greed (Alternative.me) ──
+async function loadCryptoFearGreed() {
+  try {
+    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json');
+    const data = await res.json();
+    const hist = data.data || [];
+    if (!hist.length) throw new Error('no data');
+
+    const score = parseInt(hist[0].value);
+    const { label, color } = fgiRatingZH(score);
+
+    document.getElementById('fgiCryptoScore').textContent = score;
+    document.getElementById('fgiCryptoScore').style.color = color;
+    document.getElementById('fgiCryptoLabel').textContent = label;
+    document.getElementById('fgiCryptoLabel').style.color = color;
+
+    const arcLen = 251;
+    const filled = (score / 100) * arcLen;
+    document.getElementById('fgiCryptoArc').setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
+    document.getElementById('fgiCryptoArc').setAttribute('stroke', color);
+    document.getElementById('fgiCryptoNeedle').setAttribute('transform', `rotate(${-90 + (score/100)*180}, 100, 100)`);
+
+    document.getElementById('fgiCryptoTs').textContent = '資料來源：Alternative.me · ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('fgiCryptoLoading').style.display = 'none';
+    document.getElementById('fgiCryptoContent').style.display = 'block';
+  } catch(e) {
+    document.getElementById('fgiCryptoLoading').textContent = '載入失敗';
+    console.warn('Crypto FGI error:', e.message);
+  }
+}
+
+// ── VIX 波動率儀表板 ──
+async function loadVix() {
+  try {
+    const res = await fetch('https://newsdigest-api.vercel.app/api/news?endpoint=vix');
+    const json = await res.json();
+    if (!json.data) throw new Error('no data');
+
+    const items = json.data;
+    const vix    = items.find(d => d.symbol === '^VIX');
+    const vix9d  = items.find(d => d.symbol === '^VIX9D');
+    const vix3m  = items.find(d => d.symbol === '^VIX3M');
+    const vix6m  = items.find(d => d.symbol === '^VIX6M');
+
+    if (!vix?.price) throw new Error('VIX not available');
+
+    const price = vix.price;
+    const prev  = vix.prev || price;
+    const chg   = price - prev;
+    const chgPct = prev ? ((chg / prev) * 100) : 0;
+    const chgStr = (chg >= 0 ? '+' : '') + chg.toFixed(2) + ' (' + (chgPct >= 0 ? '+' : '') + chgPct.toFixed(1) + '%)';
+    const chgColor = chg >= 0 ? '#ef4444' : '#16a34a';
+
+    // VIX level label
+    let vixLabel, vixColor;
+    if (price < 12)       { vixLabel = '極度平靜'; vixColor = '#15803d'; }
+    else if (price < 20)  { vixLabel = '低波動';   vixColor = '#16a34a'; }
+    else if (price < 30)  { vixLabel = '警戒';     vixColor = '#ca8a04'; }
+    else if (price < 40)  { vixLabel = '高波動';   vixColor = '#f97316'; }
+    else                  { vixLabel = '恐慌';     vixColor = '#ef4444'; }
+
+    document.getElementById('vixPrice').textContent = price.toFixed(2);
+    document.getElementById('vixPrice').style.color = vixColor;
+    document.getElementById('vixChange').textContent = chgStr;
+    document.getElementById('vixChange').style.color = chgColor;
+    document.getElementById('vixLabel').textContent = vixLabel;
+    document.getElementById('vixLabel').style.color = vixColor;
+
+    // Term structure bars
+    const terms = [
+      { label: '9日',  val: vix9d?.price, sym: '^VIX9D' },
+      { label: '現貨', val: price,         sym: '^VIX',  highlight: true },
+      { label: '3月',  val: vix3m?.price, sym: '^VIX3M' },
+      { label: '6月',  val: vix6m?.price, sym: '^VIX6M' },
+    ].filter(t => t.val);
+
+    const maxVal = Math.max(...terms.map(t => t.val));
+    const termHtml = terms.map(t => {
+      const barW = Math.round((t.val / maxVal) * 100);
+      const color = t.highlight ? vixColor : '#94a3b8';
+      const bold = t.highlight ? 'font-weight:700;' : '';
+      return `<div style="display:flex;align-items:center;gap:0.4rem;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);width:2rem;${bold}">${t.label}</div>
+        <div style="flex:1;height:6px;background:#ede9e0;border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${barW}%;background:${color};border-radius:3px;"></div>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:${color};${bold}width:2.5rem;text-align:right;">${t.val.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('vixTermStructure').innerHTML = termHtml;
+
+    // Contango / Backwardation
+    if (vix3m?.price) {
+      const spread = vix3m.price - price;
+      const isContango = spread > 0;
+      document.getElementById('vixContango').textContent =
+        isContango
+          ? `▲ Contango +${spread.toFixed(2)}（市場平靜，期貨溢價）`
+          : `▼ Backwardation ${spread.toFixed(2)}（市場緊張，期貨折價）`;
+      document.getElementById('vixContango').style.background = isContango ? '#f0fdf4' : '#fef2f2';
+      document.getElementById('vixContango').style.color = isContango ? '#15803d' : '#ef4444';
+    }
+
+    document.getElementById('vixTs').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('vixLoading').style.display = 'none';
+    document.getElementById('vixContent').style.display = 'block';
+
+  } catch(e) {
+    document.getElementById('vixLoading').textContent = '載入失敗：' + e.message;
+    console.warn('VIX error:', e);
+  }
+}
+
+// ── localStorage: remember keys ──
+function saveGroqKey() {
+  const key = document.getElementById('groqKey').value.trim();
+  if (!key) { setGroqStatus('請輸入 Key', 'err'); return; }
+  groqApiKey = key;
+  localStorage.setItem('nd_groq_key', key);
+  setGroqStatus('✓ 已啟用並記住', 'ok');
+}
+
+function setGroqStatus(msg, type) {
+  const el = document.getElementById('groqStatus');
+  el.textContent = msg;
+  el.className = 'api-status' + (type ? ' ' + type : '');
+}
+
+function loadSavedKeys() {
+  const gemk = localStorage.getItem('nd_groq_key');
+  const mxk = localStorage.getItem('nd_marketaux_key');
+  if (gemk) { groqApiKey = gemk; document.getElementById('groqKey').value = gemk; setGroqStatus('✓ 已啟用（已記住）', 'ok'); }
+}
+
+// ── Init ──
+renderTrending();
+loadSavedKeys();
+loadFearGreed();
+loadCryptoFearGreed();
+loadVix();
+setTimeout(() => {
+  allArticles = mockArticles;
+  renderFeed(getFiltered());
+}, 500);
+</script>
+</body>
+</html>
