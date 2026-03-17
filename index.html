@@ -1032,7 +1032,6 @@ async function fetchMarketaux() {
     setStatus(`✓ 科技 ${techCnt} · 經濟 ${econCnt} · 地緣政治 ${geoCnt}`, 'ok');
 
     renderFeed(getFiltered());
-    localStorage.setItem('nd_marketaux_key', key);
     renderTrending();
     generateBrief();
 
