@@ -1313,7 +1313,6 @@ function startAutoRefresh() {
     countdown--;
     updateCountdownUI();
     if (countdown <= 0) {
-      const key = document.getElementById('gnewsKey').value.trim();
       fetchMarketaux();
       countdown = REFRESH_INTERVAL;
     }
