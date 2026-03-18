@@ -46,56 +46,57 @@ export default async function handler(req, res) {
   // Global Futures via stooq.com (free, no API key, no CORS issues)
   if (endpoint === 'futures') {
     const FUTURES = [
-      // 美股指數期貨 - stooq symbols
-      { symbol: '@dj',    name: '道瓊',       cat: '美股指數' },
-      { symbol: '@sp500', name: 'S&P500',     cat: '美股指數' },
-      { symbol: '@nq100', name: '那斯達克100', cat: '美股指數' },
-      { symbol: '@rut',   name: '羅素2000',   cat: '美股指數' },
-      { symbol: '^sox',   name: '費城半導體', cat: '美股指數' },
-      { symbol: '^dax',   name: '德國DAX',    cat: '美股指數' },
+      // 美股指數 - stooq format
+      { symbol: '%5Edji',   name: '道瓊',        cat: '美股指數' },
+      { symbol: '%5Espx',   name: 'S&P500',      cat: '美股指數' },
+      { symbol: '%5Endx',   name: '那斯達克100', cat: '美股指數' },
+      { symbol: '%5Erut',   name: '羅素2000',    cat: '美股指數' },
+      { symbol: '%5Esox',   name: '費城半導體',  cat: '美股指數' },
+      { symbol: '%5Edax',   name: '德國DAX',     cat: '美股指數' },
       // 亞股
-      { symbol: '^twii',  name: '台灣加權',   cat: '亞股指數' },
-      { symbol: '^nk225', name: '日經225',    cat: '亞股指數' },
-      { symbol: '^hsi',   name: '香港恆生',   cat: '亞股指數' },
-      // 能源
-      { symbol: 'cl.f',   name: '輕原油',    cat: '能源' },
-      { symbol: 'ng.f',   name: '天然氣',    cat: '能源' },
-      { symbol: 'ho.f',   name: '燃料油',    cat: '能源' },
-      { symbol: 'rb.f',   name: '汽油',      cat: '能源' },
+      { symbol: '%5Etwii',  name: '台灣加權',    cat: '亞股指數' },
+      { symbol: '%5Enk225', name: '日經225',     cat: '亞股指數' },
+      { symbol: '%5Ehsi',   name: '香港恆生',    cat: '亞股指數' },
+      { symbol: '%5Essi',   name: '新加坡STI',   cat: '亞股指數' },
+      // 能源 (stooq futures use .f suffix)
+      { symbol: 'cl.f',     name: '輕原油',      cat: '能源' },
+      { symbol: 'ng.f',     name: '天然氣',      cat: '能源' },
+      { symbol: 'ho.f',     name: '燃料油',      cat: '能源' },
+      { symbol: 'rb.f',     name: '汽油',        cat: '能源' },
       // 金屬
-      { symbol: 'gc.f',   name: '黃金',      cat: '金屬' },
-      { symbol: 'si.f',   name: '白銀',      cat: '金屬' },
-      { symbol: 'pl.f',   name: '白金',      cat: '金屬' },
-      { symbol: 'hg.f',   name: '銅',        cat: '金屬' },
-      { symbol: 'pa.f',   name: '鈀金',      cat: '金屬' },
+      { symbol: 'gc.f',     name: '黃金',        cat: '金屬' },
+      { symbol: 'si.f',     name: '白銀',        cat: '金屬' },
+      { symbol: 'pl.f',     name: '白金',        cat: '金屬' },
+      { symbol: 'hg.f',     name: '銅',          cat: '金屬' },
+      { symbol: 'pa.f',     name: '鈀金',        cat: '金屬' },
       // 農產品
-      { symbol: 'zs.f',   name: '黃豆',      cat: '農產品' },
-      { symbol: 'zc.f',   name: '玉米',      cat: '農產品' },
-      { symbol: 'zw.f',   name: '小麥',      cat: '農產品' },
-      { symbol: 'sb.f',   name: '11號糖',    cat: '農產品' },
-      { symbol: 'cc.f',   name: '可可',      cat: '農產品' },
-      { symbol: 'kc.f',   name: '咖啡',      cat: '農產品' },
-      { symbol: 'ct.f',   name: '棉花',      cat: '農產品' },
-      { symbol: 'le.f',   name: '活牛',      cat: '農產品' },
-      { symbol: 'he.f',   name: '瘦豬',      cat: '農產品' },
+      { symbol: 'zs.f',     name: '黃豆',        cat: '農產品' },
+      { symbol: 'zc.f',     name: '玉米',        cat: '農產品' },
+      { symbol: 'zw.f',     name: '小麥',        cat: '農產品' },
+      { symbol: 'sb.f',     name: '11號糖',      cat: '農產品' },
+      { symbol: 'cc.f',     name: '可可',        cat: '農產品' },
+      { symbol: 'kc.f',     name: '咖啡',        cat: '農產品' },
+      { symbol: 'ct.f',     name: '棉花',        cat: '農產品' },
+      { symbol: 'le.f',     name: '活牛',        cat: '農產品' },
+      { symbol: 'he.f',     name: '瘦豬',        cat: '農產品' },
       // 外匯
-      { symbol: 'eurusd', name: '歐元/美元',  cat: '外匯' },
-      { symbol: 'gbpusd', name: '英鎊/美元',  cat: '外匯' },
-      { symbol: 'usdjpy', name: '美元/日圓',  cat: '外匯' },
-      { symbol: 'audusd', name: '澳幣/美元',  cat: '外匯' },
-      { symbol: 'usdcad', name: '美元/加幣',  cat: '外匯' },
-      // 債券
-      { symbol: 'tnx.cboe', name: '10年美債殖利率', cat: '債券' },
-      { symbol: 'tyx.cboe', name: '30年美債殖利率', cat: '債券' },
+      { symbol: 'eurusd',   name: '歐元/美元',   cat: '外匯' },
+      { symbol: 'gbpusd',   name: '英鎊/美元',   cat: '外匯' },
+      { symbol: 'usdjpy',   name: '美元/日圓',   cat: '外匯' },
+      { symbol: 'audusd',   name: '澳幣/美元',   cat: '外匯' },
+      { symbol: 'usdcad',   name: '美元/加幣',   cat: '外匯' },
+      // 債券殖利率
+      { symbol: '10usyb.b', name: '10年美債殖利率', cat: '債券' },
+      { symbol: '30usyb.b', name: '30年美債殖利率', cat: '債券' },
       // 加密貨幣
-      { symbol: 'btcusd',  name: '比特幣',    cat: '加密貨幣' },
-      { symbol: 'ethusd',  name: '以太幣',    cat: '加密貨幣' },
+      { symbol: 'btcusd',   name: '比特幣',      cat: '加密貨幣' },
+      { symbol: 'ethusd',   name: '以太幣',      cat: '加密貨幣' },
     ];
 
     try {
       const results = await Promise.all(FUTURES.map(async f => {
         try {
-          const url = `https://stooq.com/q/d/l/?s=${f.symbol}&i=d`;
+          const url = `https://stooq.com/q/d/l/?s=${f.symbol}&i=d`; // symbol pre-encoded
           const r = await fetch(url, {
             headers: { 'User-Agent': 'Mozilla/5.0' }
           });
