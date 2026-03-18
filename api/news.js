@@ -94,22 +94,26 @@ export default async function handler(req, res) {
     ];
 
     try {
-      const results = await Promise.all(FUTURES.map(async f => {
+      // Support pagination: page=0 returns all, page=1,2,3 returns batches of 12
+      const page = parseInt(req.query.page || '0');
+      const BATCH_SIZE = 12;
+      const batch = page > 0
+        ? FUTURES.slice((page-1)*BATCH_SIZE, page*BATCH_SIZE)
+        : FUTURES;
+
+      const results = await Promise.all(batch.map(async f => {
         try {
-          const url = `https://stooq.com/q/d/l/?s=${f.symbol}&i=d`; // symbol pre-encoded
-          const r = await fetch(url, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-          });
+          const url = `https://stooq.com/q/d/l/?s=${f.symbol}&i=d`;
+          const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
           const csv = await r.text();
           const lines = csv.trim().split('\n');
           if (lines.length < 2) return null;
-          // CSV format: Date,Open,High,Low,Close,Volume
           const latest = lines[lines.length - 1].split(',');
-          const prev   = lines.length >= 3 ? lines[lines.length - 2].split(',') : latest;
-          const curr  = parseFloat(latest[4]); // Close
-          const prevC = parseFloat(prev[4]);   // Previous Close
-          const hi    = parseFloat(latest[2]); // High
-          const lo    = parseFloat(latest[3]); // Low
+          const prevLine = lines.length >= 3 ? lines[lines.length - 2].split(',') : latest;
+          const curr  = parseFloat(latest[4]);
+          const prevC = parseFloat(prevLine[4]);
+          const hi    = parseFloat(latest[2]);
+          const lo    = parseFloat(latest[3]);
           if (!curr || isNaN(curr)) return null;
           return {
             symbol: f.symbol, name: f.name, cat: f.cat,
@@ -122,7 +126,7 @@ export default async function handler(req, res) {
       }));
 
       const data = results.filter(r => r !== null);
-      res.status(200).json({ data, count: data.length });
+      res.status(200).json({ data, count: data.length, total: FUTURES.length, pages: Math.ceil(FUTURES.length / BATCH_SIZE) });
     } catch(e) {
       res.status(500).json({ error: e.message });
     }
