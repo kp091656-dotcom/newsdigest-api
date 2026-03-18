@@ -1528,12 +1528,82 @@ let futuresSortKey = 'chgPct';
 
 async function loadFutures() {
   document.getElementById('futuresLoading').style.display = 'block';
+  document.getElementById('futuresLoading').textContent = '載入中…';
   document.getElementById('futuresContent').style.display = 'none';
+
+  const FUTURES = [
+    { symbol: 'YM=F',      name: '小道瓊',     cat: '美股指數' },
+    { symbol: 'ES=F',      name: '小SP500',     cat: '美股指數' },
+    { symbol: 'NQ=F',      name: '小那斯達克',  cat: '美股指數' },
+    { symbol: 'RTY=F',     name: '羅素2000',    cat: '美股指數' },
+    { symbol: '^GDAXI',    name: '德國DAX',     cat: '美股指數' },
+    { symbol: '^SOX',      name: '費城半導體',  cat: '美股指數' },
+    { symbol: 'TW=F',      name: '台指期',      cat: '亞股指數' },
+    { symbol: '^N225',     name: '日經225',     cat: '亞股指數' },
+    { symbol: '^HSI',      name: '香港恆生',    cat: '亞股指數' },
+    { symbol: '000300.SS', name: '中國滬深300', cat: '亞股指數' },
+    { symbol: 'CL=F',      name: '輕原油',      cat: '能源' },
+    { symbol: 'HO=F',      name: '燃料油',      cat: '能源' },
+    { symbol: 'RB=F',      name: '汽油',        cat: '能源' },
+    { symbol: 'NG=F',      name: '天然氣',      cat: '能源' },
+    { symbol: 'GC=F',      name: '黃金',        cat: '金屬' },
+    { symbol: 'SI=F',      name: '白銀',        cat: '金屬' },
+    { symbol: 'PL=F',      name: '白金',        cat: '金屬' },
+    { symbol: 'HG=F',      name: '銅',          cat: '金屬' },
+    { symbol: 'PA=F',      name: '鈀金',        cat: '金屬' },
+    { symbol: 'ZS=F',      name: '黃豆',        cat: '農產品' },
+    { symbol: 'ZC=F',      name: '玉米',        cat: '農產品' },
+    { symbol: 'ZW=F',      name: '小麥',        cat: '農產品' },
+    { symbol: 'SB=F',      name: '11號糖',      cat: '農產品' },
+    { symbol: 'CC=F',      name: '可可',        cat: '農產品' },
+    { symbol: 'KC=F',      name: '咖啡',        cat: '農產品' },
+    { symbol: 'CT=F',      name: '棉花',        cat: '農產品' },
+    { symbol: 'LE=F',      name: '活牛',        cat: '農產品' },
+    { symbol: 'HE=F',      name: '瘦豬',        cat: '農產品' },
+    { symbol: 'ZO=F',      name: '燕麥',        cat: '農產品' },
+    { symbol: 'ZL=F',      name: '大豆油',      cat: '農產品' },
+    { symbol: 'ZM=F',      name: '大豆粉',      cat: '農產品' },
+    { symbol: 'DX=F',      name: '美元指數',    cat: '外匯' },
+    { symbol: 'EURUSD=X',  name: '歐元',        cat: '外匯' },
+    { symbol: 'GBPUSD=X',  name: '英鎊',        cat: '外匯' },
+    { symbol: 'JPY=X',     name: '日圓',        cat: '外匯' },
+    { symbol: 'AUDUSD=X',  name: '澳幣',        cat: '外匯' },
+    { symbol: 'CADUSD=X',  name: '加幣',        cat: '外匯' },
+    { symbol: 'ZF=F',      name: '5年美債',     cat: '債券' },
+    { symbol: 'ZN=F',      name: '10年美債',    cat: '債券' },
+    { symbol: 'ZB=F',      name: '30年美債',    cat: '債券' },
+    { symbol: 'BTC=F',     name: '比特幣',      cat: '加密貨幣' },
+    { symbol: 'ETH=F',     name: '以太幣',      cat: '加密貨幣' },
+  ];
+
   try {
-    const res = await fetch('https://newsdigest-api.vercel.app/api/news?endpoint=futures');
-    const json = await res.json();
-    if (!json.data?.length) throw new Error('no data');
-    futuresData = json.data;
+    // Fetch via Yahoo Finance directly from browser (CORS ok for chart endpoint)
+    const results = await Promise.all(FUTURES.map(async f => {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(f.symbol)}?interval=1d&range=1d`;
+        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const d = await r.json();
+        const meta = d?.chart?.result?.[0]?.meta;
+        if (!meta) return null;
+        const prev = meta.chartPreviousClose || meta.previousClose || 0;
+        const curr = meta.regularMarketPrice || 0;
+        const hi   = meta.regularMarketDayHigh || curr;
+        const lo   = meta.regularMarketDayLow  || curr;
+        return {
+          symbol:  f.symbol,
+          name:    f.name,
+          cat:     f.cat,
+          prev, price: curr, high: hi, low: lo,
+          chg:     curr - prev,
+          chgPct:  prev ? (curr - prev) / prev : 0,
+          volPct:  prev ? (hi - lo) / prev : 0,
+        };
+      } catch(e) { return null; }
+    }));
+
+    futuresData = results.filter(r => r && r.price > 0);
+    if (!futuresData.length) throw new Error('no data');
+
     document.getElementById('futuresTs').textContent = '15分鐘延遲 · ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('futuresLoading').style.display = 'none';
     document.getElementById('futuresContent').style.display = 'block';
