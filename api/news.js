@@ -63,23 +63,28 @@ export default async function handler(req, res) {
       { symbol: '%5Enk225', name: '日經225',     cat: '亞股指數' },
       { symbol: '%5Ehsi',   name: '香港恆生',    cat: '亞股指數' },
       { symbol: '%5Essi',   name: '新加坡STI',   cat: '亞股指數' },
-      // 能源 - stooq spot/index
-      { symbol: 'cl.f',    name: '輕原油',      cat: '能源' },
-      { symbol: 'ngas',    name: '天然氣',      cat: '能源' },
-      // 金屬 - stooq spot (xauusd, xagusd format)
-      { symbol: 'xauusd',  name: '黃金',        cat: '金屬' },
-      { symbol: 'xagusd',  name: '白銀',        cat: '金屬' },
-      { symbol: 'xptusd',  name: '白金',        cat: '金屬' },
-      { symbol: 'xpdusd',  name: '鈀金',        cat: '金屬' },
-      { symbol: 'hgusd',   name: '銅',          cat: '金屬' },
-      // 農產品
-      { symbol: 'soyb',    name: '黃豆',        cat: '農產品' },
-      { symbol: 'corn',    name: '玉米',        cat: '農產品' },
-      { symbol: 'wheat',   name: '小麥',        cat: '農產品' },
-      { symbol: 'sugar',   name: '11號糖',      cat: '農產品' },
-      { symbol: 'cocoa',   name: '可可',        cat: '農產品' },
-      { symbol: 'coffee',  name: '咖啡',        cat: '農產品' },
-      { symbol: 'cotton',  name: '棉花',        cat: '農產品' },
+      // 能源 - stooq futures (uppercase)
+      { symbol: 'CL.F',    name: '輕原油',      cat: '能源' },
+      { symbol: 'CB.F',    name: '布倫特原油',  cat: '能源' },
+      { symbol: 'NG.F',    name: '天然氣',      cat: '能源' },
+      { symbol: 'HO.F',    name: '燃料油',      cat: '能源' },
+      { symbol: 'RB.F',    name: '汽油',        cat: '能源' },
+      // 金屬 - stooq spot
+      { symbol: 'XAUUSD',  name: '黃金',        cat: '金屬' },
+      { symbol: 'XAGUSD',  name: '白銀',        cat: '金屬' },
+      { symbol: 'XPTUSD',  name: '白金',        cat: '金屬' },
+      { symbol: 'XPDUSD',  name: '鈀金',        cat: '金屬' },
+      { symbol: 'HG.F',    name: '銅',          cat: '金屬' },
+      // 農產品 - stooq futures
+      { symbol: 'ZS.F',    name: '黃豆',        cat: '農產品' },
+      { symbol: 'ZC.F',    name: '玉米',        cat: '農產品' },
+      { symbol: 'ZW.F',    name: '小麥',        cat: '農產品' },
+      { symbol: 'SB.F',    name: '11號糖',      cat: '農產品' },
+      { symbol: 'CC.F',    name: '可可',        cat: '農產品' },
+      { symbol: 'KC.F',    name: '咖啡',        cat: '農產品' },
+      { symbol: 'CT.F',    name: '棉花',        cat: '農產品' },
+      { symbol: 'LE.F',    name: '活牛',        cat: '農產品' },
+      { symbol: 'HE.F',    name: '瘦豬',        cat: '農產品' },
       // 外匯
       { symbol: 'eurusd',  name: '歐元/美元',   cat: '外匯' },
       { symbol: 'gbpusd',  name: '英鎊/美元',   cat: '外匯' },
@@ -104,9 +109,7 @@ export default async function handler(req, res) {
 
       const results = await Promise.all(batch.map(async f => {
         try {
-          // stooq CSV: lowercase symbol, range=5 days to get prev close
-          const sym = f.symbol.toLowerCase();
-          const url = `https://stooq.com/q/d/l/?s=${sym}&i=d&d1=${getStooqDate(5)}&d2=${getStooqDate(0)}`;
+          const url = `https://stooq.com/q/d/l/?s=${f.symbol}&i=d&d1=${getStooqDate(5)}&d2=${getStooqDate(0)}`;
           const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
           const csv = await r.text();
           if (csv.includes('No data') || csv.includes('Brak') || csv.length < 20) return null;
