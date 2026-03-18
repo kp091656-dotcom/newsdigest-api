@@ -91,47 +91,49 @@ export default async function handler(req, res) {
     ];
 
     try {
-      // Use Yahoo Finance spark endpoint - batch all symbols
-      const syms = FUTURES.map(f => encodeURIComponent(f.symbol)).join(',');
-      const url = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${syms}&range=1d&interval=1d`;
-      const r = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://finance.yahoo.com/',
-          'Origin': 'https://finance.yahoo.com',
-        }
-      });
-
-      const text = await r.text();
-      let data;
-      try { data = JSON.parse(text); } catch(e) {
-        return res.status(500).json({ error: 'parse error', raw: text.slice(0, 200) });
-      }
-
       const symMap = Object.fromEntries(FUTURES.map(f => [f.symbol, f]));
       const results = [];
 
-      const sparkData = data?.spark?.result || [];
-      for (const item of sparkData) {
-        const sym = item?.symbol;
-        const resp = item?.response?.[0];
-        const meta = resp?.meta;
-        if (!meta || !sym) continue;
-        const info = symMap[sym] || { name: sym, cat: '其他' };
-        const curr = meta.regularMarketPrice || 0;
-        const prev = meta.chartPreviousClose || meta.previousClose || curr;
-        const hi   = meta.regularMarketDayHigh || curr;
-        const lo   = meta.regularMarketDayLow  || curr;
-        if (!curr) continue;
-        results.push({
-          symbol: sym, name: info.name, cat: info.cat,
-          prev, price: curr, high: hi, low: lo,
-          chg: curr - prev,
-          chgPct: prev ? (curr - prev) / prev : 0,
-          volPct: prev ? (hi - lo) / prev : 0,
-        });
+      // Fetch in small batches of 8, with delay between batches
+      const BATCH = 8;
+      for (let i = 0; i < FUTURES.length; i += BATCH) {
+        const batch = FUTURES.slice(i, i + BATCH);
+        const syms = batch.map(f => encodeURIComponent(f.symbol)).join('%2C');
+        // Alternate between query1 and query2 to avoid rate limits
+        const host = i % 16 === 0 ? 'query2' : 'query1';
+        const url = `https://${host}.finance.yahoo.com/v7/finance/quote?symbols=${syms}&fields=regularMarketPrice,regularMarketPreviousClose,regularMarketDayHigh,regularMarketDayLow`;
+        try {
+          const r = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
+              'Accept': 'application/json',
+              'Accept-Language': 'en-US,en;q=0.5',
+              'Referer': 'https://finance.yahoo.com/',
+              'Cookie': 'GUC=AQEBAQFm; A1=; A3=',
+            }
+          });
+          if (!r.ok) continue;
+          const data = await r.json();
+          const quotes = data?.quoteResponse?.result || [];
+          for (const q of quotes) {
+            const info = symMap[q.symbol];
+            if (!info) continue;
+            const curr = q.regularMarketPrice || 0;
+            const prev = q.regularMarketPreviousClose || curr;
+            const hi   = q.regularMarketDayHigh || curr;
+            const lo   = q.regularMarketDayLow  || curr;
+            if (!curr) continue;
+            results.push({
+              symbol: q.symbol, name: info.name, cat: info.cat,
+              prev, price: curr, high: hi, low: lo,
+              chg: curr - prev,
+              chgPct: prev ? (curr - prev) / prev : 0,
+              volPct: prev ? (hi - lo) / prev : 0,
+            });
+          }
+        } catch(e) { continue; }
+        // Small delay between batches
+        if (i + BATCH < FUTURES.length) await new Promise(r => setTimeout(r, 200));
       }
 
       res.status(200).json({ data: results, count: results.length });
