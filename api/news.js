@@ -63,27 +63,23 @@ export default async function handler(req, res) {
       { symbol: '%5Enk225', name: '日經225',     cat: '亞股指數' },
       { symbol: '%5Ehsi',   name: '香港恆生',    cat: '亞股指數' },
       { symbol: '%5Essi',   name: '新加坡STI',   cat: '亞股指數' },
-      // 能源 - stooq NYMEX/ICE futures
+      // 能源 - stooq spot/index
       { symbol: 'cl.f',    name: '輕原油',      cat: '能源' },
-      { symbol: 'ng.f',    name: '天然氣',      cat: '能源' },
-      { symbol: 'ho.f',    name: '燃料油',      cat: '能源' },
-      { symbol: 'rb.f',    name: '汽油',        cat: '能源' },
-      // 金屬 - COMEX
-      { symbol: 'gc.f',    name: '黃金',        cat: '金屬' },
-      { symbol: 'si.f',    name: '白銀',        cat: '金屬' },
-      { symbol: 'pl.f',    name: '白金',        cat: '金屬' },
-      { symbol: 'hg.f',    name: '銅',          cat: '金屬' },
-      { symbol: 'pa.f',    name: '鈀金',        cat: '金屬' },
-      // 農產品 - CBOT
-      { symbol: 'zs.f',    name: '黃豆',        cat: '農產品' },
-      { symbol: 'zc.f',    name: '玉米',        cat: '農產品' },
-      { symbol: 'zw.f',    name: '小麥',        cat: '農產品' },
-      { symbol: 'sb.f',    name: '11號糖',      cat: '農產品' },
-      { symbol: 'cc.f',    name: '可可',        cat: '農產品' },
-      { symbol: 'kc.f',    name: '咖啡',        cat: '農產品' },
-      { symbol: 'ct.f',    name: '棉花',        cat: '農產品' },
-      { symbol: 'le.f',    name: '活牛',        cat: '農產品' },
-      { symbol: 'he.f',    name: '瘦豬',        cat: '農產品' },
+      { symbol: 'ngas',    name: '天然氣',      cat: '能源' },
+      // 金屬 - stooq spot (xauusd, xagusd format)
+      { symbol: 'xauusd',  name: '黃金',        cat: '金屬' },
+      { symbol: 'xagusd',  name: '白銀',        cat: '金屬' },
+      { symbol: 'xptusd',  name: '白金',        cat: '金屬' },
+      { symbol: 'xpdusd',  name: '鈀金',        cat: '金屬' },
+      { symbol: 'hgusd',   name: '銅',          cat: '金屬' },
+      // 農產品
+      { symbol: 'soyb',    name: '黃豆',        cat: '農產品' },
+      { symbol: 'corn',    name: '玉米',        cat: '農產品' },
+      { symbol: 'wheat',   name: '小麥',        cat: '農產品' },
+      { symbol: 'sugar',   name: '11號糖',      cat: '農產品' },
+      { symbol: 'cocoa',   name: '可可',        cat: '農產品' },
+      { symbol: 'coffee',  name: '咖啡',        cat: '農產品' },
+      { symbol: 'cotton',  name: '棉花',        cat: '農產品' },
       // 外匯
       { symbol: 'eurusd',  name: '歐元/美元',   cat: '外匯' },
       { symbol: 'gbpusd',  name: '英鎊/美元',   cat: '外匯' },
