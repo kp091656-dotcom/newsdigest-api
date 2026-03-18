@@ -1578,7 +1578,8 @@ async function loadFutures() {
     // Call Yahoo Finance chart API directly from browser (has cookie, won't be blocked)
     const results = await Promise.all(SYMBOLS.map(async s => {
       try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s.symbol)}?interval=1d&range=2d`;
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s.symbol)}?interval=1d&range=2d`;
+        const url = `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`;
         const r = await fetch(url);
         const d = await r.json();
         const meta = d?.chart?.result?.[0]?.meta;
