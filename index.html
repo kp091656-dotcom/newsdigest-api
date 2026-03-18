@@ -1299,11 +1299,17 @@ ${headlines || '（今日暫無相關新聞）'}`;
 
 
 // ── Category switch ──
-document.querySelectorAll('.cat-tab').forEach(tab => {
+document.querySelectorAll('.cat-tab[data-cat]').forEach(tab => {
   tab.addEventListener('click', function () {
     document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
     this.classList.add('active');
     currentCat = this.dataset.cat;
+    // Hide futures panel, show news
+    const fp = document.getElementById('futuresPanel');
+    const nf = document.getElementById('newsFeed');
+    const lm = document.getElementById('loadMoreBtn');
+    if (fp) fp.style.display = 'none';
+    if (nf) nf.style.display = 'block';
     renderFeed(getFiltered());
   });
 });
@@ -1532,50 +1538,67 @@ async function loadFutures() {
   document.getElementById('futuresContent').style.display = 'none';
 
   const SYMBOLS = [
-    { symbol: 'YM=F',      name: '小道瓊',      cat: '美股指數' },
-    { symbol: 'ES=F',      name: '小SP500',      cat: '美股指數' },
-    { symbol: 'NQ=F',      name: '小那斯達克',   cat: '美股指數' },
-    { symbol: 'RTY=F',     name: '羅素2000',     cat: '美股指數' },
-    { symbol: '^GDAXI',    name: '德國DAX',      cat: '美股指數' },
-    { symbol: '^SOX',      name: '費城半導體',   cat: '美股指數' },
-    { symbol: '^TWII',     name: '台灣加權',     cat: '亞股指數' },
-    { symbol: '^N225',     name: '日經225',      cat: '亞股指數' },
-    { symbol: '^HSI',      name: '香港恆生',     cat: '亞股指數' },
-    { symbol: '000300.SS', name: '中國滬深300',  cat: '亞股指數' },
-    { symbol: 'CL=F',      name: '輕原油',       cat: '能源' },
-    { symbol: 'BZ=F',      name: '布倫特原油',   cat: '能源' },
-    { symbol: 'NG=F',      name: '天然氣',       cat: '能源' },
-    { symbol: 'HO=F',      name: '燃料油',       cat: '能源' },
-    { symbol: 'RB=F',      name: '汽油',         cat: '能源' },
-    { symbol: 'GC=F',      name: '黃金',         cat: '金屬' },
-    { symbol: 'SI=F',      name: '白銀',         cat: '金屬' },
-    { symbol: 'PL=F',      name: '白金',         cat: '金屬' },
-    { symbol: 'HG=F',      name: '銅',           cat: '金屬' },
-    { symbol: 'PA=F',      name: '鈀金',         cat: '金屬' },
-    { symbol: 'ZS=F',      name: '黃豆',         cat: '農產品' },
-    { symbol: 'ZC=F',      name: '玉米',         cat: '農產品' },
-    { symbol: 'ZW=F',      name: '小麥',         cat: '農產品' },
-    { symbol: 'SB=F',      name: '11號糖',       cat: '農產品' },
-    { symbol: 'CC=F',      name: '可可',         cat: '農產品' },
-    { symbol: 'KC=F',      name: '咖啡',         cat: '農產品' },
-    { symbol: 'CT=F',      name: '棉花',         cat: '農產品' },
-    { symbol: 'LE=F',      name: '活牛',         cat: '農產品' },
-    { symbol: 'HE=F',      name: '瘦豬',         cat: '農產品' },
-    { symbol: 'DX=F',      name: '美元指數',     cat: '外匯' },
-    { symbol: 'EURUSD=X',  name: '歐元/美元',    cat: '外匯' },
-    { symbol: 'GBPUSD=X',  name: '英鎊/美元',    cat: '外匯' },
-    { symbol: 'JPY=X',     name: '美元/日圓',    cat: '外匯' },
-    { symbol: 'AUDUSD=X',  name: '澳幣/美元',    cat: '外匯' },
-    { symbol: 'CADUSD=X',  name: '美元/加幣',    cat: '外匯' },
-    { symbol: 'ZF=F',      name: '5年美債',      cat: '債券' },
-    { symbol: 'ZN=F',      name: '10年美債',     cat: '債券' },
-    { symbol: 'ZB=F',      name: '30年美債',     cat: '債券' },
-    { symbol: 'BTC=F',     name: '比特幣',       cat: '加密貨幣' },
-    { symbol: 'ETH=F',     name: '以太幣',       cat: '加密貨幣' },
+    // 美股指數 - stooq ^
+    { symbol: '%5Edji',   name: '道瓊',        cat: '美股指數', src: 'stooq' },
+    { symbol: '%5Espx',   name: 'S&P500',      cat: '美股指數', src: 'stooq' },
+    { symbol: '%5Endx',   name: '那斯達克100', cat: '美股指數', src: 'stooq' },
+    { symbol: '%5Edax',   name: '德國DAX',     cat: '美股指數', src: 'stooq' },
+    { symbol: '%5Esox',   name: '費城半導體',  cat: '美股指數', src: 'stooq' },
+    // 亞股指數
+    { symbol: '%5Etwii',  name: '台灣加權',    cat: '亞股指數', src: 'stooq' },
+    { symbol: '%5Enk225', name: '日經225',     cat: '亞股指數', src: 'stooq' },
+    { symbol: '%5Ehsi',   name: '香港恆生',    cat: '亞股指數', src: 'stooq' },
+    { symbol: '%5Essi',   name: '新加坡STI',   cat: '亞股指數', src: 'stooq' },
+    // 金屬現貨 - stooq XAUUSD format
+    { symbol: 'XAUUSD',   name: '黃金',        cat: '金屬', src: 'stooq' },
+    { symbol: 'XAGUSD',   name: '白銀',        cat: '金屬', src: 'stooq' },
+    { symbol: 'XPTUSD',   name: '白金',        cat: '金屬', src: 'stooq' },
+    { symbol: 'XPDUSD',   name: '鈀金',        cat: '金屬', src: 'stooq' },
+    // 外匯
+    { symbol: 'EURUSD',   name: '歐元/美元',   cat: '外匯', src: 'stooq' },
+    { symbol: 'GBPUSD',   name: '英鎊/美元',   cat: '外匯', src: 'stooq' },
+    { symbol: 'USDJPY',   name: '美元/日圓',   cat: '外匯', src: 'stooq' },
+    { symbol: 'AUDUSD',   name: '澳幣/美元',   cat: '外匯', src: 'stooq' },
+    { symbol: 'USDCAD',   name: '美元/加幣',   cat: '外匯', src: 'stooq' },
+    { symbol: 'USDCNH',   name: '美元/人民幣', cat: '外匯', src: 'stooq' },
+    // 債券殖利率
+    { symbol: '10USY.B',  name: '10年美債殖利率', cat: '債券', src: 'stooq' },
+    { symbol: '30USY.B',  name: '30年美債殖利率', cat: '債券', src: 'stooq' },
+    // 加密貨幣
+    { symbol: 'BTCUSD',   name: '比特幣',      cat: '加密貨幣', src: 'stooq' },
+    { symbol: 'ETHUSD',   name: '以太幣',      cat: '加密貨幣', src: 'stooq' },
   ];
 
   try {
-    // Call Yahoo Finance chart API directly from browser (has cookie, won't be blocked)
+    // Fetch from stooq CSV (free, no CORS issues, confirmed working)
+    const results = await Promise.all(SYMBOLS.map(async s => {
+      try {
+        const today = new Date();
+        const d2 = today.toISOString().slice(0,10).replace(/-/g,'');
+        const past = new Date(today - 7*24*60*60*1000);
+        const d1 = past.toISOString().slice(0,10).replace(/-/g,'');
+        const url = `https://stooq.com/q/d/l/?s=${s.symbol}&d1=${d1}&d2=${d2}&i=d`;
+        const r = await fetch(url);
+        const csv = await r.text();
+        if (!csv || csv.includes('No data') || csv.length < 20) return null;
+        const lines = csv.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+        if (lines.length < 1) return null;
+        const latest = lines[lines.length-1].split(',');
+        const prev   = lines.length >= 2 ? lines[lines.length-2].split(',') : latest;
+        const curr  = parseFloat(latest[4]);
+        const prevC = parseFloat(prev[4]);
+        const hi    = parseFloat(latest[2]);
+        const lo    = parseFloat(latest[3]);
+        if (!curr || isNaN(curr)) return null;
+        return {
+          symbol: s.symbol, name: s.name, cat: s.cat,
+          prev: prevC, price: curr, high: hi, low: lo,
+          chg: curr - prevC,
+          chgPct: prevC ? (curr - prevC) / prevC : 0,
+          volPct: prevC ? (hi - lo) / prevC : 0,
+        };
+      } catch(e) { return null; }
+    })); from browser (has cookie, won't be blocked)
     const results = await Promise.all(SYMBOLS.map(async s => {
       try {
         const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s.symbol)}?interval=1d&range=2d`;
