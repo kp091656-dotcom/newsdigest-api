@@ -127,6 +127,24 @@ export default async function handler(req, res) {
     return;
   }
 
+  // FinMind - Taiwan Futures OHLCV data
+  if (endpoint === 'finmind') {
+    const TOKEN = process.env.FINMIND_TOKEN;
+    if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
+
+    const { dataset = 'TaiwanFuturesDaily', symbol = 'TX', start = '2024-01-01' } = req.query;
+    const url = `https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${symbol}&start_date=${start}&token=${TOKEN}`;
+
+    try {
+      const r = await fetch(url);
+      const data = await r.json();
+      res.status(200).json(data);
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+    return;
+  }
+
   // RSS news feeds
   const RSS_FEEDS = [
     { url: 'https://feeds.reuters.com/reuters/businessNews',                                       source: 'Reuters' },
