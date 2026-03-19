@@ -51,44 +51,46 @@ export default async function handler(req, res) {
   // Global Futures via stooq.com (server-side, no CORS issues)
   if (endpoint === 'futures') {
     const SYMBOLS = [
-      // 美股指數
+      // 美股指數 (confirmed working)
       { symbol: '%5Espx',   name: 'S&P500',          cat: '美股指數' },
       { symbol: '%5Endx',   name: '那斯達克100',     cat: '美股指數' },
       { symbol: '%5Edji',   name: '道瓊',            cat: '美股指數' },
       { symbol: '%5Edax',   name: '德國DAX',         cat: '美股指數' },
       { symbol: '%5Esox',   name: '費城半導體',      cat: '美股指數' },
       { symbol: '%5Eftse',  name: '英國FTSE100',     cat: '美股指數' },
+      { symbol: '%5Ecac',   name: '法國CAC40',       cat: '美股指數' },
       // 亞股指數
       { symbol: '%5Etwii',  name: '台灣加權',        cat: '亞股指數' },
       { symbol: '%5Enk225', name: '日經225',         cat: '亞股指數' },
       { symbol: '%5Ehsi',   name: '香港恆生',        cat: '亞股指數' },
-      { symbol: '%5Essi',   name: '新加坡STI',       cat: '亞股指數' },
-      // 金屬 - ETF 替代（美元計價，stooq .US 格式）
-      { symbol: 'GLD.US',   name: '黃金(ETF)',       cat: '金屬' },
-      { symbol: 'SLV.US',   name: '白銀(ETF)',       cat: '金屬' },
-      { symbol: 'PPLT.US',  name: '白金(ETF)',       cat: '金屬' },
-      { symbol: 'HG.F',     name: '銅',              cat: '金屬' },
-      // 能源
-      { symbol: 'USO.US',   name: '原油(ETF)',       cat: '能源' },
-      { symbol: 'UNG.US',   name: '天然氣(ETF)',     cat: '能源' },
-      // 外匯
+      // 金屬 ETF (confirmed working on stooq .US)
+      { symbol: 'GLD.US',   name: '黃金',            cat: '金屬' },
+      { symbol: 'SLV.US',   name: '白銀',            cat: '金屬' },
+      { symbol: 'PPLT.US',  name: '白金',            cat: '金屬' },
+      { symbol: 'PALL.US',  name: '鈀金',            cat: '金屬' },
+      { symbol: 'COPX.US',  name: '銅礦ETF',         cat: '金屬' },
+      // 能源 ETF
+      { symbol: 'USO.US',   name: '原油',            cat: '能源' },
+      { symbol: 'UNG.US',   name: '天然氣',          cat: '能源' },
+      { symbol: 'XLE.US',   name: '能源類股',        cat: '能源' },
+      // 外匯 (confirmed working)
       { symbol: 'EURUSD',   name: '歐元/美元',       cat: '外匯' },
       { symbol: 'GBPUSD',   name: '英鎊/美元',       cat: '外匯' },
       { symbol: 'USDJPY',   name: '美元/日圓',       cat: '外匯' },
       { symbol: 'AUDUSD',   name: '澳幣/美元',       cat: '外匯' },
       { symbol: 'USDCAD',   name: '美元/加幣',       cat: '外匯' },
       { symbol: 'USDCNH',   name: '美元/人民幣',     cat: '外匯' },
-      // 債券殖利率
-      { symbol: '10USY.B',  name: '10年美債殖利率',  cat: '債券' },
-      { symbol: '30USY.B',  name: '30年美債殖利率',  cat: '債券' },
-      // 加密貨幣
-      { symbol: 'BTC.V',    name: '比特幣',          cat: '加密貨幣' },
-      { symbol: 'ETH.V',    name: '以太幣',          cat: '加密貨幣' },
+      // 債券 ETF
+      { symbol: 'TLT.US',   name: '20年美債',        cat: '債券' },
+      { symbol: 'IEF.US',   name: '10年美債',        cat: '債券' },
+      // 加密貨幣 ETF
+      { symbol: 'IBIT.US',  name: '比特幣(ETF)',     cat: '加密貨幣' },
+      { symbol: 'FETH.US',  name: '以太幣(ETF)',     cat: '加密貨幣' },
     ];
 
     const today = new Date();
     const d2 = today.toISOString().slice(0,10).replace(/-/g,'');
-    const past = new Date(today - 7*24*60*60*1000);
+    const past = new Date(today - 30*24*60*60*1000);
     const d1 = past.toISOString().slice(0,10).replace(/-/g,'');
 
     try {
