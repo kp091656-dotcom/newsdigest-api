@@ -197,8 +197,8 @@
   <div class="controls">
     <div style="display:flex;gap:0.4rem;">
       <button class="symbol-btn active" onclick="loadChart('TX','台指期')">台指期 TX</button>
-      <button class="symbol-btn" onclick="loadChart('TXO','台指選)">台指選 TXO</button>
       <button class="symbol-btn" onclick="loadChart('MTX','小台指')">小台指 MTX</button>
+      <button class="symbol-btn" onclick="loadVix()">台股 VIX</button>
     </div>
     <div style="display:flex;gap:0.3rem;margin-left:1rem;">
       <button class="range-btn" onclick="setRange(90)">3M</button>
@@ -243,10 +243,11 @@
 <script>
 const API_BASE = 'https://newsdigest-api.vercel.app/api/news?endpoint=finmind';
 
-let chart, candleSeries, volumeSeries;
+let chart, candleSeries, volumeSeries, vixSeries;
 let currentSymbol = 'TX';
 let currentDays = 365;
 let allData = [];
+let vixMode = false;
 
 function initChart() {
   const container = document.getElementById('chartContainer');
@@ -308,6 +309,14 @@ function initChart() {
     document.getElementById('ohlcC').textContent = d.close?.toLocaleString() ?? '—';
     const vd = param.seriesData.get(volumeSeries);
     document.getElementById('ohlcV').textContent = vd?.value ? Math.round(vd.value).toLocaleString() : '—';
+  });
+
+  // VIX line series (hidden by default)
+  vixSeries = chart.addLineSeries({
+    color: '#f97316',
+    lineWidth: 2,
+    priceScaleId: 'right',
+    visible: false,
   });
 
   // Resize observer
@@ -421,9 +430,73 @@ function setRange(days) {
   else loadChart(currentSymbol);
 }
 
+async function loadVix() {
+  vixMode = true;
+  document.querySelectorAll('.symbol-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.includes('VIX'));
+  });
+  document.getElementById('symbolName').textContent = '台股波動率指數 (TAIWAN VIX)';
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  document.getElementById('loadingText').textContent = '載入台股 VIX 歷史資料…';
+
+  try {
+    const res = await fetch(`${API_BASE.replace('finmind','twvix')}`);
+    const json = await res.json();
+    if (!json?.length) throw new Error('無資料');
+
+    // Parse VIX data - field names from TAIFEX OpenAPI
+    const vixData = json
+      .filter(d => d.VIX && parseFloat(d.VIX) > 0)
+      .map(d => ({
+        time: d.Date?.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') || d.date,
+        value: parseFloat(d.VIX),
+      }))
+      .sort((a, b) => a.time.localeCompare(b.time));
+
+    if (!vixData.length) throw new Error('無有效資料');
+
+    // Switch chart to line mode
+    candleSeries.setData([]);
+    volumeSeries.setData([]);
+    vixSeries.applyOptions({ visible: true });
+    vixSeries.setData(vixData);
+    chart.timeScale().fitContent();
+
+    const last = vixData[vixData.length - 1];
+    const prev = vixData[vixData.length - 2];
+    const chg = last.value - (prev?.value ?? last.value);
+    const chgPct = prev ? (chg / prev.value * 100) : 0;
+    const isUp = chg >= 0;
+
+    document.getElementById('currentPrice').textContent = last.value.toFixed(2);
+    document.getElementById('currentPrice').style.color = isUp ? '#ef5350' : '#26a69a'; // VIX up = bad
+    document.getElementById('priceChange').textContent = `${isUp?'+':''}${chg.toFixed(2)} (${isUp?'+':''}${chgPct.toFixed(2)}%)`;
+    document.getElementById('priceChange').className = isUp ? 'down' : 'up';
+    document.getElementById('ohlcO').textContent = '—';
+    document.getElementById('ohlcH').textContent = '—';
+    document.getElementById('ohlcL').textContent = '—';
+    document.getElementById('ohlcC').textContent = last.value.toFixed(2);
+    document.getElementById('ohlcV').textContent = '—';
+    document.getElementById('dataInfo').textContent = `資料來源：台灣期貨交易所 OpenAPI · ${vixData.length} 個交易日`;
+    document.getElementById('loadingOverlay').style.display = 'none';
+  } catch(e) {
+    document.getElementById('loadingText').textContent = '載入失敗：' + e.message;
+  }
+}
+
+// Override loadChart to reset VIX mode
+const _origLoadChart = loadChart;
+async function loadChart(symbol, name) {
+  vixMode = false;
+  vixSeries.applyOptions({ visible: false });
+  candleSeries.setData([]);
+  volumeSeries.setData([]);
+  await _origLoadChart(symbol, name);
+}
+
 // Init
 initChart();
-loadChart('TX', '台指期 TX');
+_origLoadChart('TX', '台指期 TX');
 </script>
 </body>
 </html>
