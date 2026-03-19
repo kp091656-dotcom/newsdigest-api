@@ -127,6 +127,20 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Taiwan VIX from TAIFEX OpenAPI
+  if (endpoint === 'twvix') {
+    try {
+      const r = await fetch('https://openapi.taifex.com.tw/v1/DailyTaiexStockIndexOptionUnderlyingVolatility', {
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await r.json();
+      res.status(200).json(data);
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+    return;
+  }
+
   // FinMind - Taiwan Futures OHLCV data
   if (endpoint === 'finmind') {
     const TOKEN = process.env.FINMIND_TOKEN;
