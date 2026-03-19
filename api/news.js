@@ -132,38 +132,27 @@ export default async function handler(req, res) {
     const TOKEN = process.env.FINMIND_TOKEN;
     if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
     try {
-      // TaiwanOptionDailyNearbySeries gives near-month TXO implied vol history
-      const start = req.query.start || '2015-01-01';
-      const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanFuturesMonthlyReport&data_id=TAIWAN+VIX&start_date=${start}&token=${TOKEN}`;
-      // Try TAIWAN VIX specific dataset
-      const url2 = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanVariousIndicators5Seconds&data_id=TVIX&start_date=${start}&token=${TOKEN}`;
-      // Use correct dataset: TaiwanOptionDailyNearbySeries filtered for VIX
-      const vixUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanVariousIndicators5Seconds&start_date=2025-01-01&token=${TOKEN}`;
+      const start = req.query.start || '2010-01-01';
+      // TAIWAN VIX is in TaiwanFuturesDaily with futures_id = 'VIX'
+      const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanFuturesDaily&data_id=VIX&start_date=${start}&token=${TOKEN}`;
+      const r = await fetch(url);
+      const json = await r.json();
       
-      // Try taifex directly with correct path
-      const taifexUrl = 'https://openapi.taifex.com.tw/v1/HistoricalVIX';
-      const r = await fetch(taifexUrl, {
-        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-      });
-      const text = await r.text();
-      // If it's JSON parse it, otherwise try alternative
-      let data;
-      try { data = JSON.parse(text); } catch(e) { data = null; }
-      
-      if (data && Array.isArray(data) && data.length > 0) {
-        res.status(200).json({ data, source: 'taifex' });
+      if (json.data?.length > 0) {
+        res.status(200).json({ data: json.data, source: 'finmind-VIX', count: json.data.length });
       } else {
-        // Fallback: FinMind TaiwanFuturesDaily for TXVIX
-        const fmUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanFuturesDaily&data_id=VIX&start_date=${start}&token=${TOKEN}`;
-        const r2 = await fetch(fmUrl);
-        const d2 = await r2.json();
-        res.status(200).json({ data: d2.data || [], source: 'finmind', raw: text.slice(0, 200) });
+        // Try alternative: TaiwanOptionDailyNearbySeries for implied vol
+        const url2 = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanOptionDailyNearbySeries&data_id=TXO&start_date=${start}&token=${TOKEN}`;
+        const r2 = await fetch(url2);
+        const json2 = await r2.json();
+        res.status(200).json({ data: json2.data || [], source: 'finmind-TXO', count: json2.data?.length || 0, msg: json.msg });
       }
     } catch(e) {
       res.status(500).json({ error: e.message });
     }
     return;
   }
+
 
   // FinMind - Taiwan Futures OHLCV data
   if (endpoint === 'finmind') {
