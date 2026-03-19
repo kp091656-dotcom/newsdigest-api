@@ -63,21 +63,21 @@ export default async function handler(req, res) {
       { symbol: '%5Enk225', name: '日經225',         cat: '亞股指數' },
       { symbol: '%5Ehsi',   name: '香港恆生',        cat: '亞股指數' },
       { symbol: '%5Essi',   name: '新加坡STI',       cat: '亞股指數' },
-      // 金屬 - 用 .US 後綴確保美元計價
-      { symbol: 'GC.F',     name: '黃金',            cat: '金屬' },
-      { symbol: 'SI.F',     name: '白銀',            cat: '金屬' },
-      { symbol: 'PL.F',     name: '白金',            cat: '金屬' },
-      { symbol: 'PA.F',     name: '鈀金',            cat: '金屬' },
+      // 金屬 - ETF 替代（美元計價，stooq .US 格式）
+      { symbol: 'GLD.US',   name: '黃金(ETF)',       cat: '金屬' },
+      { symbol: 'SLV.US',   name: '白銀(ETF)',       cat: '金屬' },
+      { symbol: 'PPLT.US',  name: '白金(ETF)',       cat: '金屬' },
       { symbol: 'HG.F',     name: '銅',              cat: '金屬' },
       // 能源
-      { symbol: 'CL.F',     name: '輕原油(WTI)',     cat: '能源' },
-      { symbol: 'NG.F',     name: '天然氣',          cat: '能源' },
+      { symbol: 'USO.US',   name: '原油(ETF)',       cat: '能源' },
+      { symbol: 'UNG.US',   name: '天然氣(ETF)',     cat: '能源' },
       // 外匯
       { symbol: 'EURUSD',   name: '歐元/美元',       cat: '外匯' },
       { symbol: 'GBPUSD',   name: '英鎊/美元',       cat: '外匯' },
       { symbol: 'USDJPY',   name: '美元/日圓',       cat: '外匯' },
       { symbol: 'AUDUSD',   name: '澳幣/美元',       cat: '外匯' },
       { symbol: 'USDCAD',   name: '美元/加幣',       cat: '外匯' },
+      { symbol: 'USDCNH',   name: '美元/人民幣',     cat: '外匯' },
       // 債券殖利率
       { symbol: '10USY.B',  name: '10年美債殖利率',  cat: '債券' },
       { symbol: '30USY.B',  name: '30年美債殖利率',  cat: '債券' },
