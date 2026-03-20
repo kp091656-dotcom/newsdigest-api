@@ -479,11 +479,11 @@ function getStartDate(days) {
 }
 
 async function loadChart(symbol, name) {
+  // Reset VIX mode
+  vixMode = false;
+  if (vixSeries) vixSeries.applyOptions({ visible: false });
   currentSymbol = symbol;
   document.getElementById('symbolName').textContent = name || symbol;
-  document.querySelectorAll('.symbol-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.includes(symbol));
-  });
 
   document.getElementById('loadingOverlay').style.display = 'flex';
   document.getElementById('loadingText').textContent = `載入 ${symbol} 歷史資料…`;
@@ -679,19 +679,9 @@ async function loadVix() {
   }
 }
 
-// Override loadChart to reset VIX mode
-const _origLoadChart = loadChart;
-async function loadChart(symbol, name) {
-  vixMode = false;
-  vixSeries.applyOptions({ visible: false });
-  candleSeries.setData([]);
-  volumeSeries.setData([]);
-  await _origLoadChart(symbol, name);
-}
-
 // Init
 initChart();
-_origLoadChart('TX', '台指期 TX');
+loadChart('TX', '台指期 TX');
 </script>
 </body>
 </html>
