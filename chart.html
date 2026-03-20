@@ -206,13 +206,22 @@
       </div>
       <!-- 快捷按鈕 -->
       <div style="display:flex;gap:0.3rem;border-left:1px solid var(--border);padding-left:0.6rem;">
-        <button class="symbol-btn" onclick="loadChart('TAIEX','加權指數','stock')">加權指數</button>
+        <!-- 台股 -->
+        <button class="symbol-btn" onclick="loadChart('TAIEX','加權指數','tw')">加權指數</button>
         <button class="symbol-btn active" onclick="loadChart('TX','台指期','futures')">台指期</button>
-        <button class="symbol-btn" onclick="loadChart('2330','台積電','stock')">台積電</button>
-        <button class="symbol-btn" onclick="loadChart('2317','鴻海','stock')">鴻海</button>
-        <button class="symbol-btn" onclick="loadChart('2454','聯發科','stock')">聯發科</button>
-        <button class="symbol-btn" onclick="loadChart('2308','台達電','stock')">台達電</button>
-        <button class="symbol-btn" onclick="loadChart('0050','元大台50','stock')">元大台50</button>
+        <button class="symbol-btn" onclick="loadChart('2330','台積電','tw')">台積電</button>
+        <button class="symbol-btn" onclick="loadChart('2454','聯發科','tw')">聯發科</button>
+        <button class="symbol-btn" onclick="loadChart('0050','元大台50','tw')">元大台50</button>
+      </div>
+      <!-- 美股 -->
+      <div style="display:flex;gap:0.3rem;border-left:1px solid var(--border);padding-left:0.6rem;">
+        <button class="symbol-btn" onclick="loadChart('^GSPC','S&P500','us')">S&P500</button>
+        <button class="symbol-btn" onclick="loadChart('^IXIC','那斯達克','us')">那斯達克</button>
+        <button class="symbol-btn" onclick="loadChart('^DJI','道瓊','us')">道瓊</button>
+        <button class="symbol-btn" onclick="loadChart('^VIX','VIX波動率','us')">VIX</button>
+        <button class="symbol-btn" onclick="loadChart('AAPL','蘋果','us')">蘋果</button>
+        <button class="symbol-btn" onclick="loadChart('NVDA','輝達','us')">輝達</button>
+        <button class="symbol-btn" onclick="loadChart('TSM','台積電ADR','us')">台積電ADR</button>
       </div>
     </div>
     <div style="display:flex;gap:0.3rem;margin-left:1rem;">
@@ -262,7 +271,7 @@
   </div>
 
   <div class="status-bar">
-    <div id="dataInfo">資料來源：FinMind · 台灣期交所盤後資料</div>
+    <div id="dataInfo">資料來源：FinMind · 台灣期交所 / 美股盤後資料</div>
     <div id="lastUpdate"></div>
   </div>
 </div>
@@ -494,12 +503,20 @@ function getStartDate(days) {
 }
 
 function searchStock() {
-  const val = document.getElementById('searchInput').value.trim().toUpperCase();
+  const val = document.getElementById('searchInput').value.trim();
+  const valU = val.toUpperCase();
   if (!val) return;
-  const isFutures = ['TX','MTX','TE','TF','ZEF','ZFF','GDF','XIF','EXF','SPF','NQF','DOF'].includes(val);
-  const type = isFutures ? 'futures' : 'stock';
-  const nameMap = { 'TAIEX':'加權指數', '2330':'台積電', '2317':'鴻海', '2454':'聯發科', '2308':'台達電', '0050':'元大台灣50', '006208':'富邦台50' };
-  loadChart(val, nameMap[val] || val, type);
+  const isFutures = ['TX','MTX','TE','TF','ZEF','ZFF','GDF','XIF','EXF','SPF','NQF','DOF'].includes(valU);
+  // US stocks: start with ^ or contain letters only (non-numeric)
+  const isUS = val.startsWith('^') || /^[A-Z]{1,5}$/.test(valU) && !['TX','MTX','TAIEX'].includes(valU);
+  const type = isFutures ? 'futures' : isUS ? 'us' : 'tw';
+  const nameMap = {
+    'TAIEX':'加權指數','2330':'台積電','2317':'鴻海','2454':'聯發科','2308':'台達電',
+    '0050':'元大台50','006208':'富邦台50',
+    '^GSPC':'S&P500','^IXIC':'那斯達克','^DJI':'道瓊','^VIX':'VIX波動率',
+    'AAPL':'蘋果','NVDA':'輝達','MSFT':'微軟','GOOGL':'Alphabet','AMZN':'亞馬遜','TSM':'台積電ADR',
+  };
+  loadChart(val, nameMap[valU] || val, type);
 }
 
 let currentType = 'futures';
@@ -507,6 +524,8 @@ let currentType = 'futures';
 async function loadChart(symbol, name, type = 'futures') {
   // Reset VIX mode
   vixMode = false;
+  // Normalize type
+  if (type === 'stock') type = 'tw';
   currentType = type;
   if (vixSeries) vixSeries.applyOptions({ visible: false });
   document.querySelectorAll('.symbol-btn').forEach(b => {
@@ -523,7 +542,7 @@ async function loadChart(symbol, name, type = 'futures') {
 
     // Choose dataset by type
     let url, processData;
-    if (type === 'stock') {
+    if (type === 'tw') {
       url = `${API_BASE}&dataset=TaiwanStockPrice&symbol=${symbol}&start=${start}`;
       processData = (json) => json.data
         .filter(d => (d.open || d.Open) > 0)
@@ -534,6 +553,16 @@ async function loadChart(symbol, name, type = 'futures') {
           low: d.min || d.Min || d.low, 
           close: d.close || d.Close, 
           volume: d.Trading_Volume || d.volume || 0 
+        }))
+        .sort((a, b) => a.time.localeCompare(b.time));
+    } else if (type === 'us') {
+      url = `${API_BASE}&dataset=USStockPrice&symbol=${symbol}&start=${start}`;
+      processData = (json) => json.data
+        .filter(d => d.Close > 0)
+        .map(d => ({
+          time: d.date,
+          open: d.Open, high: d.High, low: d.Low, close: d.Close,
+          volume: d.Volume || 0,
         }))
         .sort((a, b) => a.time.localeCompare(b.time));
     } else if (type === 'index') {
@@ -565,7 +594,7 @@ async function loadChart(symbol, name, type = 'futures') {
     allData = processData(json);
 
     renderRange();
-    document.getElementById('dataInfo').textContent = `資料來源：FinMind · 台灣期交所 · ${allData.length} 個交易日`;
+    document.getElementById('dataInfo').textContent = `資料來源：FinMind · 台灣期交所 / 美股 · ${allData.length} 個交易日`;
     document.getElementById('lastUpdate').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
 
   } catch(e) {
