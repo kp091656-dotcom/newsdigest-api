@@ -212,7 +212,7 @@
         <button class="symbol-btn" onclick="loadChart('2317','鴻海','stock')">鴻海</button>
         <button class="symbol-btn" onclick="loadChart('2454','聯發科','stock')">聯發科</button>
         <button class="symbol-btn" onclick="loadChart('2308','台達電','stock')">台達電</button>
-        <button class="symbol-btn" onclick="loadChart('IX0001','加權指數','index')">加權指數</button>
+        <button class="symbol-btn" onclick="loadChart('TAIEX','加權指數','stock')">加權指數</button>
       </div>
     </div>
     <div style="display:flex;gap:0.3rem;margin-left:1rem;">
@@ -498,7 +498,8 @@ function searchStock() {
   if (!val) return;
   const isFutures = ['TX','MTX','TE','TF','ZEF','ZFF','GDF','XIF','EXF','SPF','NQF','DOF'].includes(val);
   const type = isFutures ? 'futures' : 'stock';
-  loadChart(val, val, type);
+  const nameMap = { 'TAIEX':'加權指數', '2330':'台積電', '2317':'鴻海', '2454':'聯發科', '2308':'台達電', '0050':'元大台灣50', '006208':'富邦台50' };
+  loadChart(val, nameMap[val] || val, type);
 }
 
 let currentType = 'futures';
@@ -518,15 +519,22 @@ async function loadChart(symbol, name, type = 'futures') {
   document.getElementById('loadingText').textContent = `載入 ${symbol} 歷史資料…`;
 
   try {
-    const start = getStartDate(Math.max(currentDays, 730));
+    const start = getStartDate(Math.max(currentDays, 365));
 
     // Choose dataset by type
     let url, processData;
     if (type === 'stock') {
       url = `${API_BASE}&dataset=TaiwanStockPrice&symbol=${symbol}&start=${start}`;
       processData = (json) => json.data
-        .filter(d => d.open > 0)
-        .map(d => ({ time: d.date, open: d.open, high: d.max, low: d.min, close: d.close, volume: d.Trading_Volume || d.volume || 0 }))
+        .filter(d => (d.open || d.Open) > 0)
+        .map(d => ({ 
+          time: d.date, 
+          open: d.open || d.Open, 
+          high: d.max || d.Max || d.high, 
+          low: d.min || d.Min || d.low, 
+          close: d.close || d.Close, 
+          volume: d.Trading_Volume || d.volume || 0 
+        }))
         .sort((a, b) => a.time.localeCompare(b.time));
     } else if (type === 'index') {
       url = `${API_BASE}&dataset=TaiwanStockWeightedIndex&symbol=${symbol}&start=${start}`;
