@@ -197,7 +197,7 @@ export default async function handler(req, res) {
     if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
     try {
       const today = new Date();
-      const start = new Date(today - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const start = new Date(today - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
       const [goldRes, wtiRes, brentRes] = await Promise.all([
         fetch(`https://api.finmindtrade.com/api/v4/data?dataset=GoldPrice&start_date=${start}&token=${TOKEN}`),
