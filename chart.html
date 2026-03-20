@@ -195,10 +195,25 @@
 <header>
   <div class="logo">NewsDigest<span>.</span>AI <span style="font-size:0.65rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-left:0.5rem;">期貨K線</span></div>
   <div class="controls">
-    <div style="display:flex;gap:0.4rem;">
-      <button class="symbol-btn active" onclick="loadChart('TX','台指期')">台指期 TX</button>
-      <button class="symbol-btn" onclick="loadChart('MTX','小台指')">小台指 MTX</button>
-      <button class="symbol-btn" onclick="loadVix()">台股 VIX</button>
+    <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+      <!-- 搜尋框 -->
+      <div style="display:flex;gap:0.3rem;align-items:center;">
+        <input id="searchInput" type="text" placeholder="輸入代碼 e.g. 2330"
+          style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;padding:0.3rem 0.6rem;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);width:140px;outline:none;"
+          onkeydown="if(event.key==='Enter') searchStock()"
+        />
+        <button class="symbol-btn" onclick="searchStock()" style="padding:0.3rem 0.6rem;">搜尋</button>
+      </div>
+      <!-- 快捷按鈕 -->
+      <div style="display:flex;gap:0.3rem;border-left:1px solid var(--border);padding-left:0.6rem;">
+        <button class="symbol-btn active" onclick="loadChart('TX','台指期','futures')">台指期</button>
+        <button class="symbol-btn" onclick="loadChart('MTX','小台指','futures')">小台指</button>
+        <button class="symbol-btn" onclick="loadChart('2330','台積電','stock')">台積電</button>
+        <button class="symbol-btn" onclick="loadChart('2317','鴻海','stock')">鴻海</button>
+        <button class="symbol-btn" onclick="loadChart('2454','聯發科','stock')">聯發科</button>
+        <button class="symbol-btn" onclick="loadChart('2308','台達電','stock')">台達電</button>
+        <button class="symbol-btn" onclick="loadChart('IX0001','加權指數','index')">加權指數</button>
+      </div>
     </div>
     <div style="display:flex;gap:0.3rem;margin-left:1rem;">
       <button class="range-btn" onclick="setRange(90)">3M</button>
@@ -478,10 +493,24 @@ function getStartDate(days) {
   return d.toISOString().slice(0, 10);
 }
 
-async function loadChart(symbol, name) {
+function searchStock() {
+  const val = document.getElementById('searchInput').value.trim().toUpperCase();
+  if (!val) return;
+  const isFutures = ['TX','MTX','TE','TF','ZEF','ZFF','GDF','XIF','EXF','SPF','NQF','DOF'].includes(val);
+  const type = isFutures ? 'futures' : 'stock';
+  loadChart(val, val, type);
+}
+
+let currentType = 'futures';
+
+async function loadChart(symbol, name, type = 'futures') {
   // Reset VIX mode
   vixMode = false;
+  currentType = type;
   if (vixSeries) vixSeries.applyOptions({ visible: false });
+  document.querySelectorAll('.symbol-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === (name || symbol));
+  });
   currentSymbol = symbol;
   document.getElementById('symbolName').textContent = name || symbol;
 
@@ -489,35 +518,43 @@ async function loadChart(symbol, name) {
   document.getElementById('loadingText').textContent = `載入 ${symbol} 歷史資料…`;
 
   try {
-    const start = getStartDate(Math.max(currentDays, 730)); // Always fetch 2Y, filter on display
-    const url = `${API_BASE}&symbol=${symbol}&start=${start}`;
-    const res = await fetch(url);
-    const json = await res.json();
+    const start = getStartDate(Math.max(currentDays, 730));
 
-    if (!json.data?.length) throw new Error('無資料');
-
-    // Process data - filter to position session only, then pick near-month contract per date
-    // Group by date, pick contract_date closest to date (near-month)
-    const byDate = {};
-    for (const d of json.data) {
-      if (d.trading_session !== 'position') continue; // 白盤只取 position
-      if (!d.open || d.open === 0) continue; // skip empty rows
-      // Keep near-month: contract_date with shortest distance to date
-      const cd = d.contract_date.toString();
-      const dateStr = d.date;
-      if (!byDate[dateStr] || cd < byDate[dateStr].contract_date) {
-        byDate[dateStr] = d;
-      }
+    // Choose dataset by type
+    let url, processData;
+    if (type === 'stock') {
+      url = `${API_BASE}&dataset=TaiwanStockPrice&symbol=${symbol}&start=${start}`;
+      processData = (json) => json.data
+        .filter(d => d.open > 0)
+        .map(d => ({ time: d.date, open: d.open, high: d.max, low: d.min, close: d.close, volume: d.Trading_Volume || d.volume || 0 }))
+        .sort((a, b) => a.time.localeCompare(b.time));
+    } else if (type === 'index') {
+      url = `${API_BASE}&dataset=TaiwanStockWeightedIndex&symbol=${symbol}&start=${start}`;
+      processData = (json) => json.data
+        .filter(d => d.price > 0)
+        .map(d => ({ time: d.date, open: d.price, high: d.price, low: d.price, close: d.price, volume: d.volume || 0 }))
+        .sort((a, b) => a.time.localeCompare(b.time));
+    } else {
+      // futures (default)
+      url = `${API_BASE}&symbol=${symbol}&start=${start}`;
+      processData = (json) => {
+        const byDate = {};
+        for (const d of json.data) {
+          if (d.trading_session !== 'position') continue;
+          if (!d.open || d.open === 0) continue;
+          const cd = d.contract_date.toString();
+          if (!byDate[d.date] || cd < byDate[d.date].contract_date) byDate[d.date] = d;
+        }
+        return Object.values(byDate)
+          .map(d => ({ time: d.date, open: d.open, high: d.max, low: d.min, close: d.close, volume: d.volume }))
+          .sort((a, b) => a.time.localeCompare(b.time));
+      };
     }
 
-    allData = Object.values(byDate).map(d => ({
-      time: d.date,
-      open: d.open,
-      high: d.max,
-      low: d.min,
-      close: d.close,
-      volume: d.volume,
-    })).sort((a, b) => a.time.localeCompare(b.time));
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!json.data?.length) throw new Error('無資料，請確認代碼正確');
+    allData = processData(json);
 
     renderRange();
     document.getElementById('dataInfo').textContent = `資料來源：FinMind · 台灣期交所 · ${allData.length} 個交易日`;
