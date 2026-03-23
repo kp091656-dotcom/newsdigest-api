@@ -127,6 +127,12 @@ export default async function handler(req, res) {
         { symbol: '^DJI',  name: '道瓊',      cat: '美股指數' },
         { symbol: '^VIX',  name: 'VIX波動率', cat: '美股指數' },
         { symbol: '^SOX',  name: '費城半導體', cat: '美股指數' },
+        { symbol: 'GLD',   name: '黃金(GLD)', cat: '金屬' },
+        { symbol: 'SLV',   name: '白銀(SLV)', cat: '金屬' },
+        { symbol: 'USO',   name: 'WTI原油',   cat: '能源' },
+        { symbol: 'BNO',   name: '布倫特原油', cat: '能源' },
+        { symbol: 'IBIT',  name: '比特幣ETF', cat: '加密貨幣' },
+        { symbol: 'FETH',  name: '以太幣ETF', cat: '加密貨幣' },
       ];
 
       const usData = TOKEN ? await Promise.all(usSymbols.map(async s => {
@@ -150,51 +156,11 @@ export default async function handler(req, res) {
         } catch(e) { return null; }
       })) : [];
 
-      // Also fetch Gold & Oil from FinMind (more reliable than stooq ETFs)
-      const commoditySymbols = [
-        { fmSymbol: 'WTI',   name: 'WTI原油',   cat: '能源',  dataset: 'CrudeOilPrices' },
-        { fmSymbol: 'Brent', name: '布倫特原油', cat: '能源',  dataset: 'CrudeOilPrices' },
-      ];
-      const commStart = new Date(Date.now() - 7*24*60*60*1000).toISOString().slice(0,10);
-      const commData = TOKEN ? await Promise.all(commoditySymbols.map(async s => {
-        try {
-          const r = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=${s.dataset}&data_id=${s.fmSymbol}&start_date=${commStart}&token=${TOKEN}`);
-          const json = await r.json();
-          const rows = (json.data || []).sort((a,b) => a.date.localeCompare(b.date));
-          if (rows.length < 1) return null;
-          const curr = rows[rows.length-1].price;
-          const prev = rows.length >= 2 ? rows[rows.length-2].price : curr;
-          return { symbol: s.fmSymbol, name: s.name, cat: s.cat,
-            prev, price: curr, high: curr, low: curr,
-            chg: curr-prev, chgPct: prev?(curr-prev)/prev:0, volPct:0 };
-        } catch(e) { return null; }
-      })) : [];
-
-      // Gold from GoldPrice dataset (5-min, take last daily close)
-      let goldItem = null;
-      if (TOKEN) {
-        try {
-          const goldStart = new Date(Date.now() - 7*24*60*60*1000).toISOString().slice(0,10);
-          const gr = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=GoldPrice&start_date=${goldStart}&token=${TOKEN}`);
-          const gj = await gr.json();
-          const byDate = {};
-          for (const d of gj.data||[]) { const dt=d.date.slice(0,10); byDate[dt]=d.Price; }
-          const dates = Object.keys(byDate).sort();
-          if (dates.length >= 2) {
-            const curr = byDate[dates[dates.length-1]];
-            const prev = byDate[dates[dates.length-2]];
-            goldItem = { symbol:'GOLD', name:'黃金(即時)', cat:'金屬',
-              prev, price:curr, high:curr, low:curr,
-              chg:curr-prev, chgPct:prev?(curr-prev)/prev:0, volPct:0 };
-          }
-        } catch(e) {}
-      }
+      const commData = [];
 
       const data = [
         ...usData.filter(Boolean),
         ...stooqData,
-        ...commData.filter(Boolean),
-        ...(goldItem ? [goldItem] : []),
       ];
       res.status(200).json({ data, count: data.length });
     } catch(e) {
