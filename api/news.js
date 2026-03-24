@@ -125,7 +125,7 @@ export default async function handler(req, res) {
         { symbol: '^GSPC', name: 'S&P500',    cat: '美股指數' },
         { symbol: '^IXIC', name: '那斯達克',  cat: '美股指數' },
         { symbol: '^DJI',  name: '道瓊',      cat: '美股指數' },
-        { symbol: '^VIX',  name: 'VIX波動率', cat: '美股指數' },
+        { symbol: '^VIX',  name: 'VIX波動率', cat: '波動率' },
         { symbol: '^SOX',  name: '費城半導體', cat: '美股指數' },
         { symbol: 'GLD',   name: '黃金(GLD)', cat: '金屬' },
         { symbol: 'SLV',   name: '白銀(SLV)', cat: '金屬' },
