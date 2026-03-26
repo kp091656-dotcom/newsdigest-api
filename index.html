@@ -466,8 +466,8 @@
     padding:4px 10px; border-radius:20px; border:1px solid var(--border);
     background:var(--surface); cursor:pointer; transition:all 0.15s;
   }
-  .sent-pill.active-bull    { background:#2a9d5c; color:#fff; border-color:#2a9d5c; }
-  .sent-pill.active-bear    { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .sent-pill.active-bull    { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .sent-pill.active-bear    { background:#2a9d5c; color:#fff; border-color:#2a9d5c; }
   .sent-pill.active-neutral { background:var(--muted); color:#fff; border-color:var(--muted); }
   .sent-pill.active-all     { background:var(--text); color:#fff; border-color:var(--text); }
   .sent-post-card {
@@ -481,8 +481,8 @@
     padding:3px 7px; border-radius:2px; font-weight:500;
     letter-spacing:0.08em; white-space:nowrap;
   }
-  .sent-bull    { background:#d4edda; color:#155724; }
-  .sent-bear    { background:#f8d7da; color:#721c24; }
+  .sent-bull    { background:#fde8e8; color:#8b1a1a; }
+  .sent-bear    { background:#e8f5ee; color:#155724; }
   .sent-neutral { background:#e2e3e5; color:#383d41; }
 
   .feed-state p { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
@@ -746,9 +746,9 @@
       <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:12px;">SENTIMENT SCORE</div>
       <svg viewBox="0 0 200 110" style="width:180px;height:99px;">
         <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e8e4dc" stroke-width="16" stroke-linecap="round"/>
-        <path d="M 20 100 A 80 80 0 0 1 80 28"   fill="none" stroke="#f5c6cb" stroke-width="16" stroke-linecap="round"/>
+        <path d="M 20 100 A 80 80 0 0 1 80 28"   fill="none" stroke="#c8e6c9" stroke-width="16" stroke-linecap="round"/>
         <path d="M 80 28  A 80 80 0 0 1 120 28"  fill="none" stroke="#e2e3e5" stroke-width="16" stroke-linecap="round"/>
-        <path d="M 120 28 A 80 80 0 0 1 180 100" fill="none" stroke="#c3e6cb" stroke-width="16" stroke-linecap="round"/>
+        <path d="M 120 28 A 80 80 0 0 1 180 100" fill="none" stroke="#ffccbc" stroke-width="16" stroke-linecap="round"/>
         <line id="sentNeedle" x1="100" y1="100" x2="100" y2="30" stroke="#1a1814" stroke-width="3" stroke-linecap="round" transform="rotate(0,100,100)"/>
         <circle cx="100" cy="100" r="6" fill="#1a1814"/>
         <text x="16"  y="118" font-size="9" fill="#8a8278" font-family="IBM Plex Mono">BEAR</text>
@@ -762,9 +762,9 @@
       <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:14px;">BREAKDOWN</div>
       <div style="display:flex;flex-direction:column;gap:12px;" id="sentBarsWrap">
         <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent3);width:50px;">多頭</span>
-          <div style="flex:1;background:#e8e4dc;border-radius:2px;height:16px;overflow:hidden;"><div id="sentBullBar" style="height:100%;width:0%;background:var(--accent3);border-radius:2px;transition:width 0.8s;"></div></div>
-          <span id="sentBullCnt" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--accent3);width:28px;text-align:right;">0</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent);width:50px;">多頭</span>
+          <div style="flex:1;background:#e8e4dc;border-radius:2px;height:16px;overflow:hidden;"><div id="sentBullBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.8s;"></div></div>
+          <span id="sentBullCnt" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--accent);width:28px;text-align:right;">0</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);width:50px;">中性</span>
@@ -772,9 +772,9 @@
           <span id="sentNeuCnt" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);width:28px;text-align:right;">0</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent);width:50px;">空頭</span>
-          <div style="flex:1;background:#e8e4dc;border-radius:2px;height:16px;overflow:hidden;"><div id="sentBearBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.8s;"></div></div>
-          <span id="sentBearCnt" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--accent);width:28px;text-align:right;">0</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent3);width:50px;">空頭</span>
+          <div style="flex:1;background:#e8e4dc;border-radius:2px;height:16px;overflow:hidden;"><div id="sentBearBar" style="height:100%;width:0%;background:#2a9d5c;border-radius:2px;transition:width 0.8s;"></div></div>
+          <span id="sentBearCnt" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--accent3);width:28px;text-align:right;">0</span>
         </div>
       </div>
       <!-- per-source mini -->
@@ -790,9 +790,9 @@
     <div style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:600;">貼文列表</div>
     <div style="display:flex;gap:5px;flex-wrap:wrap;" id="sentFilterPills">
       <button class="sent-pill active-all" onclick="sentFilterSentiment('all',this)">全部</button>
-      <button class="sent-pill" onclick="sentFilterSentiment('bull',this)">多頭 🟢</button>
+      <button class="sent-pill" onclick="sentFilterSentiment('bull',this)">多頭 🔴</button>
       <button class="sent-pill" onclick="sentFilterSentiment('neutral',this)">中性 ⚪</button>
-      <button class="sent-pill" onclick="sentFilterSentiment('bear',this)">空頭 🔴</button>
+      <button class="sent-pill" onclick="sentFilterSentiment('bear',this)">空頭 🟢</button>
     </div>
   </div>
   <div id="sentPostList" style="display:flex;flex-direction:column;gap:8px;">
@@ -1759,8 +1759,8 @@ function sentSetGauge(score) {
   const v = document.getElementById('sentGaugeValue');
   const l = document.getElementById('sentGaugeLabel');
   v.textContent = score;
-  if (score >= 60)      { v.style.color = '#2a9d5c'; l.textContent = '偏多頭'; l.style.color = '#2a9d5c'; }
-  else if (score <= 40) { v.style.color = 'var(--accent)'; l.textContent = '偏空頭'; l.style.color = 'var(--accent)'; }
+  if (score >= 60)      { v.style.color = 'var(--accent)'; l.textContent = '偏多頭'; l.style.color = 'var(--accent)'; }
+  else if (score <= 40) { v.style.color = '#2a9d5c'; l.textContent = '偏空頭'; l.style.color = '#2a9d5c'; }
   else                  { v.style.color = 'var(--muted)'; l.textContent = '中性偏觀望'; l.style.color = 'var(--muted)'; }
 }
 
@@ -1769,7 +1769,7 @@ function sentRenderDashboard(posts) {
   const bear = posts.filter(p => p.sentiment === 'bear').length;
   const neu  = posts.filter(p => p.sentiment === 'neutral').length;
   const total = posts.length || 1;
-  document.getElementById('sentBullBar').style.width = (bull/total*100)+'%';
+  document.getElementById('sentBullBar').style.width = (bull/total*100)+'%'; document.getElementById('sentBullBar').style.background='var(--accent)';
   document.getElementById('sentBearBar').style.width = (bear/total*100)+'%';
   document.getElementById('sentNeuBar').style.width  = (neu/total*100)+'%';
   document.getElementById('sentBullCnt').textContent = bull;
@@ -1787,7 +1787,7 @@ function sentRenderDashboard(posts) {
     return `<div style="display:flex;align-items:center;gap:8px;">
       <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:var(--muted);width:28px;">${lbl}</span>
       <div style="flex:1;background:var(--surface2,#edeae3);border-radius:2px;height:9px;overflow:hidden;">
-        <div style="height:100%;width:${pct}%;background:#2a9d5c;border-radius:2px;transition:width 0.8s;"></div>
+        <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;transition:width 0.8s;"></div>
       </div>
       <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:var(--muted);width:34px;">${pct}% 多</span>
     </div>`;
@@ -1815,7 +1815,8 @@ function sentRenderPosts() {
     return `<div class="sent-post-card">
       <span class="sent-s-pill ${sc}">${sl}</span>
       <div>
-        <div style="font-size:0.83rem;line-height:1.4;margin-bottom:4px;">${p.title}</div>
+        <div style="font-size:0.83rem;line-height:1.4;margin-bottom:4px;">${p.title_zh||p.title}</div>
+        ${p.title_zh && p.title_zh !== p.title ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:3px;">${p.title}</div>` : ''}
         <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           ${srcBadge(p.source)}<span>${p.time}</span>${p.reason?`<span>${p.reason}</span>`:''}
         </div>
@@ -1842,20 +1843,54 @@ function sentFilterSentiment(s, el) {
 }
 
 async function sentFetchPTT() {
+  // 嘗試多個 proxy，任一成功即返回
+  const proxies = [
+    url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  ];
+  const pttUrl = 'https://www.ptt.cc/bbs/Stock/index.html';
+
+  for (const makeProxy of proxies) {
+    try {
+      const res = await fetch(makeProxy(pttUrl), { signal: AbortSignal.timeout(7000) });
+      if (!res.ok) continue;
+      const raw = await res.json().catch(() => null);
+      // allorigins / codetabs return {contents:...}, corsproxy returns raw text
+      const html = raw ? (raw.contents || raw) : await res.text();
+      if (!html || typeof html !== 'string' || !html.includes('r-ent')) continue;
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const posts = Array.from(doc.querySelectorAll('.r-ent')).map(el => {
+        const ta = el.querySelector('.title a');
+        const sc = el.querySelector('.nrec span');
+        if (!ta) return null;
+        const title = ta.textContent.trim();
+        if (title.startsWith('[公告]') || title.startsWith('Fw:') || title.startsWith('[板規]')) return null;
+        return {
+          title,
+          time: el.querySelector('.meta .date')?.textContent.trim() || '',
+          score: sc ? (sc.textContent.trim() === '爆' ? 99 : parseInt(sc.textContent) || 0) : 0,
+          source: 'ptt', sentiment: null, reason: ''
+        };
+      }).filter(Boolean).slice(0, 15);
+      if (posts.length > 0) return posts;
+    } catch(e) { continue; }
+  }
+
+  // 最後備案：抓多頁 index 試試
   try {
-    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent('https://www.ptt.cc/bbs/Stock/index.html')}`;
-    const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
-    const data = await res.json();
-    const doc = new DOMParser().parseFromString(data.contents, 'text/html');
-    return Array.from(doc.querySelectorAll('.r-ent')).map(el => {
+    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent('https://www.ptt.cc/bbs/Stock/index1.html')}`, { signal: AbortSignal.timeout(6000) });
+    const text = await res.text();
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    const posts = Array.from(doc.querySelectorAll('.r-ent')).map(el => {
       const ta = el.querySelector('.title a');
-      const sc = el.querySelector('.nrec span');
       if (!ta) return null;
-      const title = ta.textContent.trim();
-      if (title.startsWith('[公告]') || title.startsWith('Fw:')) return null;
-      return { title, time: el.querySelector('.meta .date')?.textContent.trim()||'', score: sc?(sc.textContent.trim()==='爆'?99:parseInt(sc.textContent)||0):0, source:'ptt', sentiment:null, reason:'' };
-    }).filter(Boolean).slice(0,15);
-  } catch(e) { return []; }
+      return { title: ta.textContent.trim(), time: '', score: 0, source: 'ptt', sentiment: null, reason: '' };
+    }).filter(Boolean).slice(0, 10);
+    if (posts.length > 0) return posts;
+  } catch(e) {}
+
+  return [];
 }
 
 async function sentFetchReddit(sub) {
@@ -1870,19 +1905,33 @@ async function sentAnalyzeGroq(posts) {
   const BATCH = 10;
   for (let i = 0; i < posts.length; i += BATCH) {
     const batch = posts.slice(i, i+BATCH);
-    const prompt = `分析以下貼文標題的市場情緒，輸出 JSON array，不要其他文字：
-[{"idx":0,"sentiment":"bull/bear/neutral","reason":"10字內"}]
+    const prompt = `你是財經情緒分析師。分析以下貼文標題，輸出 JSON array，不要其他文字。
+
+規則：
+- sentiment: "bull"（看多/利多）、"bear"（看空/利空）、"neutral"（中性討論）
+- reason: 繁體中文，10字內
+- title_zh: 英文標題翻譯成繁體中文；中文標題原文照寫
+
+格式：[{"idx":0,"sentiment":"bull","reason":"AI需求強","title_zh":"繁中標題"}]
+
+貼文：
 ${batch.map((p,j)=>`${j}. [${p.source.toUpperCase()}] ${p.title}`).join('\n')}`;
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqApiKey}`},
-        body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], temperature:0.2, max_tokens:600 })
+        body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], temperature:0.2, max_tokens:900 })
       });
       const d = await res.json();
       if (d.error) throw new Error(d.error.message);
       const parsed = JSON.parse(d.choices[0].message.content.replace(/```json|```/g,'').trim());
-      parsed.forEach(r => { if(batch[r.idx]){batch[r.idx].sentiment=r.sentiment;batch[r.idx].reason=r.reason||'';} });
-    } catch(e) { batch.forEach(p=>{p.sentiment=p.sentiment||'neutral';}); }
+      parsed.forEach(r => {
+        if (batch[r.idx]) {
+          batch[r.idx].sentiment = r.sentiment;
+          batch[r.idx].reason = r.reason || '';
+          if (r.title_zh) batch[r.idx].title_zh = r.title_zh;
+        }
+      });
+    } catch(e) { batch.forEach(p=>{ p.sentiment = p.sentiment||'neutral'; }); }
     if (i+BATCH < posts.length) await new Promise(r=>setTimeout(r,300));
   }
   return posts;
@@ -1890,11 +1939,17 @@ ${batch.map((p,j)=>`${j}. [${p.source.toUpperCase()}] ${p.title}`).join('\n')}`;
 
 async function sentGenerateSummary(posts) {
   const bull=posts.filter(p=>p.sentiment==='bull').length, bear=posts.filter(p=>p.sentiment==='bear').length, neu=posts.filter(p=>p.sentiment==='neutral').length;
-  const prompt = `根據以下社群資料，用繁體中文寫一段約80字的市場情緒摘要（段落形式）：多頭${bull}篇、空頭${bear}篇、中性${neu}篇。熱門：${posts.slice(0,4).map(p=>p.title).join('；')}`;
+  const topPosts = posts.slice(0,8).map(p=>`[${p.source.toUpperCase()}${p.sentiment==='bull'?'↑':p.sentiment==='bear'?'↓':''}] ${p.title_zh||p.title}`).join('；');
+  const prompt = `你是專業財經分析師。根據以下社群討論資料，用繁體中文寫一段150字左右的市場情緒分析報告（段落形式，不要列點）。
+
+數據：PTT ${posts.filter(p=>p.source==='ptt').length}篇（多${posts.filter(p=>p.source==='ptt'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='ptt'&&p.sentiment==='bear').length}）、WSB ${posts.filter(p=>p.source==='wsb').length}篇（多${posts.filter(p=>p.source==='wsb'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='wsb'&&p.sentiment==='bear').length}）、r/investing ${posts.filter(p=>p.source==='inv').length}篇（多${posts.filter(p=>p.source==='inv'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='inv'&&p.sentiment==='bear').length}）
+熱門討論：${topPosts}
+
+請分析：1)整體情緒傾向 2)各來源差異 3)主要關注議題 4)短期市場風險提示`;
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqApiKey}`},
-      body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], temperature:0.5, max_tokens:250 })
+      body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], temperature:0.5, max_tokens:500 })
     });
     const d = await res.json();
     return d.choices?.[0]?.message?.content || null;
@@ -1923,24 +1978,24 @@ async function startSentimentAnalysis() {
 
 function loadSentimentDemo() {
   const demo = [
-    {title:'[標的] 台積電 2330 多',time:'03/26',score:85,source:'ptt',sentiment:'bull',reason:'AI 需求強勁'},
-    {title:'[閒聊] 今天大盤漲很多，是真的嗎',time:'03/26',score:42,source:'ptt',sentiment:'bull',reason:'正面行情'},
-    {title:'[新聞] Fed 可能升息，市場震盪',time:'03/26',score:61,source:'ptt',sentiment:'bear',reason:'升息利空'},
-    {title:'[心得] 這波下跌是好機會嗎？',time:'03/25',score:33,source:'ptt',sentiment:'neutral',reason:'觀望態度'},
-    {title:'[標的] 聯發科 2454 空，目標 1000',time:'03/25',score:28,source:'ptt',sentiment:'bear',reason:'目標做空'},
-    {title:'NVDA to $1000 EOY - here is why',time:'03/26',score:12400,source:'wsb',sentiment:'bull',reason:'AI 樂觀'},
-    {title:'I lost everything. YOLO on puts',time:'03/25',score:8900,source:'wsb',sentiment:'bear',reason:'看跌操作'},
-    {title:"SPY calls printing, who's with me?",time:'03/26',score:6700,source:'wsb',sentiment:'bull',reason:'買入看漲'},
-    {title:'Fed is going to crash this market',time:'03/25',score:4200,source:'wsb',sentiment:'bear',reason:'Fed 利空'},
-    {title:'TSMC blows out earnings again 🚀',time:'03/26',score:3300,source:'wsb',sentiment:'bull',reason:'財報亮眼'},
-    {title:'Is the market overvalued? Analysis inside',time:'03/26',score:2800,source:'inv',sentiment:'neutral',reason:'估值分析'},
-    {title:"Why I'm building cash for the correction",time:'03/26',score:2100,source:'inv',sentiment:'bear',reason:'預期修正'},
-    {title:'Dollar-cost averaging through volatility',time:'03/25',score:1900,source:'inv',sentiment:'neutral',reason:'定期定額'},
-    {title:'Tech sector showing strong momentum',time:'03/26',score:1600,source:'inv',sentiment:'bull',reason:'科技動能'},
-    {title:'Inflation data surprises to downside',time:'03/26',score:1400,source:'inv',sentiment:'bull',reason:'通膨降溫'},
+    {title:'[標的] 台積電 2330 多',time:'03/26',score:85,source:'ptt',sentiment:'bull',reason:'AI 需求強勁',title_zh:'[標的] 台積電 2330 多'},
+    {title:'[閒聊] 今天大盤漲很多，是真的嗎',time:'03/26',score:42,source:'ptt',sentiment:'bull',reason:'正面行情',title_zh:'[閒聊] 今天大盤漲很多，是真的嗎'},
+    {title:'[新聞] Fed 可能升息，市場震盪',time:'03/26',score:61,source:'ptt',sentiment:'bear',reason:'升息利空',title_zh:'[新聞] Fed 可能升息，市場震盪'},
+    {title:'[心得] 這波下跌是好機會嗎？',time:'03/25',score:33,source:'ptt',sentiment:'neutral',reason:'觀望態度',title_zh:'[心得] 這波下跌是好機會嗎？'},
+    {title:'[標的] 聯發科 2454 空，目標 1000',time:'03/25',score:28,source:'ptt',sentiment:'bear',reason:'目標做空',title_zh:'[標的] 聯發科 2454 空，目標 1000'},
+    {title:'NVDA to $1000 EOY - here is why',time:'03/26',score:12400,source:'wsb',sentiment:'bull',reason:'AI 樂觀',title_zh:'輝達年底目標 1000 美元分析'},
+    {title:'I lost everything. YOLO on puts',time:'03/25',score:8900,source:'wsb',sentiment:'bear',reason:'看跌操作',title_zh:'我賠光了，梭哈買賣權'},
+    {title:"SPY calls printing, who's with me?",time:'03/26',score:6700,source:'wsb',sentiment:'bull',reason:'買入看漲',title_zh:'SPY 買權大漲，誰跟我一起？'},
+    {title:'Fed is going to crash this market',time:'03/25',score:4200,source:'wsb',sentiment:'bear',reason:'Fed 利空',title_zh:'Fed 將導致市場崩潰'},
+    {title:'TSMC blows out earnings again 🚀',time:'03/26',score:3300,source:'wsb',sentiment:'bull',reason:'財報亮眼',title_zh:'台積電再度繳出亮眼財報 🚀'},
+    {title:'Is the market overvalued? Analysis inside',time:'03/26',score:2800,source:'inv',sentiment:'neutral',reason:'估值分析',title_zh:'市場估值過高了嗎？深度分析'},
+    {title:"Why I'm building cash for the correction",time:'03/26',score:2100,source:'inv',sentiment:'bear',reason:'預期修正',title_zh:'為何我正在儲備現金等待修正'},
+    {title:'Dollar-cost averaging through volatility',time:'03/25',score:1900,source:'inv',sentiment:'neutral',reason:'定期定額',title_zh:'在波動中堅持定期定額投資'},
+    {title:'Tech sector showing strong momentum',time:'03/26',score:1600,source:'inv',sentiment:'bull',reason:'科技動能',title_zh:'科技板塊展現強勁上漲動能'},
+    {title:'Inflation data surprises to downside',time:'03/26',score:1400,source:'inv',sentiment:'bull',reason:'通膨降溫',title_zh:'通膨數據優於預期，低於市場預估'},
   ];
   sentAllPosts = demo;
-  document.getElementById('sentAiText').textContent = '社群整體情緒偏向多頭，PTT 以台積電、聯發科為主要討論標的，市場對 AI 概念股維持樂觀預期。Reddit WSB 情緒較為極端，多空分歧明顯；r/investing 則以理性分析為主，部分投資者對 Fed 政策保持觀望。整體來看，短線偏多，但需留意升息風險帶來的波動。';
+  document.getElementById('sentAiText').textContent = '整體社群情緒偏向多頭，多空比例約為 8:5。PTT 股票版討論聚焦台積電與聯發科，多頭訊號明顯，但部分版友對 Fed 升息疑慮保持謹慎。Reddit WSB 情緒最為兩極，輝達 AI 題材持續吸引多頭資金，但也有大量看跌貼文反映恐懼情緒。r/investing 相對理性，多數討論圍繞估值過高風險與現金部位配置，暗示機構型投資人已開始布局防守。關鍵風險在於 Fed 利率決策不確定性及科技股高估值，短期雖偏多但波動率可能上升。';
   document.getElementById('sentAiSummary').style.display = 'block';
   sentRenderDashboard(demo);
 }
