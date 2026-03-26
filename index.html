@@ -547,8 +547,8 @@
   .mkt-sub { font-size: 0.63rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
   .mkt-val { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; font-weight: 500; text-align: right; }
   .mkt-chg { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; text-align: right; }
-  .mkt-chg.up { color: var(--accent3); }
-  .mkt-chg.down { color: #e03030; }
+  .mkt-chg.up { color: var(--accent); }
+  .mkt-chg.down { color: var(--accent3); }
 
   .trend-item {
     padding: 0.72rem 1.1rem;
@@ -1705,8 +1705,8 @@ function renderFuturesChart(sortKey) {
       const val = item[sortKey];
       const pct = maxVal ? Math.abs(val) / maxVal * 100 : 0;
       const isUp = val >= 0;
-      const color = isUp ? '#16a34a' : '#ef4444';
-      const barColor = isUp ? '#bbf7d0' : '#fecaca';
+      const color = isUp ? '#c8521a' : '#2a9d5c';
+      const barColor = isUp ? '#fde8dc' : '#d4edda';
       const label = (val >= 0 ? '+' : '') + (val * 100).toFixed(2) + '%';
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;';
@@ -1822,7 +1822,7 @@ function sentRenderPosts() {
         </div>
       </div>
       <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:right;white-space:nowrap;">
-        <strong style="display:block;font-size:0.82rem;color:var(--text);">${p.score>0?'+':''}${p.score}</strong>分數
+        <strong style="display:block;font-size:0.82rem;color:var(--text);">${p.score>999?Math.round(p.score/1000)+'k':p.score>0?'+'+p.score:p.score}</strong>${p.source==='ptt'?'推文':'👍 讚數'}
       </div>
     </div>`;
   }).join('');
@@ -1843,62 +1843,63 @@ function sentFilterSentiment(s, el) {
 }
 
 async function sentFetchPTT() {
-  // 嘗試多個 proxy，任一成功即返回
-  const proxies = [
-    url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  ];
-  const pttUrl = 'https://www.ptt.cc/bbs/Stock/index.html';
-
-  for (const makeProxy of proxies) {
-    try {
-      const res = await fetch(makeProxy(pttUrl), { signal: AbortSignal.timeout(7000) });
-      if (!res.ok) continue;
-      const raw = await res.json().catch(() => null);
-      // allorigins / codetabs return {contents:...}, corsproxy returns raw text
-      const html = raw ? (raw.contents || raw) : await res.text();
-      if (!html || typeof html !== 'string' || !html.includes('r-ent')) continue;
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      const posts = Array.from(doc.querySelectorAll('.r-ent')).map(el => {
-        const ta = el.querySelector('.title a');
-        const sc = el.querySelector('.nrec span');
-        if (!ta) return null;
-        const title = ta.textContent.trim();
-        if (title.startsWith('[公告]') || title.startsWith('Fw:') || title.startsWith('[板規]')) return null;
-        return {
-          title,
-          time: el.querySelector('.meta .date')?.textContent.trim() || '',
-          score: sc ? (sc.textContent.trim() === '爆' ? 99 : parseInt(sc.textContent) || 0) : 0,
-          source: 'ptt', sentiment: null, reason: ''
-        };
-      }).filter(Boolean).slice(0, 15);
-      if (posts.length > 0) return posts;
-    } catch(e) { continue; }
-  }
-
-  // 最後備案：抓多頁 index 試試
+  // PTT Stock 板 RSS（公開，無需登入，不受 CORS 限制）
+  const RSS_URL = 'https://www.ptt.cc/atom/Stock.xml';
+  const PROXY   = `https://api.allorigins.win/get?url=${encodeURIComponent(RSS_URL)}`;
   try {
-    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent('https://www.ptt.cc/bbs/Stock/index1.html')}`, { signal: AbortSignal.timeout(6000) });
-    const text = await res.text();
-    const doc = new DOMParser().parseFromString(text, 'text/html');
-    const posts = Array.from(doc.querySelectorAll('.r-ent')).map(el => {
-      const ta = el.querySelector('.title a');
-      if (!ta) return null;
-      return { title: ta.textContent.trim(), time: '', score: 0, source: 'ptt', sentiment: null, reason: '' };
-    }).filter(Boolean).slice(0, 10);
-    if (posts.length > 0) return posts;
-  } catch(e) {}
-
-  return [];
+    const res  = await fetch(PROXY, { signal: AbortSignal.timeout(9000) });
+    const data = await res.json();
+    const xml  = data.contents;
+    const doc  = new DOMParser().parseFromString(xml, 'application/xml');
+    const entries = Array.from(doc.querySelectorAll('entry'));
+    const now24 = Date.now() - 24 * 60 * 60 * 1000;
+    const posts = [];
+    for (const e of entries) {
+      const title   = e.querySelector('title')?.textContent?.trim() || '';
+      const updated = e.querySelector('updated')?.textContent?.trim() || '';
+      const time    = updated ? new Date(updated).toLocaleDateString('zh-TW') : '';
+      const ts      = updated ? new Date(updated).getTime() : 0;
+      if (!title || title.startsWith('[公告]') || title.startsWith('[板規]')) continue;
+      posts.push({ title, time, score: 0, source: 'ptt', sentiment: null, reason: '', ts });
+    }
+    return posts.slice(0, 20);
+  } catch(e) {
+    console.warn('PTT RSS failed:', e.message);
+    return [];
+  }
 }
 
 async function sentFetchReddit(sub) {
-  try {
-    const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=15`, { signal: AbortSignal.timeout(8000) });
-    const data = await res.json();
-    return data.data.children.map(c=>c.data).map(p=>({ title:p.title, time:new Date(p.created_utc*1000).toLocaleDateString('zh-TW'), score:p.score, source:sub==='wallstreetbets'?'wsb':'inv', sentiment:null, reason:'' }));
-  } catch(e) { return []; }
+  const srcKey = sub === 'wallstreetbets' ? 'wsb' : 'inv';
+  const now24  = Date.now() - 24 * 60 * 60 * 1000;
+  const seen   = new Set();
+  let posts    = [];
+  for (const sort of ['hot', 'new']) {
+    try {
+      const res  = await fetch(`https://www.reddit.com/r/${sub}/${sort}.json?limit=25`, { signal: AbortSignal.timeout(8000) });
+      const data = await res.json();
+      for (const c of data.data.children) {
+        const p = c.data;
+        if (seen.has(p.id)) continue;
+        seen.add(p.id);
+        const ts = p.created_utc * 1000;
+        posts.push({
+          title: p.title,
+          time: new Date(ts).toLocaleDateString('zh-TW'),
+          score: p.score,
+          source: srcKey,
+          sentiment: null,
+          reason: '',
+          ts
+        });
+      }
+    } catch(e) { continue; }
+  }
+  // 優先顯示 24 小時內；若不足則補入較舊文章
+  const recent = posts.filter(p => p.ts >= now24);
+  const older  = posts.filter(p => p.ts < now24);
+  const result = [...recent, ...older].slice(0, 20);
+  return result;
 }
 
 async function sentAnalyzeGroq(posts) {
@@ -1964,7 +1965,8 @@ async function startSentimentAnalysis() {
   document.getElementById('sentAiSummary').style.display = 'none';
   try {
     const [ptt,wsb,inv] = await Promise.all([sentFetchPTT(), sentFetchReddit('wallstreetbets'), sentFetchReddit('investing')]);
-    let posts = [...ptt,...wsb,...inv];
+    // 合併並依時間排序（最新在前）
+    let posts = [...ptt,...wsb,...inv].sort((a,b) => (b.ts||0) - (a.ts||0));
     if (!posts.length) { document.getElementById('sentPostList').innerHTML=`<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;">無法取得資料，請改用 Demo 模式</div>`; btn.disabled=false;btn.textContent='▶ 分析';return; }
     btn.textContent = `⏳ AI 分析 ${posts.length} 篇...`;
     posts = await sentAnalyzeGroq(posts);
