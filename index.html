@@ -452,6 +452,39 @@
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── Sentiment Panel ── */
+  @keyframes sentPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @media(max-width:680px){ .sent-top-grid{ grid-template-columns:1fr !important; } }
+  .sent-src-tab {
+    font-family:'IBM Plex Mono',monospace; font-size:0.68rem;
+    padding:5px 12px; border-radius:20px; border:1px solid var(--border);
+    background:var(--surface); cursor:pointer; transition:all 0.15s;
+  }
+  .sent-src-tab.active { background:var(--text); color:#fff; border-color:var(--text); }
+  .sent-pill {
+    font-family:'IBM Plex Mono',monospace; font-size:0.63rem;
+    padding:4px 10px; border-radius:20px; border:1px solid var(--border);
+    background:var(--surface); cursor:pointer; transition:all 0.15s;
+  }
+  .sent-pill.active-bull    { background:#2a9d5c; color:#fff; border-color:#2a9d5c; }
+  .sent-pill.active-bear    { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .sent-pill.active-neutral { background:var(--muted); color:#fff; border-color:var(--muted); }
+  .sent-pill.active-all     { background:var(--text); color:#fff; border-color:var(--text); }
+  .sent-post-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:5px;
+    padding:12px 14px; display:grid; grid-template-columns:auto 1fr auto;
+    gap:10px; align-items:start; transition:border-color 0.15s;
+  }
+  .sent-post-card:hover { border-color:var(--accent2); }
+  .sent-s-pill {
+    font-family:'IBM Plex Mono',monospace; font-size:0.58rem;
+    padding:3px 7px; border-radius:2px; font-weight:500;
+    letter-spacing:0.08em; white-space:nowrap;
+  }
+  .sent-bull    { background:#d4edda; color:#155724; }
+  .sent-bear    { background:#f8d7da; color:#721c24; }
+  .sent-neutral { background:#e2e3e5; color:#383d41; }
+
   .feed-state p { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
   .feed-state small { font-size: 0.68rem; margin-top: 0.4rem; display: block; }
 
@@ -631,6 +664,7 @@
   <button class="cat-tab" data-cat="economy">📈 經濟</button>
   <button class="cat-tab" data-cat="geopolitics">🌐 地緣政治</button>
   <button class="cat-tab" id="futuresTab" onclick="showFutures()" style="margin-left:1rem;border-left:1px solid var(--border);padding-left:1rem;">📊 全球商品</button>
+  <button class="cat-tab" id="sentimentTab" onclick="showSentiment()" style="border-left:1px solid var(--border);padding-left:1rem;">🌐 社群情緒</button>
 </div>
 
 <main>
@@ -674,6 +708,97 @@
       <button class="fut-sort-btn" onclick="renderFuturesChart('volPct')" style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;padding:0.3rem 0.8rem;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--muted);cursor:pointer;">波幅</button>
     </div>
     <div id="futuresChart"></div>
+  </div>
+</div>
+
+<!-- ── 社群情緒面板 ── -->
+<div id="sentimentPanel" style="display:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:0.5rem;">
+    <div style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;">社群情緒儀表板</div>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+      <span id="sentimentTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);"></span>
+      <button onclick="startSentimentAnalysis()" id="sentimentAnalyzeBtn" style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;padding:0.3rem 0.9rem;border:none;border-radius:4px;background:var(--accent);color:#fff;cursor:pointer;">▶ 分析</button>
+      <button onclick="loadSentimentDemo()" style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;padding:0.3rem 0.9rem;border:1px solid var(--accent2);border-radius:4px;background:transparent;color:var(--accent2);cursor:pointer;">Demo</button>
+    </div>
+  </div>
+
+  <!-- AI Summary -->
+  <div id="sentAiSummary" style="display:none;background:var(--text);color:#f5f3ee;border-radius:6px;padding:16px 20px;margin-bottom:18px;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:var(--accent);letter-spacing:0.12em;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+      <span style="width:6px;height:6px;background:var(--accent);border-radius:50%;display:inline-block;animation:sentPulse 1.5s infinite;"></span>
+      AI SENTIMENT SUMMARY
+    </div>
+    <p id="sentAiText" style="font-size:0.85rem;line-height:1.7;"></p>
+  </div>
+
+  <!-- Source tabs -->
+  <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+    <button class="sent-src-tab active" data-src="all" onclick="sentFilterSrc('all',this)">🌐 全部</button>
+    <button class="sent-src-tab" data-src="ptt" onclick="sentFilterSrc('ptt',this)">🇹🇼 PTT 股票版</button>
+    <button class="sent-src-tab" data-src="wsb" onclick="sentFilterSrc('wsb',this)">🟠 Reddit WSB</button>
+    <button class="sent-src-tab" data-src="inv" onclick="sentFilterSrc('inv',this)">🔵 r/investing</button>
+  </div>
+
+  <!-- Gauge + bars row -->
+  <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-bottom:18px;" class="sent-top-grid">
+    <!-- Gauge -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 16px;display:flex;flex-direction:column;align-items:center;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:12px;">SENTIMENT SCORE</div>
+      <svg viewBox="0 0 200 110" style="width:180px;height:99px;">
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e8e4dc" stroke-width="16" stroke-linecap="round"/>
+        <path d="M 20 100 A 80 80 0 0 1 80 28"   fill="none" stroke="#f5c6cb" stroke-width="16" stroke-linecap="round"/>
+        <path d="M 80 28  A 80 80 0 0 1 120 28"  fill="none" stroke="#e2e3e5" stroke-width="16" stroke-linecap="round"/>
+        <path d="M 120 28 A 80 80 0 0 1 180 100" fill="none" stroke="#c3e6cb" stroke-width="16" stroke-linecap="round"/>
+        <line id="sentNeedle" x1="100" y1="100" x2="100" y2="30" stroke="#1a1814" stroke-width="3" stroke-linecap="round" transform="rotate(0,100,100)"/>
+        <circle cx="100" cy="100" r="6" fill="#1a1814"/>
+        <text x="16"  y="118" font-size="9" fill="#8a8278" font-family="IBM Plex Mono">BEAR</text>
+        <text x="168" y="118" font-size="9" fill="#8a8278" font-family="IBM Plex Mono">BULL</text>
+      </svg>
+      <div id="sentGaugeValue" style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:var(--muted);">—</div>
+      <div id="sentGaugeLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);margin-top:2px;">等待分析</div>
+    </div>
+    <!-- Bars -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 20px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:14px;">BREAKDOWN</div>
+      <div style="display:flex;flex-direction:column;gap:12px;" id="sentBarsWrap">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent3);width:50px;">多頭</span>
+          <div style="flex:1;background:#e8e4dc;border-radius:2px;height:16px;overflow:hidden;"><div id="sentBullBar" style="height:100%;width:0%;background:var(--accent3);border-radius:2px;transition:width 0.8s;"></div></div>
+          <span id="sentBullCnt" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--accent3);width:28px;text-align:right;">0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);width:50px;">中性</span>
+          <div style="flex:1;background:#e8e4dc;border-radius:2px;height:16px;overflow:hidden;"><div id="sentNeuBar" style="height:100%;width:0%;background:var(--muted);border-radius:2px;transition:width 0.8s;"></div></div>
+          <span id="sentNeuCnt" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);width:28px;text-align:right;">0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent);width:50px;">空頭</span>
+          <div style="flex:1;background:#e8e4dc;border-radius:2px;height:16px;overflow:hidden;"><div id="sentBearBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.8s;"></div></div>
+          <span id="sentBearCnt" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--accent);width:28px;text-align:right;">0</span>
+        </div>
+      </div>
+      <!-- per-source mini -->
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:8px;">BY SOURCE</div>
+        <div id="sentSrcBreakdown" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Posts list -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+    <div style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:600;">貼文列表</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;" id="sentFilterPills">
+      <button class="sent-pill active-all" onclick="sentFilterSentiment('all',this)">全部</button>
+      <button class="sent-pill" onclick="sentFilterSentiment('bull',this)">多頭 🟢</button>
+      <button class="sent-pill" onclick="sentFilterSentiment('neutral',this)">中性 ⚪</button>
+      <button class="sent-pill" onclick="sentFilterSentiment('bear',this)">空頭 🔴</button>
+    </div>
+  </div>
+  <div id="sentPostList" style="display:flex;flex-direction:column;gap:8px;">
+    <div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;">
+      需要 Groq Key（上方已設定），點擊「▶ 分析」開始，或點「Demo」查看效果
+    </div>
   </div>
 </div>
 
@@ -1306,6 +1431,8 @@ document.querySelectorAll('.cat-tab[data-cat]').forEach(tab => {
     const nf = document.getElementById('newsFeed');
     const lm = document.getElementById('loadMoreBtn');
     if (fp) fp.style.display = 'none';
+    const sp = document.getElementById('sentimentPanel');
+    if (sp) sp.style.display = 'none';
     if (nf) nf.style.display = 'block';
     renderFeed(getFiltered());
   });
@@ -1603,12 +1730,229 @@ function renderFuturesChart(sortKey) {
   }
 }
 
+// ════════════════════════════════════════════════
+// 社群情緒儀表板
+// ════════════════════════════════════════════════
+let sentAllPosts = [];
+let sentCurSrc  = 'all';
+let sentCurSent = 'all';
+
+function showSentiment() {
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('sentimentTab').classList.add('active');
+  document.getElementById('newsFeed').style.display = 'none';
+  document.getElementById('loadMoreBtn').style.display = 'none';
+  document.querySelector('.feed-header').style.display = 'none';
+  document.getElementById('futuresPanel').style.display = 'none';
+  document.getElementById('sentimentPanel').style.display = 'block';
+}
+
+function hideSentiment() {
+  document.getElementById('sentimentPanel').style.display = 'none';
+  document.getElementById('newsFeed').style.display = 'block';
+  document.querySelector('.feed-header').style.display = 'flex';
+}
+
+function sentSetGauge(score) {
+  const deg = (score / 100) * 180 - 90;
+  document.getElementById('sentNeedle').setAttribute('transform', `rotate(${deg},100,100)`);
+  const v = document.getElementById('sentGaugeValue');
+  const l = document.getElementById('sentGaugeLabel');
+  v.textContent = score;
+  if (score >= 60)      { v.style.color = '#2a9d5c'; l.textContent = '偏多頭'; l.style.color = '#2a9d5c'; }
+  else if (score <= 40) { v.style.color = 'var(--accent)'; l.textContent = '偏空頭'; l.style.color = 'var(--accent)'; }
+  else                  { v.style.color = 'var(--muted)'; l.textContent = '中性偏觀望'; l.style.color = 'var(--muted)'; }
+}
+
+function sentRenderDashboard(posts) {
+  const bull = posts.filter(p => p.sentiment === 'bull').length;
+  const bear = posts.filter(p => p.sentiment === 'bear').length;
+  const neu  = posts.filter(p => p.sentiment === 'neutral').length;
+  const total = posts.length || 1;
+  document.getElementById('sentBullBar').style.width = (bull/total*100)+'%';
+  document.getElementById('sentBearBar').style.width = (bear/total*100)+'%';
+  document.getElementById('sentNeuBar').style.width  = (neu/total*100)+'%';
+  document.getElementById('sentBullCnt').textContent = bull;
+  document.getElementById('sentBearCnt').textContent = bear;
+  document.getElementById('sentNeuCnt').textContent  = neu;
+  const score = Math.min(100, Math.max(0, Math.round(50 + ((bull-bear)/total)*50)));
+  sentSetGauge(score);
+  // per-source breakdown
+  const sb = document.getElementById('sentSrcBreakdown');
+  sb.innerHTML = ['ptt','wsb','inv'].map(src => {
+    const sp  = posts.filter(p => p.source === src);
+    const sb2 = sp.filter(p => p.sentiment === 'bull').length;
+    const pct = Math.round(sb2/(sp.length||1)*100);
+    const lbl = src === 'ptt' ? 'PTT' : src === 'wsb' ? 'WSB' : 'INV';
+    return `<div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:var(--muted);width:28px;">${lbl}</span>
+      <div style="flex:1;background:var(--surface2,#edeae3);border-radius:2px;height:9px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:#2a9d5c;border-radius:2px;transition:width 0.8s;"></div>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:var(--muted);width:34px;">${pct}% 多</span>
+    </div>`;
+  }).join('');
+  document.getElementById('sentimentTs').textContent =
+    `更新：${new Date().toLocaleTimeString('zh-TW')} · ${posts.length} 篇`;
+  sentRenderPosts();
+}
+
+function sentRenderPosts() {
+  let filtered = sentAllPosts;
+  if (sentCurSrc  !== 'all') filtered = filtered.filter(p => p.source === sentCurSrc);
+  if (sentCurSent !== 'all') filtered = filtered.filter(p => p.sentiment === sentCurSent);
+  const srcBadge = s =>
+    s==='ptt' ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:1px 5px;border-radius:2px;background:#fde;color:#e44;border:1px solid #fcc;">PTT</span>`
+    : s==='wsb' ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:1px 5px;border-radius:2px;background:#ffe8dc;color:var(--accent);border:1px solid #fcc;">WSB</span>`
+    : `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:1px 5px;border-radius:2px;background:#dde8f8;color:var(--accent2);border:1px solid #c0d4ef;">INV</span>`;
+  if (!filtered.length) {
+    document.getElementById('sentPostList').innerHTML = `<div style="text-align:center;padding:28px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;">沒有符合條件的貼文</div>`;
+    return;
+  }
+  document.getElementById('sentPostList').innerHTML = filtered.map(p => {
+    const sc = p.sentiment==='bull' ? 'sent-bull' : p.sentiment==='bear' ? 'sent-bear' : 'sent-neutral';
+    const sl = p.sentiment==='bull' ? '多頭' : p.sentiment==='bear' ? '空頭' : '中性';
+    return `<div class="sent-post-card">
+      <span class="sent-s-pill ${sc}">${sl}</span>
+      <div>
+        <div style="font-size:0.83rem;line-height:1.4;margin-bottom:4px;">${p.title}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          ${srcBadge(p.source)}<span>${p.time}</span>${p.reason?`<span>${p.reason}</span>`:''}
+        </div>
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:right;white-space:nowrap;">
+        <strong style="display:block;font-size:0.82rem;color:var(--text);">${p.score>0?'+':''}${p.score}</strong>分數
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function sentFilterSrc(src, el) {
+  sentCurSrc = src;
+  document.querySelectorAll('.sent-src-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  sentRenderPosts();
+}
+
+function sentFilterSentiment(s, el) {
+  sentCurSent = s;
+  document.querySelectorAll('.sent-pill').forEach(p => { p.className = 'sent-pill'; });
+  el.className = `sent-pill active-${s}`;
+  sentRenderPosts();
+}
+
+async function sentFetchPTT() {
+  try {
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent('https://www.ptt.cc/bbs/Stock/index.html')}`;
+    const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    const doc = new DOMParser().parseFromString(data.contents, 'text/html');
+    return Array.from(doc.querySelectorAll('.r-ent')).map(el => {
+      const ta = el.querySelector('.title a');
+      const sc = el.querySelector('.nrec span');
+      if (!ta) return null;
+      const title = ta.textContent.trim();
+      if (title.startsWith('[公告]') || title.startsWith('Fw:')) return null;
+      return { title, time: el.querySelector('.meta .date')?.textContent.trim()||'', score: sc?(sc.textContent.trim()==='爆'?99:parseInt(sc.textContent)||0):0, source:'ptt', sentiment:null, reason:'' };
+    }).filter(Boolean).slice(0,15);
+  } catch(e) { return []; }
+}
+
+async function sentFetchReddit(sub) {
+  try {
+    const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=15`, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    return data.data.children.map(c=>c.data).map(p=>({ title:p.title, time:new Date(p.created_utc*1000).toLocaleDateString('zh-TW'), score:p.score, source:sub==='wallstreetbets'?'wsb':'inv', sentiment:null, reason:'' }));
+  } catch(e) { return []; }
+}
+
+async function sentAnalyzeGroq(posts) {
+  const BATCH = 10;
+  for (let i = 0; i < posts.length; i += BATCH) {
+    const batch = posts.slice(i, i+BATCH);
+    const prompt = `分析以下貼文標題的市場情緒，輸出 JSON array，不要其他文字：
+[{"idx":0,"sentiment":"bull/bear/neutral","reason":"10字內"}]
+${batch.map((p,j)=>`${j}. [${p.source.toUpperCase()}] ${p.title}`).join('\n')}`;
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqApiKey}`},
+        body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], temperature:0.2, max_tokens:600 })
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error.message);
+      const parsed = JSON.parse(d.choices[0].message.content.replace(/```json|```/g,'').trim());
+      parsed.forEach(r => { if(batch[r.idx]){batch[r.idx].sentiment=r.sentiment;batch[r.idx].reason=r.reason||'';} });
+    } catch(e) { batch.forEach(p=>{p.sentiment=p.sentiment||'neutral';}); }
+    if (i+BATCH < posts.length) await new Promise(r=>setTimeout(r,300));
+  }
+  return posts;
+}
+
+async function sentGenerateSummary(posts) {
+  const bull=posts.filter(p=>p.sentiment==='bull').length, bear=posts.filter(p=>p.sentiment==='bear').length, neu=posts.filter(p=>p.sentiment==='neutral').length;
+  const prompt = `根據以下社群資料，用繁體中文寫一段約80字的市場情緒摘要（段落形式）：多頭${bull}篇、空頭${bear}篇、中性${neu}篇。熱門：${posts.slice(0,4).map(p=>p.title).join('；')}`;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqApiKey}`},
+      body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], temperature:0.5, max_tokens:250 })
+    });
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content || null;
+  } catch(e) { return null; }
+}
+
+async function startSentimentAnalysis() {
+  if (!groqApiKey) { alert('請先在上方設定並儲存 Groq API Key'); return; }
+  const btn = document.getElementById('sentimentAnalyzeBtn');
+  btn.disabled = true; btn.textContent = '⏳ 抓取中...';
+  document.getElementById('sentPostList').innerHTML = `<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;"><div class="spinner" style="margin:0 auto 12px;"></div>正在從 PTT、Reddit 抓取貼文…</div>`;
+  document.getElementById('sentAiSummary').style.display = 'none';
+  try {
+    const [ptt,wsb,inv] = await Promise.all([sentFetchPTT(), sentFetchReddit('wallstreetbets'), sentFetchReddit('investing')]);
+    let posts = [...ptt,...wsb,...inv];
+    if (!posts.length) { document.getElementById('sentPostList').innerHTML=`<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;">無法取得資料，請改用 Demo 模式</div>`; btn.disabled=false;btn.textContent='▶ 分析';return; }
+    btn.textContent = `⏳ AI 分析 ${posts.length} 篇...`;
+    posts = await sentAnalyzeGroq(posts);
+    const summary = await sentGenerateSummary(posts);
+    if (summary) { document.getElementById('sentAiText').textContent=summary; document.getElementById('sentAiSummary').style.display='block'; }
+    sentAllPosts = posts;
+    sentRenderDashboard(posts);
+  } catch(e) { document.getElementById('sentPostList').innerHTML=`<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;">錯誤：${e.message}</div>`; }
+  btn.disabled=false; btn.textContent='▶ 重新分析';
+}
+
+function loadSentimentDemo() {
+  const demo = [
+    {title:'[標的] 台積電 2330 多',time:'03/26',score:85,source:'ptt',sentiment:'bull',reason:'AI 需求強勁'},
+    {title:'[閒聊] 今天大盤漲很多，是真的嗎',time:'03/26',score:42,source:'ptt',sentiment:'bull',reason:'正面行情'},
+    {title:'[新聞] Fed 可能升息，市場震盪',time:'03/26',score:61,source:'ptt',sentiment:'bear',reason:'升息利空'},
+    {title:'[心得] 這波下跌是好機會嗎？',time:'03/25',score:33,source:'ptt',sentiment:'neutral',reason:'觀望態度'},
+    {title:'[標的] 聯發科 2454 空，目標 1000',time:'03/25',score:28,source:'ptt',sentiment:'bear',reason:'目標做空'},
+    {title:'NVDA to $1000 EOY - here is why',time:'03/26',score:12400,source:'wsb',sentiment:'bull',reason:'AI 樂觀'},
+    {title:'I lost everything. YOLO on puts',time:'03/25',score:8900,source:'wsb',sentiment:'bear',reason:'看跌操作'},
+    {title:"SPY calls printing, who's with me?",time:'03/26',score:6700,source:'wsb',sentiment:'bull',reason:'買入看漲'},
+    {title:'Fed is going to crash this market',time:'03/25',score:4200,source:'wsb',sentiment:'bear',reason:'Fed 利空'},
+    {title:'TSMC blows out earnings again 🚀',time:'03/26',score:3300,source:'wsb',sentiment:'bull',reason:'財報亮眼'},
+    {title:'Is the market overvalued? Analysis inside',time:'03/26',score:2800,source:'inv',sentiment:'neutral',reason:'估值分析'},
+    {title:"Why I'm building cash for the correction",time:'03/26',score:2100,source:'inv',sentiment:'bear',reason:'預期修正'},
+    {title:'Dollar-cost averaging through volatility',time:'03/25',score:1900,source:'inv',sentiment:'neutral',reason:'定期定額'},
+    {title:'Tech sector showing strong momentum',time:'03/26',score:1600,source:'inv',sentiment:'bull',reason:'科技動能'},
+    {title:'Inflation data surprises to downside',time:'03/26',score:1400,source:'inv',sentiment:'bull',reason:'通膨降溫'},
+  ];
+  sentAllPosts = demo;
+  document.getElementById('sentAiText').textContent = '社群整體情緒偏向多頭，PTT 以台積電、聯發科為主要討論標的，市場對 AI 概念股維持樂觀預期。Reddit WSB 情緒較為極端，多空分歧明顯；r/investing 則以理性分析為主，部分投資者對 Fed 政策保持觀望。整體來看，短線偏多，但需留意升息風險帶來的波動。';
+  document.getElementById('sentAiSummary').style.display = 'block';
+  sentRenderDashboard(demo);
+}
+// ════════ end sentiment ════════
+
 function showFutures() {
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('futuresTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
+  document.getElementById('sentimentPanel').style.display = 'none';
   document.getElementById('futuresPanel').style.display = 'block';
   if (!futuresData.length) loadFutures();
 }
