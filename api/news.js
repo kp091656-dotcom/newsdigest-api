@@ -366,32 +366,68 @@ export default async function handler(req, res) {
     if (!allowedSubs.includes(sub) || !allowedSorts.includes(sort)) {
       return res.status(400).json({ error: 'invalid params' });
     }
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
+    const mkC = (ms) => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c; };
+
+    // Reddit RSS（比 JSON API 更穩定，不需授權）
+    const rssUrl = `https://www.reddit.com/r/${sub}/${sort}.rss?limit=${Math.min(parseInt(limit)||25,50)}`;
     try {
-      const url = `https://www.reddit.com/r/${sub}/${sort}.json?limit=${Math.min(parseInt(limit)||25, 50)}`;
-      const r = await fetch(url, {
+      const r = await fetch(rssUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; NewsDigestBot/1.0)',
-          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
         },
-        signal: ctrl.signal,
+        signal: mkC(12000).signal,
       });
-      clearTimeout(timer);
-      if (!r.ok) throw new Error(`Reddit HTTP ${r.status}`);
-      const data = await r.json();
-      const posts = (data?.data?.children || []).map(c => ({
-        id:      c.data.id,
-        title:   c.data.title,
-        score:   c.data.score,
-        url:     c.data.url,
-        created: c.data.created_utc,
-        num_comments: c.data.num_comments,
-      }));
-      res.status(200).json({ data: posts, count: posts.length, sub, sort });
+      if (!r.ok) throw new Error(`Reddit RSS HTTP ${r.status}`);
+      const xml = await r.text();
+
+      // Parse Atom/RSS entries
+      const posts = [];
+      const entryRe = /<entry>([\s\S]*?)<\/entry>/gi;
+      let m;
+      while ((m = entryRe.exec(xml)) !== null) {
+        const blk = m[1];
+        const getTag = (tag) => {
+          const rx = new RegExp('<' + tag + '[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/' + tag + '>', 'i');
+          const found = blk.match(rx);
+          return found ? found[1].replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#[0-9]+;/g,'').trim() : '';
+        };
+        const title    = getTag('title');
+        const updated  = getTag('updated') || getTag('published');
+        const idTag    = getTag('id');
+        const score    = parseInt(getTag('score')) || 0;
+        const linkM    = blk.match(/<link[^>]+href="([^"]+)"/i);
+        const link     = linkM ? linkM[1] : '';
+        // Reddit Atom id looks like: t3_XXXXX
+        const idMatch  = idTag.match(/t3_([a-z0-9]+)/i);
+        const id       = idMatch ? idMatch[1] : Math.random().toString(36).slice(2);
+        const created  = updated ? Math.floor(new Date(updated).getTime() / 1000) : 0;
+        if (!title || title.length < 3) continue;
+        posts.push({ id, title, score, url: link, created, num_comments: 0 });
+      }
+
+      // fallback: try <item> tags (RSS 2.0)
+      if (posts.length === 0) {
+        const itemRe = /<item>([\s\S]*?)<\/item>/gi;
+        while ((m = itemRe.exec(xml)) !== null) {
+          const blk = m[1];
+          const getTag = (tag) => {
+            const rx = new RegExp('<' + tag + '[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/' + tag + '>', 'i');
+            const found = blk.match(rx);
+            return found ? found[1].replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&#[0-9]+;/g,'').trim() : '';
+          };
+          const title   = getTag('title');
+          const pubDate = getTag('pubDate');
+          const link    = getTag('link') || (blk.match(/<link>([^<]+)<\/link>/i)?.[1] || '').trim();
+          const created = pubDate ? Math.floor(new Date(pubDate).getTime() / 1000) : 0;
+          if (!title || title.length < 3) continue;
+          posts.push({ id: Math.random().toString(36).slice(2), title, score: 0, url: link, created, num_comments: 0 });
+        }
+      }
+
+      res.status(200).json({ data: posts.slice(0, parseInt(limit)||25), count: posts.length, sub, sort, source: 'rss' });
     } catch(e) {
-      clearTimeout(timer);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ error: e.message, sub, sort });
     }
     return;
   }
