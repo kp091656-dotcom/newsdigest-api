@@ -1843,63 +1843,62 @@ function sentFilterSentiment(s, el) {
 }
 
 async function sentFetchPTT() {
-  // PTT Stock 板 RSS（公開，無需登入，不受 CORS 限制）
-  const RSS_URL = 'https://www.ptt.cc/atom/Stock.xml';
-  const PROXY   = `https://api.allorigins.win/get?url=${encodeURIComponent(RSS_URL)}`;
+  // 透過 Vercel API proxy 抓 PTT Stock RSS（解決 CORS）
   try {
-    const res  = await fetch(PROXY, { signal: AbortSignal.timeout(9000) });
-    const data = await res.json();
-    const xml  = data.contents;
-    const doc  = new DOMParser().parseFromString(xml, 'application/xml');
-    const entries = Array.from(doc.querySelectorAll('entry'));
+    const res  = await fetch('/api/news?endpoint=ptt', { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
     const now24 = Date.now() - 24 * 60 * 60 * 1000;
-    const posts = [];
-    for (const e of entries) {
-      const title   = e.querySelector('title')?.textContent?.trim() || '';
-      const updated = e.querySelector('updated')?.textContent?.trim() || '';
-      const time    = updated ? new Date(updated).toLocaleDateString('zh-TW') : '';
-      const ts      = updated ? new Date(updated).getTime() : 0;
-      if (!title || title.startsWith('[公告]') || title.startsWith('[板規]')) continue;
-      posts.push({ title, time, score: 0, source: 'ptt', sentiment: null, reason: '', ts });
-    }
-    return posts.slice(0, 20);
+    return (json.data || []).map(e => {
+      const ts = e.updated ? new Date(e.updated).getTime() : 0;
+      return {
+        title:  e.title,
+        time:   e.updated ? new Date(e.updated).toLocaleDateString('zh-TW') : '',
+        score:  0,
+        source: 'ptt',
+        sentiment: null,
+        reason: '',
+        ts,
+      };
+    }).slice(0, 20);
   } catch(e) {
-    console.warn('PTT RSS failed:', e.message);
+    console.warn('PTT proxy failed:', e.message);
     return [];
   }
 }
 
 async function sentFetchReddit(sub) {
+  // 透過 Vercel API proxy 抓 Reddit（解決 CORS）
   const srcKey = sub === 'wallstreetbets' ? 'wsb' : 'inv';
   const now24  = Date.now() - 24 * 60 * 60 * 1000;
   const seen   = new Set();
   let posts    = [];
   for (const sort of ['hot', 'new']) {
     try {
-      const res  = await fetch(`https://www.reddit.com/r/${sub}/${sort}.json?limit=25`, { signal: AbortSignal.timeout(8000) });
-      const data = await res.json();
-      for (const c of data.data.children) {
-        const p = c.data;
+      const res  = await fetch(`/api/news?endpoint=reddit&sub=${sub}&sort=${sort}&limit=25`, { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      for (const p of (json.data || [])) {
         if (seen.has(p.id)) continue;
         seen.add(p.id);
-        const ts = p.created_utc * 1000;
+        const ts = (p.created || 0) * 1000;
         posts.push({
           title: p.title,
-          time: new Date(ts).toLocaleDateString('zh-TW'),
+          time:  ts ? new Date(ts).toLocaleDateString('zh-TW') : '',
           score: p.score,
           source: srcKey,
           sentiment: null,
           reason: '',
-          ts
+          ts,
         });
       }
-    } catch(e) { continue; }
+    } catch(e) { console.warn(`Reddit ${sub}/${sort} failed:`, e.message); continue; }
   }
-  // 優先顯示 24 小時內；若不足則補入較舊文章
   const recent = posts.filter(p => p.ts >= now24);
   const older  = posts.filter(p => p.ts < now24);
-  const result = [...recent, ...older].slice(0, 20);
-  return result;
+  return [...recent, ...older].slice(0, 20);
 }
 
 async function sentAnalyzeGroq(posts) {
