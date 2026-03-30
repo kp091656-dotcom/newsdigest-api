@@ -1828,13 +1828,9 @@ function sentRenderPosts() {
         </div>
       </div>
       <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:right;white-space:nowrap;min-width:56px;">
-        ${p.source==='ptt' ? `
-          <strong style="display:block;font-size:0.85rem;color:${(p.pushes||0)>0?'var(--accent)':(p.pushes||0)<0?'var(--accent3)':'var(--muted)'};">${(p.pushes||0)>0?'+':''}${p.pushes||0}</strong>
-          <span style="font-size:0.6rem;">推文淨值</span>
-        ` : `
-          <strong style="display:block;font-size:0.85rem;color:${(p.rank&&p.rank<=5)?'var(--accent)':'var(--text)'};">${p.rank ? '#'+p.rank : '—'}</strong>
-          <span style="font-size:0.6rem;">熱度排名</span>
-        `}
+        <strong style="display:block;font-size:0.85rem;color:${(p.rank&&p.rank<=5)?'var(--accent)':'var(--text)'};">${p.rank ? '#'+p.rank : '—'}</strong>
+        <span style="font-size:0.6rem;">${p.source==='ptt'?'時間排名':'熱度排名'}</span>
+        ${p.source==='ptt' && p.pushes ? `<div style="font-size:0.6rem;color:${p.pushes>0?'var(--accent)':p.pushes<0?'var(--accent3)':'#aaa'};">推${p.pushes>0?'+':''}${p.pushes}</div>` : ''}
         ${p.confidence ? `<div style="font-size:0.55rem;margin-top:2px;color:${p.confidence==='high'?'var(--accent3)':p.confidence==='low'?'#aaa':'var(--accent2)'};">${p.confidence==='high'?'◆高信心':p.confidence==='low'?'◇低信心':'◈中信心'}</div>` : ''}
       </div>
     </div>`;
@@ -1866,8 +1862,9 @@ async function sentFetchPTT() {
       const ts = e.updated ? new Date(e.updated).getTime() : 0;
       return {
         title:  e.title,
-        body:   e.body || '',       // 內文摘要（由 API 提供）
-        pushes: e.pushes || 0,      // 推文數（正負）
+        body:   e.body || '',
+        pushes: e.pushes || 0,
+        rank:   e.rank  || 0,       // 時間排名（1=最新）
         time:   e.updated ? new Date(e.updated).toLocaleDateString('zh-TW') : '',
         score:  e.pushes || 0,
         source: 'ptt',
@@ -1926,8 +1923,8 @@ async function sentAnalyzeGroq(posts) {
     const postLines = batch.map((p, j) => {
       const src    = p.source.toUpperCase();
       const engStr = p.source === 'ptt'
-        ? (p.pushes ? `推文淨值:${p.pushes>0?'+':''}${p.pushes}（正=多推/負=多噓）` : '推文:無資料（剛發文）')
-        : (p.rank ? `熱度排名:#${p.rank}（數字越小越熱門，由Reddit演算法決定）` : '熱度:未知');
+        ? `時間排名:#${p.rank||'?'}（越小=越新），推文淨值:${p.pushes>0?'+':''}${p.pushes||0}（正=多推認同）`
+        : (p.rank ? `熱度排名:#${p.rank}（Reddit演算法，數字越小越熱門）` : '熱度:未知');
       const body = p.body ? `\n   摘要：${p.body.slice(0, 120)}` : '';
       return `${j}. [${src}] ${p.title}${body}\n   互動→ ${engStr}`;
     }).join('\n');
@@ -1935,7 +1932,7 @@ async function sentAnalyzeGroq(posts) {
     const prompt = `你是專業財經情緒分析師。根據【標題、摘要、互動數】判斷市場情緒。
 
 互動數說明：
-- PTT「推文淨值」正數=多推認同，負數=多噓質疑；「無資料」代表剛發文，不影響判斷
+- PTT「時間排名」=#1最新發文；推文淨值正數=社群認同，負數=質疑
 - Reddit「熱度排名」= Reddit演算法熱度位置，#1最熱；排名越前=越多人互動
 
 sentiment規則：
