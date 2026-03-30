@@ -1827,8 +1827,13 @@ function sentRenderPosts() {
           ${srcBadge(p.source)}<span>${p.time}</span>${p.reason?`<span>${p.reason}</span>`:''}
         </div>
       </div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:right;white-space:nowrap;">
-        <strong style="display:block;font-size:0.82rem;color:var(--text);">${p.score>999?Math.round(p.score/1000)+'k':p.score>0?'+'+p.score:p.score}</strong>${p.source==='ptt'?'推文':'👍 讚數'}
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:right;white-space:nowrap;min-width:52px;">
+        ${p.source==='ptt' ? `
+          <strong style="display:block;font-size:0.82rem;color:${(p.pushes||0)>0?'var(--accent)':(p.pushes||0)<0?'var(--accent3)':'var(--muted)'};">${(p.pushes||0)>0?'+':''}${p.pushes||0}</strong>推文數
+        ` : `
+          <strong style="display:block;font-size:0.82rem;color:var(--text);">${(p.score||0)>999?Math.round((p.score||0)/1000)+'k':(p.score||0)}</strong>👍 讚
+        `}
+        ${p.confidence ? `<span style="font-size:0.55rem;color:${p.confidence==='high'?'var(--accent3)':p.confidence==='low'?'var(--muted)':'var(--accent2)'};">${p.confidence==='high'?'◆ 高信心':p.confidence==='low'?'◇ 低信心':'◈ 中信心'}</span>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1914,28 +1919,36 @@ async function sentAnalyzeGroq(posts) {
   const BATCH = 8; // 含內文後 token 較多，縮小 batch
   for (let i = 0; i < posts.length; i += BATCH) {
     const batch = posts.slice(i, i+BATCH);
-    // 組合每篇貼文的分析素材：標題 + 內文摘要 + 互動數
+    // 組合每篇貼文的分析素材
     const postLines = batch.map((p, j) => {
-      const src   = p.source.toUpperCase();
-      const inter = p.source === 'ptt'
-        ? `推文:${p.pushes||0}`
-        : `讚數:${p.score||0} 留言:${p.comments||0}`;
-      const body  = p.body ? `\n   內文摘要：${p.body.slice(0, 120)}` : '';
-      return `${j}. [${src}] 標題：${p.title}${body}\n   互動：${inter}`;
+      const src    = p.source.toUpperCase();
+      const engStr = p.source === 'ptt'
+        ? (p.pushes ? `推文淨值:${p.pushes>0?'+':''}${p.pushes}（正=多推/負=多噓）` : '推文:無資料')
+        : `讚數:${p.score||0}${p.comments?` 留言:${p.comments}`:''}`;
+      const body = p.body ? `\n   摘要：${p.body.slice(0, 120)}` : '';
+      return `${j}. [${src}] ${p.title}${body}\n   互動→ ${engStr}`;
     }).join('\n');
 
-    const prompt = `你是專業財經情緒分析師。根據以下貼文的【標題、內文摘要、互動數】綜合判斷市場情緒。
-互動數高（推文多/讚數多）代表社群重視程度高，應給予較高權重。
+    const prompt = `你是專業財經情緒分析師。根據【標題、摘要、互動數】判斷市場情緒。
 
-判斷規則：
-- bull: 明確看多、利多消息、股價上漲、正面預期
-- bear: 明確看空、利空消息、股價下跌、負面警示
-- neutral: 中性討論、資訊分享、無明確方向
+互動數說明：
+- PTT「推文淨值」正數=社群認同，負數=質疑；「無資料」不影響判斷
+- Reddit「讚數」高代表認同度高；讚數=0可能剛發文，不代表不重要
 
-輸出純 JSON array，不要其他文字：
-[{"idx":0,"sentiment":"bull","reason":"10字內繁中理由","title_zh":"英文翻繁中；中文原文照寫","confidence":"high/mid/low"}]
+sentiment規則：
+- bull: 看多/利多/上漲/正面預期
+- bear: 看空/利空/下跌/風險警示
+- neutral: 中性討論/資訊分享/無明確方向
 
-貼文資料：
+confidence規則：
+- high: 標題+摘要情緒一致 且 互動數有支持
+- mid: 標題清楚但摘要模糊，或互動數=0
+- low: 語意模糊或矛盾
+
+輸出純JSON array不要其他文字：
+[{"idx":0,"sentiment":"bull","reason":"10字內繁中","title_zh":"英文翻繁中；中文原文照寫","confidence":"high"}]
+
+貼文：
 ${postLines}`;
 
     try {
