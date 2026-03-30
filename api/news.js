@@ -306,8 +306,10 @@ export default async function handler(req, res) {
 
   // ── PTT Stock 板 RSS proxy + 內文摘要 ──
   if (endpoint === 'ptt') {
+    // PTT Stock Atom RSS — 不爬內文（Vercel 10s 限制），只抓標題+時間
+    // 推文數從 Atom summary 欄位估算（部分條目有帶）
     const mkC = (ms) => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c; };
-    const PTT_HEADERS = { 'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1' };
+    const PTT_HEADERS = { 'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1', 'Accept': 'application/xml,text/xml' };
 
     const parseAtom = (xml) => {
       const out = [];
@@ -317,82 +319,59 @@ export default async function handler(req, res) {
         const blk = m[1];
         const getTag = (tag) => {
           const rx = new RegExp('<' + tag + '[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/' + tag + '>', 'i');
-          return (blk.match(rx) || ['',''])[1].replace(/&amp;/g,'&').replace(/&#[0-9]+;/g,'').trim();
+          return (blk.match(rx) || ['',''])[1].replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&#[0-9]+;/g,'').trim();
         };
-        const title = getTag('title'), updated = getTag('updated');
-        const linkM = blk.match(/<link[^>]+href="([^"]+)"/i);
-        const link  = linkM ? linkM[1].trim() : '';
+        const title   = getTag('title');
+        const updated = getTag('updated');
+        // PTT Atom summary 含推文數，格式如「推:12 噓:2 →:5」
+        const summary = getTag('summary');
+        const pushM   = summary.match(/推\s*[:：]\s*(\d+)/);
+        const booM    = summary.match(/噓\s*[:：]\s*(\d+)/);
+        const pushes  = (parseInt(pushM?.[1]||0)) - (parseInt(booM?.[1]||0));
+        const linkM   = blk.match(/<link[^>]+href="([^"]+)"/i);
+        const link    = linkM ? linkM[1].trim() : '';
         if (!title || ['[公告]','[板規]','Fw:'].some(p => title.startsWith(p))) continue;
-        out.push({ title, updated, link });
+        out.push({ title, updated, link, pushes, body: summary.slice(0, 150) });
       }
       return out;
     };
 
-    // 抓單篇文章：取內文前 200 字 + 推文統計
-    const fetchArticle = async (url) => {
-      if (!url) return { body: '', pushes: 0 };
-      try {
-        const r = await fetch(url, { headers: PTT_HEADERS, signal: mkC(6000).signal });
-        if (!r.ok) return { body: '', pushes: 0 };
-        const html = await r.text();
-        // 內文
-        const mainM = html.match(/id="main-content"[^>]*>([\s\S]*?)<\/div>/i);
-        let body = '';
-        if (mainM) {
-          body = mainM[1]
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .replace(/作者.*?看板.*?標題.*?時間/s, '')
-            .trim()
-            .slice(0, 200);
-        }
-        // 推文（正推 - 負推）
-        const pushMatches = [...html.matchAll(/class="push-tag">([^<]+)</g)];
-        let pushes = 0;
-        for (const pm of pushMatches) {
-          const tag = pm[1].trim();
-          if (tag === '推') pushes++;
-          else if (tag === '噓') pushes--;
-        }
-        return { body, pushes };
-      } catch(e) { return { body: '', pushes: 0 }; }
-    };
-
     let entries = [];
-    // 抓 RSS
     try {
       const r = await fetch('https://www.ptt.cc/atom/Stock.xml', {
-        headers: { ...PTT_HEADERS, 'Accept': 'application/xml,text/xml' },
-        signal: mkC(9000).signal,
+        headers: PTT_HEADERS, signal: mkC(9000).signal,
       });
       if (r.ok) entries = parseAtom(await r.text());
     } catch(e) {}
 
-    // HTML fallback
+    // HTML fallback（只取標題，推文數為 0）
     if (entries.length === 0) {
       try {
         const r2 = await fetch('https://www.ptt.cc/bbs/Stock/index.html', {
-          headers: PTT_HEADERS, signal: mkC(9000).signal,
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1' },
+          signal: mkC(9000).signal,
         });
         if (r2.ok) {
           const html = await r2.text();
-          const rx2 = /class="title">[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/gi;
+          // 連同推文數一起解析（nrec span）
+          const rowRe = /<div class="r-ent">([\s\S]*?)<\/div>\s*<\/div>/gi;
           let hm;
-          while ((hm = rx2.exec(html)) !== null) {
-            const t = hm[2].trim();
+          while ((hm = rowRe.exec(html)) !== null) {
+            const row = hm[1];
+            const titleM = row.match(/<a[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/i);
+            if (!titleM) continue;
+            const t = titleM[2].trim();
             if (['[公告]','[板規]','Fw:'].some(p => t.startsWith(p))) continue;
-            entries.push({ title: t, updated: new Date().toISOString(), link: 'https://www.ptt.cc' + hm[1] });
+            const nrecM = row.match(/<span[^>]*>(\d+|爆|X+)<\/span>/i);
+            const nrecRaw = nrecM ? nrecM[1] : '0';
+            const pushes = nrecRaw === '爆' ? 99 : (nrecRaw.startsWith('X') ? -nrecRaw.length*10 : parseInt(nrecRaw)||0);
+            entries.push({ title: t, updated: new Date().toISOString(), link: 'https://www.ptt.cc' + titleM[1], pushes, body: '' });
           }
         }
       } catch(e) {}
     }
 
-    // 批次爬內文（最多前 15 篇，避免超時）
-    const top = entries.slice(0, 15);
-    const articles = await Promise.all(top.map(e => fetchArticle(e.link)));
-    const result = top.map((e, i) => ({ ...e, body: articles[i].body, pushes: articles[i].pushes }));
-
-    res.status(200).json({ data: result, count: result.length });
+    res.status(200).json({ data: entries.slice(0, 25), count: entries.length });
     return;
   }
 
