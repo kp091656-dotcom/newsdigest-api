@@ -1827,13 +1827,15 @@ function sentRenderPosts() {
           ${srcBadge(p.source)}<span>${p.time}</span>${p.reason?`<span>${p.reason}</span>`:''}
         </div>
       </div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:right;white-space:nowrap;min-width:52px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:right;white-space:nowrap;min-width:56px;">
         ${p.source==='ptt' ? `
-          <strong style="display:block;font-size:0.82rem;color:${(p.pushes||0)>0?'var(--accent)':(p.pushes||0)<0?'var(--accent3)':'var(--muted)'};">${(p.pushes||0)>0?'+':''}${p.pushes||0}</strong>推文數
+          <strong style="display:block;font-size:0.85rem;color:${(p.pushes||0)>0?'var(--accent)':(p.pushes||0)<0?'var(--accent3)':'var(--muted)'};">${(p.pushes||0)>0?'+':''}${p.pushes||0}</strong>
+          <span style="font-size:0.6rem;">推文淨值</span>
         ` : `
-          <strong style="display:block;font-size:0.82rem;color:var(--text);">${(p.score||0)>999?Math.round((p.score||0)/1000)+'k':(p.score||0)}</strong>👍 讚
+          <strong style="display:block;font-size:0.85rem;color:${(p.rank&&p.rank<=5)?'var(--accent)':'var(--text)'};">${p.rank ? '#'+p.rank : '—'}</strong>
+          <span style="font-size:0.6rem;">熱度排名</span>
         `}
-        ${p.confidence ? `<span style="font-size:0.55rem;color:${p.confidence==='high'?'var(--accent3)':p.confidence==='low'?'var(--muted)':'var(--accent2)'};">${p.confidence==='high'?'◆ 高信心':p.confidence==='low'?'◇ 低信心':'◈ 中信心'}</span>` : ''}
+        ${p.confidence ? `<div style="font-size:0.55rem;margin-top:2px;color:${p.confidence==='high'?'var(--accent3)':p.confidence==='low'?'#aaa':'var(--accent2)'};">${p.confidence==='high'?'◆高信心':p.confidence==='low'?'◇低信心':'◈中信心'}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1897,14 +1899,15 @@ async function sentFetchReddit(sub) {
         seen.add(p.id);
         const ts = (p.created || 0) * 1000;
         posts.push({
-          title:  p.title,
-          body:   p.body || '',       // selftext 摘要
-          time:   ts ? new Date(ts).toLocaleDateString('zh-TW') : '',
-          score:  p.score,
+          title:    p.title,
+          body:     p.body || '',
+          time:     ts ? new Date(ts).toLocaleDateString('zh-TW') : '',
+          score:    p.score || 0,
+          rank:     p.rank || 0,        // hot feed 排名（1=最熱）
           comments: p.num_comments || 0,
-          source: srcKey,
+          source:   srcKey,
           sentiment: null,
-          reason: '',
+          reason:   '',
           ts,
         });
       }
@@ -1923,8 +1926,8 @@ async function sentAnalyzeGroq(posts) {
     const postLines = batch.map((p, j) => {
       const src    = p.source.toUpperCase();
       const engStr = p.source === 'ptt'
-        ? (p.pushes ? `推文淨值:${p.pushes>0?'+':''}${p.pushes}（正=多推/負=多噓）` : '推文:無資料')
-        : `讚數:${p.score||0}${p.comments?` 留言:${p.comments}`:''}`;
+        ? (p.pushes ? `推文淨值:${p.pushes>0?'+':''}${p.pushes}（正=多推/負=多噓）` : '推文:無資料（剛發文）')
+        : (p.rank ? `熱度排名:#${p.rank}（數字越小越熱門，由Reddit演算法決定）` : '熱度:未知');
       const body = p.body ? `\n   摘要：${p.body.slice(0, 120)}` : '';
       return `${j}. [${src}] ${p.title}${body}\n   互動→ ${engStr}`;
     }).join('\n');
@@ -1932,8 +1935,8 @@ async function sentAnalyzeGroq(posts) {
     const prompt = `你是專業財經情緒分析師。根據【標題、摘要、互動數】判斷市場情緒。
 
 互動數說明：
-- PTT「推文淨值」正數=社群認同，負數=質疑；「無資料」不影響判斷
-- Reddit「讚數」高代表認同度高；讚數=0可能剛發文，不代表不重要
+- PTT「推文淨值」正數=多推認同，負數=多噓質疑；「無資料」代表剛發文，不影響判斷
+- Reddit「熱度排名」= Reddit演算法熱度位置，#1最熱；排名越前=越多人互動
 
 sentiment規則：
 - bull: 看多/利多/上漲/正面預期
