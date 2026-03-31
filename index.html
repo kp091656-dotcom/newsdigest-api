@@ -1193,9 +1193,12 @@ async function fetchMarketaux() {
     const lastEl = document.getElementById('lastRefreshTime');
     if (lastEl) lastEl.textContent = '上次更新 ' + now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 
-    // 啟動自動刷新（首次載入啟動，後續刷新重置計時器）
-    startAutoRefresh();
-    // (sticky offsets auto-update via resize observer)
+    // 記錄本次抓取時間，重置倒計時
+    lastFetchTime = Date.now();
+    if (!refreshPaused) {
+      if (countdownTimer) clearTimeout(countdownTimer);
+      startAutoRefresh();
+    }
 
     const savedGroq = groqApiKey || localStorage.getItem('nd_groq_key') || '';
     if (savedGroq) {
@@ -1461,56 +1464,69 @@ function switchLang(btn, lang) {
 }
 
 // ── Auto-refresh (15 min) ──
-const REFRESH_INTERVAL = 15 * 60;
-let countdownInterval = null;
-let countdown = 0;
+const REFRESH_INTERVAL = 15 * 60; // 秒
+let refreshPaused    = false;
+let lastFetchTime    = 0;      // Unix ms，上次成功抓取的時間
+let countdownTimer   = null;   // requestAnimationFrame handle
+
+// ── 核心：timestamp 對比，不依賴 setInterval 精度 ──
+function autoRefreshTick() {
+  if (refreshPaused) return;
+  const now     = Date.now();
+  const elapsed = (now - lastFetchTime) / 1000; // 已過秒數
+  const remain  = Math.max(0, REFRESH_INTERVAL - elapsed);
+  updateCountdownUI(remain);
+  if (remain <= 0 && lastFetchTime > 0) {
+    fetchMarketaux(); // 會在成功後更新 lastFetchTime
+  }
+  countdownTimer = setTimeout(autoRefreshTick, 1000);
+}
 
 function startAutoRefresh() {
-  stopAutoRefresh();
-  countdown = REFRESH_INTERVAL;
-  updateCountdownUI();
+  if (countdownTimer) clearTimeout(countdownTimer);
   document.getElementById('autoRefreshBar').style.display = 'flex';
   const btn = document.getElementById('toggleRefreshBtn');
-  btn.textContent = '⏸ 暫停';
-  btn.style.color = 'var(--accent)';
-
-  countdownInterval = setInterval(() => {
-    countdown--;
-    updateCountdownUI();
-    if (countdown <= 0) {
-      fetchMarketaux();
-      countdown = REFRESH_INTERVAL;
-    }
-  }, 1000);
+  if (btn) { btn.textContent = '⏸'; btn.style.color = 'var(--accent)'; }
+  autoRefreshTick();
 }
 
 function stopAutoRefresh() {
-  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  if (countdownTimer) { clearTimeout(countdownTimer); countdownTimer = null; }
 }
 
 function toggleAutoRefresh() {
   const btn = document.getElementById('toggleRefreshBtn');
-  if (countdownInterval) {
+  refreshPaused = !refreshPaused;
+  if (refreshPaused) {
     stopAutoRefresh();
-    btn.textContent = '▶ 啟動';
-    btn.style.color = 'var(--accent3)';
-    document.getElementById('autoRefreshBar').style.opacity = '0.5';
+    if (btn) { btn.textContent = '▶'; btn.style.color = 'var(--accent3)'; }
+    document.getElementById('autoRefreshBar').style.opacity = '0.6';
   } else {
-    startAutoRefresh();
     document.getElementById('autoRefreshBar').style.opacity = '1';
+    if (btn) { btn.textContent = '⏸'; btn.style.color = 'var(--accent)'; }
+    autoRefreshTick();
   }
 }
 
-function updateCountdownUI() {
-  const m = String(Math.floor(countdown / 60)).padStart(2, '0');
-  const s = String(countdown % 60).padStart(2, '0');
-  const el = document.getElementById('countdownDisplay');
+function updateCountdownUI(remain) {
+  const secs = Math.round(remain);
+  const m    = String(Math.floor(secs / 60)).padStart(2, '0');
+  const s    = String(secs % 60).padStart(2, '0');
+  const el   = document.getElementById('countdownDisplay');
   if (el) el.textContent = m + ':' + s;
-  // progress bar
-  const pct = ((REFRESH_INTERVAL - countdown) / REFRESH_INTERVAL) * 100;
+  const pct = Math.min(100, ((REFRESH_INTERVAL - secs) / REFRESH_INTERVAL) * 100);
   const bar = document.getElementById('progressBar');
   if (bar) bar.style.width = pct + '%';
 }
+
+// ── 分頁重新變成前景時，立即檢查是否該更新 ──
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !refreshPaused) {
+    if (countdownTimer) clearTimeout(countdownTimer);
+    autoRefreshTick(); // 重新檢查（若已超時立即觸發 fetch）
+  }
+});
+
 
 // ── Fear & Greed: colour helper ──
 function fgiRatingZH(score) {
