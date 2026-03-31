@@ -642,25 +642,23 @@
     <span class="api-status" id="apiStatus">示範模式</span>
     <span class="api-hint">RSS 直連 Reuters · CNBC · Bloomberg · WSJ · MarketWatch · FT · 無請求限制</span>
   </div>
-  <div class="api-row">
+  <div class="api-row" style="flex-wrap:nowrap;">
     <label>◆ GROQ KEY</label>
     <input class="api-input" id="groqKey" type="password" placeholder="Groq API Key（console.groq.com 免費申請，不需信用卡）">
     <button class="api-fetch-btn" style="background:var(--accent2)" onclick="saveGroqKey()">儲存</button>
     <span class="api-status" id="groqStatus">未設定</span>
-    <span class="api-hint">免費申請：<a href="https://console.groq.com/keys" target="_blank">console.groq.com</a> · 免費，不需信用卡</span>
+    <span class="api-hint">免費申請：<a href="https://console.groq.com/keys" target="_blank">console.groq.com</a> · 不需信用卡</span>
+    <!-- 自動刷新進度條（內嵌在 GROQ KEY 列最右邊）-->
+    <div id="autoRefreshBar" style="display:none;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:#2a9d5c;margin-left:auto;flex-shrink:0;white-space:nowrap;">
+      <span style="color:var(--muted);">↻</span>
+      <span style="color:var(--muted);">下次：<span id="countdownDisplay">15:00</span></span>
+      <div style="width:80px;height:4px;background:#e4e2d9;border-radius:2px;overflow:hidden;">
+        <div id="progressBar" style="height:100%;width:0%;background:#2a9d5c;border-radius:2px;transition:width 1s linear;"></div>
+      </div>
+      <button id="toggleRefreshBtn" onclick="toggleAutoRefresh()" style="background:none;border:1px solid var(--border);border-radius:3px;padding:1px 6px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.6rem;cursor:pointer;line-height:1.4;">⏸</button>
+      <span id="lastRefreshTime" style="color:var(--muted);font-size:0.58rem;"></span>
+    </div>
   </div>
-</div>
-
-
-<!-- Auto-refresh bar -->
-<div id="autoRefreshBar" style="display:none; background:linear-gradient(90deg,#f0fdf6,#e8fbf0); border-bottom:1px solid #c8f0d8; padding:0.45rem 2.5rem; align-items:center; gap:1rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#2a9d5c;">
-  <span>&#x27F3; 自動更新已啟動</span>
-  <span style="color:#1a1a18; font-weight:500;">下次更新：<span id="countdownDisplay">30:00</span></span>
-  <div style="flex:1; max-width:200px; height:4px; background:#e4e2d9; border-radius:2px; overflow:hidden;">
-    <div id="progressBar" style="height:100%; width:0%; background:#2a9d5c; border-radius:2px; transition:width 1s linear;"></div>
-  </div>
-  <button id="toggleRefreshBtn" onclick="toggleAutoRefresh()" style="background:none; border:1px solid #c8f0d8; border-radius:4px; padding:0.2rem 0.65rem; color:var(--accent); font-family:'IBM Plex Mono',monospace; font-size:0.65rem; cursor:pointer;">&#x23F8; 暫停</button>
-  <span id="lastRefreshTime" style="color:#7a7870;"></span>
 </div>
 
 <!-- Categories -->
@@ -1197,7 +1195,7 @@ async function fetchMarketaux() {
 
     // 啟動自動刷新（首次載入啟動，後續刷新重置計時器）
     startAutoRefresh();
-    setTimeout(updateStickyOffsets, 100); // autoRefreshBar 顯示後重算 sticky 高度
+    // (sticky offsets auto-update via resize observer)
 
     const savedGroq = groqApiKey || localStorage.getItem('nd_groq_key') || '';
     if (savedGroq) {
@@ -1463,7 +1461,7 @@ function switchLang(btn, lang) {
 }
 
 // ── Auto-refresh (15 min) ──
-const REFRESH_INTERVAL = 30 * 60;
+const REFRESH_INTERVAL = 15 * 60;
 let countdownInterval = null;
 let countdown = 0;
 
@@ -2104,14 +2102,11 @@ function updateStickyOffsets() {
   const header   = document.querySelector('header');
   const apiBar   = document.querySelector('.api-config-bar');
   const catBar   = document.querySelector('.category-bar');
-  const autoBar  = document.getElementById('autoRefreshBar');
   if (!header || !apiBar || !catBar) return;
   const hH = header.offsetHeight;       // 64px
   const aH = apiBar.offsetHeight;       // variable
   apiBar.style.top = hH + 'px';
-  // autoRefreshBar is between apiBar and catBar; measure if visible
-  const bH = (autoBar && autoBar.style.display !== 'none') ? autoBar.offsetHeight : 0;
-  catBar.style.top = (hH + aH + bH) + 'px';
+  catBar.style.top = (hH + aH) + 'px';
 }
 // Run on load, resize, and when autoRefreshBar toggles
 updateStickyOffsets();
@@ -2129,10 +2124,8 @@ loadSavedKeys();
 loadFearGreed();
 loadCryptoFearGreed();
 loadVix();
-setTimeout(() => {
-  allArticles = mockArticles;
-  renderFeed(getFiltered());
-}, 500);
+// 自動載入財經新聞（頁面載入時直接抓，不用點按鈕）
+fetchMarketaux();
 </script>
 </body>
 </html>
