@@ -648,6 +648,7 @@
     <button class="api-fetch-btn" style="background:var(--accent2)" onclick="saveGroqKey()">儲存</button>
     <span class="api-status" id="groqStatus">未設定</span>
     <span class="api-hint">免費申請：<a href="https://console.groq.com/keys" target="_blank">console.groq.com</a> · 不需信用卡</span>
+  </div>
     <!-- 自動刷新進度條（內嵌在 GROQ KEY 列最右邊）-->
     <div id="autoRefreshBar" style="display:none;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:#2a9d5c;margin-left:auto;flex-shrink:0;white-space:nowrap;">
       <span style="color:var(--muted);">↻</span>
@@ -1220,40 +1221,54 @@ async function fetchMarketaux() {
 
 
 // ── Translate articles to Traditional Chinese via Groq ──
+// ── MyMemory 翻譯（免費，無需 Key，支援繁中）──
+async function myMemoryTranslate(text) {
+  if (!text || !text.trim()) return null;
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0,500))}&langpair=en|zh-TW`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`MyMemory ${res.status}`);
+    const data = await res.json();
+    if (data.responseStatus !== 200) return null;
+    return data.responseData?.translatedText || null;
+  } catch(e) {
+    console.warn('MyMemory error:', e.message);
+    return null;
+  }
+}
+
 async function translateArticles() {
-  if (!groqApiKey || !allArticles.length) return;
-  setStatus('Groq 翻譯中…', 'loading');
+  if (!allArticles.length) return;
+  setStatus('MyMemory 翻譯中…', 'loading');
 
-  const BATCH = 5;
-  let successCount = 0;
+  // MyMemory 免費版：每天 5000 字，每篇標題約 10 字 + 描述 30 字 = 50 篇約 2000 字，OK
+  // 逐篇翻譯（不需 Key，直接呼叫）
+  const DELAY = 150; // 每篇間隔 150ms，避免觸發 rate limit
+  let done = 0;
 
-  for (let i = 0; i < allArticles.length; i += BATCH) {
-    const batch = allArticles.slice(i, i + BATCH);
-    const lines = batch.map((a, j) =>
-      `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,80).replace(/[|]/g,' ')}`
-    ).join('\n');
+  for (let i = 0; i < allArticles.length; i++) {
+    const art = allArticles[i];
+    // 跳過已是中文的（PTT 文章）
+    const isChinese = /[一-鿿]/.test(art.title);
+    if (isChinese) { done++; continue; }
 
     try {
-      const prompt = `你是財經翻譯專員。將以下 ${batch.length} 則英文財經新聞翻譯成繁體中文。格式：每行 "編號. 標題 ||| 描述"，請按相同格式輸出繁體中文，不要加任何說明或 markdown。\n\n${lines}`;
-      const raw = await callGemini(prompt);
-      const outputLines = raw.trim().split('\n').filter(l => l.match(/^\d+\./));
-      outputLines.forEach(line => {
-        const numMatch = line.match(/^(\d+)\.\s*/);
-        if (!numMatch) return;
-        const idx = parseInt(numMatch[1]) - 1;
-        const rest = line.replace(/^\d+\.\s*/, '');
-        const parts = rest.split('|||');
-        const art = allArticles[i + idx];
-        if (!art) return;
-        if (parts[0]?.trim()) art.title = parts[0].trim();
+      // 標題和描述合併成一個請求（節省每日配額）
+      const combined = `${art.title} ||| ${(art.description||'').slice(0,120)}`;
+      const result = await myMemoryTranslate(combined);
+      if (result) {
+        const parts = result.split('|||');
+        if (parts[0]?.trim()) art.title       = parts[0].trim();
         if (parts[1]?.trim()) art.description = parts[1].trim();
-      });
-      successCount += batch.length;
-      setStatus(`Groq 翻譯中… ${successCount}/${allArticles.length}`, 'loading');
-    } catch(e) {
-      console.warn(`Translation batch ${i} failed:`, e.message);
+      }
+    } catch(e) { /* 單篇失敗不中斷 */ }
+
+    done++;
+    if (done % 10 === 0) {
+      setStatus(`MyMemory 翻譯中… ${done}/${allArticles.length}`, 'loading');
+      renderFeed(getFiltered()); // 邊翻邊顯示
     }
-    if (i + BATCH < allArticles.length) await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, DELAY));
   }
 
   setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
@@ -1350,7 +1365,7 @@ async function callGemini(prompt) {
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
+      max_tokens: 1024,
       temperature: 0.7
     })
   });
@@ -2033,15 +2048,39 @@ async function sentGenerateSummary(posts) {
 async function startSentimentAnalysis() {
   if (!groqApiKey) { alert('請先在上方設定並儲存 Groq API Key'); return; }
   const btn = document.getElementById('sentimentAnalyzeBtn');
+  const setMsg = (msg) => {
+    document.getElementById('sentPostList').innerHTML = `<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;"><div class="spinner" style="margin:0 auto 12px;"></div>${msg}</div>`;
+  };
   btn.disabled = true; btn.textContent = '⏳ 抓取中...';
-  document.getElementById('sentPostList').innerHTML = `<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;"><div class="spinner" style="margin:0 auto 12px;"></div>正在從 PTT、Reddit 抓取貼文…</div>`;
+  setMsg('正在從 PTT、Reddit 抓取貼文…');
   document.getElementById('sentAiSummary').style.display = 'none';
   try {
     const [ptt,wsb,inv] = await Promise.all([sentFetchPTT(), sentFetchReddit('wallstreetbets'), sentFetchReddit('investing')]);
-    // 合併並依時間排序（最新在前）
     let posts = [...ptt,...wsb,...inv].sort((a,b) => (b.ts||0) - (a.ts||0));
-    if (!posts.length) { document.getElementById('sentPostList').innerHTML=`<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;">無法取得資料，請改用 Demo 模式</div>`; btn.disabled=false;btn.textContent='▶ 分析';return; }
+    if (!posts.length) { setMsg('無法取得資料，請改用 Demo 模式'); btn.disabled=false; btn.textContent='▶ 分析'; return; }
+
+    // ── 爬 PTT 文章內文（逐篇，最多 20 篇，避免 Vercel 超時）──
+    const pttPosts = posts.filter(p => p.source === 'ptt' && p.link).slice(0, 20);
+    if (pttPosts.length) {
+      setMsg(`正在讀取 PTT 文章內文（0/${pttPosts.length}）…`);
+      for (let i = 0; i < pttPosts.length; i++) {
+        try {
+          const r = await fetch(`/api/news?endpoint=ptt_article&url=${encodeURIComponent(pttPosts[i].link)}`);
+          if (r.ok) {
+            const d = await r.json();
+            pttPosts[i].body   = d.body   || '';
+            pttPosts[i].pushes = d.pushes ?? pttPosts[i].pushes;
+            pttPosts[i].pushCount = d.pushCount || 0;
+            pttPosts[i].booCount  = d.booCount  || 0;
+          }
+        } catch(e) { /* 單篇失敗不中斷 */ }
+        setMsg(`正在讀取 PTT 文章內文（${i+1}/${pttPosts.length}）…`);
+        if (i < pttPosts.length - 1) await new Promise(r => setTimeout(r, 300));
+      }
+    }
+
     btn.textContent = `⏳ AI 分析 ${posts.length} 篇...`;
+    setMsg(`Groq AI 情緒分析中（共 ${posts.length} 篇）…`);
     posts = await sentAnalyzeGroq(posts);
     const summary = await sentGenerateSummary(posts);
     if (summary) { document.getElementById('sentAiText').textContent=summary; document.getElementById('sentAiSummary').style.display='block'; }
@@ -2111,6 +2150,7 @@ function saveGroqKey() {
 function loadSavedKeys() {
   const gemk = localStorage.getItem('nd_groq_key');
   if (gemk) { groqApiKey = gemk; document.getElementById('groqKey').value = gemk; setGroqStatus('✓ 已啟用（已記住）', 'ok'); }
+
 }
 
 // ── Sticky offset calculator ──
