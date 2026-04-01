@@ -652,7 +652,7 @@
     <!-- 自動刷新進度條（內嵌在 GROQ KEY 列最右邊）-->
     <div id="autoRefreshBar" style="display:none;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:#2a9d5c;margin-left:auto;flex-shrink:0;white-space:nowrap;">
       <span style="color:var(--muted);">↻</span>
-      <span style="color:var(--muted);">下次：<span id="countdownDisplay">15:00</span></span>
+      <span style="color:var(--muted);">下次：<span id="countdownDisplay">60:00</span></span>
       <div style="width:80px;height:4px;background:#e4e2d9;border-radius:2px;overflow:hidden;">
         <div id="progressBar" style="height:100%;width:0%;background:#2a9d5c;border-radius:2px;transition:width 1s linear;"></div>
       </div>
@@ -1221,54 +1221,76 @@ async function fetchMarketaux() {
 
 
 // ── Translate articles to Traditional Chinese via Groq ──
-// ── MyMemory 翻譯（免費，無需 Key，支援繁中）──
-async function myMemoryTranslate(text) {
-  if (!text || !text.trim()) return null;
-  try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0,500))}&langpair=en|zh-TW`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`MyMemory ${res.status}`);
-    const data = await res.json();
-    if (data.responseStatus !== 200) return null;
-    return data.responseData?.translatedText || null;
-  } catch(e) {
-    console.warn('MyMemory error:', e.message);
-    return null;
-  }
-}
-
 async function translateArticles() {
-  if (!allArticles.length) return;
-  setStatus('MyMemory 翻譯中…', 'loading');
+  if (!groqApiKey || !allArticles.length) return;
 
-  // MyMemory 免費版：每天 5000 字，每篇標題約 10 字 + 描述 30 字 = 50 篇約 2000 字，OK
-  // 逐篇翻譯（不需 Key，直接呼叫）
-  const DELAY = 150; // 每篇間隔 150ms，避免觸發 rate limit
-  let done = 0;
+  // 只翻英文文章（跳過已是中文的 PTT 文章）
+  const targets = allArticles.filter(a => !/[\u4e00-\u9fff]/.test(a.title));
+  if (!targets.length) {
+    setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
+    renderFeed(getFiltered()); renderTrending(); generateBrief();
+    return;
+  }
 
-  for (let i = 0; i < allArticles.length; i++) {
-    const art = allArticles[i];
-    // 跳過已是中文的（PTT 文章）
-    const isChinese = /[一-鿿]/.test(art.title);
-    if (isChinese) { done++; continue; }
+  const BATCH      = 8;    // 每批 8 篇，約 1,200 tokens，安全邊際夠
+  const HALF       = 25;   // 第一分鐘翻前 25 篇，第二分鐘翻剩下
+  const MIN_WAIT   = 62000; // 兩波之間等 62 秒（跨過 1 分鐘 TPM 重置）
 
-    try {
-      // 標題和描述合併成一個請求（節省每日配額）
-      const combined = `${art.title} ||| ${(art.description||'').slice(0,120)}`;
-      const result = await myMemoryTranslate(combined);
-      if (result) {
-        const parts = result.split('|||');
-        if (parts[0]?.trim()) art.title       = parts[0].trim();
-        if (parts[1]?.trim()) art.description = parts[1].trim();
+  const translateBatch = async (arts, labelOffset) => {
+    for (let i = 0; i < arts.length; i += BATCH) {
+      const batch = arts.slice(i, i + BATCH);
+      const lines = batch.map((a, j) =>
+        `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,80).replace(/[|]/g,' ')}`
+      ).join('\n');
+      const prompt = `你是財經翻譯專員。翻譯成繁體中文，格式不變，每行「編號. 標題 ||| 描述」，不要加說明。\n\n${lines}`;
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const raw = await callGemini(prompt);
+          raw.trim().split('\n').filter(l => l.match(/^\d+\./)).forEach(line => {
+            const nm = line.match(/^(\d+)\.\s*/);
+            if (!nm) return;
+            const idx  = parseInt(nm[1]) - 1;
+            const rest = line.replace(/^\d+\.\s*/, '');
+            const parts = rest.split('|||');
+            const art = arts[i + idx];
+            if (!art) return;
+            if (parts[0]?.trim()) art.title       = parts[0].trim();
+            if (parts[1]?.trim()) art.description = parts[1].trim();
+          });
+          break;
+        } catch(e) {
+          const is429 = e.message?.includes('429') || e.message?.includes('Rate limit');
+          if (is429 && attempt === 0) {
+            setStatus('Groq 流量限制，等待 20 秒…', 'loading');
+            await new Promise(r => setTimeout(r, 20000));
+          }
+        }
       }
-    } catch(e) { /* 單篇失敗不中斷 */ }
 
-    done++;
-    if (done % 10 === 0) {
-      setStatus(`MyMemory 翻譯中… ${done}/${allArticles.length}`, 'loading');
+      const done = labelOffset + Math.min(i + BATCH, arts.length);
+      setStatus(`Groq 翻譯中… ${done}/${targets.length}`, 'loading');
       renderFeed(getFiltered()); // 邊翻邊顯示
+      if (i + BATCH < arts.length) await new Promise(r => setTimeout(r, 500));
     }
-    await new Promise(r => setTimeout(r, DELAY));
+  };
+
+  // ── 第一波：前 25 篇 ──
+  const wave1 = targets.slice(0, HALF);
+  const wave2 = targets.slice(HALF);
+  setStatus(`Groq 翻譯中（第 1 波，共 ${wave1.length} 篇）…`, 'loading');
+  await translateBatch(wave1, 0);
+
+  // 有剩下的篇數才等待第二波
+  if (wave2.length > 0) {
+    setStatus(`第 1 波完成，等待 1 分鐘後繼續翻譯剩餘 ${wave2.length} 篇…`, 'loading');
+    // 倒數顯示
+    for (let s = Math.floor(MIN_WAIT/1000); s > 0; s--) {
+      await new Promise(r => setTimeout(r, 1000));
+      setStatus(`等待 TPM 重置… ${s} 秒後繼續翻譯剩餘 ${wave2.length} 篇`, 'loading');
+    }
+    setStatus(`Groq 翻譯中（第 2 波，共 ${wave2.length} 篇）…`, 'loading');
+    await translateBatch(wave2, wave1.length);
   }
 
   setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
@@ -1276,6 +1298,7 @@ async function translateArticles() {
   renderTrending();
   generateBrief();
 }
+
 
 // ── Market Summary ──
 async function generateMarketSummary() {
@@ -1479,7 +1502,7 @@ function switchLang(btn, lang) {
 }
 
 // ── Auto-refresh (15 min) ──
-const REFRESH_INTERVAL = 15 * 60; // 秒
+const REFRESH_INTERVAL = 60 * 60; // 秒
 let refreshPaused    = false;
 let lastFetchTime    = 0;      // Unix ms，上次成功抓取的時間
 let countdownTimer   = null;   // requestAnimationFrame handle
