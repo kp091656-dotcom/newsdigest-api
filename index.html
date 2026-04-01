@@ -1130,6 +1130,8 @@ function setStatus(msg, type) {
 
 // ── News fetch: TheNewsAPI via Vercel proxy ──
 async function fetchMarketaux() {
+  if (isFetching) return; // 防止重複觸發
+  isFetching = true;
   const btn = document.getElementById('fetchBtn');
   btn.disabled = true;
   btn.textContent = '載入中…';
@@ -1214,6 +1216,7 @@ async function fetchMarketaux() {
     document.getElementById('newsFeed').innerHTML = `<div class="feed-state"><p>載入失敗</p><small>${e.message}</small></div>`;
     setTimeout(() => { allArticles = mockArticles; renderFeed(getFiltered()); }, 1000);
   } finally {
+    isFetching = false;
     btn.disabled = false;
     btn.textContent = '載入財經新聞';
   }
@@ -1507,6 +1510,9 @@ let refreshPaused    = false;
 let lastFetchTime    = 0;      // Unix ms，上次成功抓取的時間
 let countdownTimer   = null;   // requestAnimationFrame handle
 
+let isFetching   = false; // 防止 fetchMarketaux 重複觸發
+let isAnalyzing  = false; // 情緒分析進行中時暫停自動刷新
+
 // ── 核心：timestamp 對比，不依賴 setInterval 精度 ──
 function autoRefreshTick() {
   if (refreshPaused) return;
@@ -1514,7 +1520,7 @@ function autoRefreshTick() {
   const elapsed = (now - lastFetchTime) / 1000; // 已過秒數
   const remain  = Math.max(0, REFRESH_INTERVAL - elapsed);
   updateCountdownUI(remain);
-  if (remain <= 0 && lastFetchTime > 0) {
+  if (remain <= 0 && lastFetchTime > 0 && !isFetching && !isAnalyzing) {
     fetchMarketaux(); // 會在成功後更新 lastFetchTime
   }
   countdownTimer = setTimeout(autoRefreshTick, 1000);
@@ -2070,6 +2076,7 @@ async function sentGenerateSummary(posts) {
 
 async function startSentimentAnalysis() {
   if (!groqApiKey) { alert('請先在上方設定並儲存 Groq API Key'); return; }
+  isAnalyzing = true; // 分析期間暫停自動刷新觸發
   const btn = document.getElementById('sentimentAnalyzeBtn');
   const setMsg = (msg) => {
     document.getElementById('sentPostList').innerHTML = `<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;"><div class="spinner" style="margin:0 auto 12px;"></div>${msg}</div>`;
@@ -2110,6 +2117,7 @@ async function startSentimentAnalysis() {
     sentAllPosts = posts;
     sentRenderDashboard(posts);
   } catch(e) { document.getElementById('sentPostList').innerHTML=`<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;">錯誤：${e.message}</div>`; }
+  isAnalyzing = false;
   btn.disabled=false; btn.textContent='▶ 重新分析';
 }
 
