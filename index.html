@@ -491,6 +491,69 @@
   .sent-bear    { background:#e8f5ee; color:#155724; }
   .sent-neutral { background:#e2e3e5; color:#383d41; }
 
+  /* ── 台股熱圖 ── */
+  .hm-sector-tab {
+    font-family:'IBM Plex Mono',monospace; font-size:0.63rem;
+    padding:4px 10px; border-radius:20px; border:1px solid var(--border);
+    background:var(--surface); cursor:pointer; transition:all 0.15s;
+  }
+  .hm-sector-tab.active { background:var(--text); color:#fff; border-color:var(--text); }
+  .hm-sector-tab:hover:not(.active) { border-color:var(--accent); color:var(--accent); }
+
+  #heatmapGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .hm-sector-block { }
+  .hm-sector-label {
+    font-family:'IBM Plex Mono',monospace; font-size:0.63rem;
+    color:var(--muted); letter-spacing:0.08em; text-transform:uppercase;
+    margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--border);
+  }
+  .hm-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .hm-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+    overflow: hidden;
+    position: relative;
+    min-width: 52px;
+    min-height: 44px;
+    padding: 4px 6px;
+  }
+  .hm-tile:hover {
+    transform: scale(1.06);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    z-index: 10;
+  }
+  .hm-tile-name {
+    font-family:'Noto Sans TC',sans-serif;
+    font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:100%;
+  }
+  .hm-tile-id {
+    font-family:'IBM Plex Mono',monospace;
+    opacity:0.75;
+    white-space:nowrap;
+  }
+  .hm-tile-chg {
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    white-space:nowrap;
+  }
+
   .feed-state p { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
   .feed-state small { font-size: 0.68rem; margin-top: 0.4rem; display: block; }
 
@@ -661,6 +724,7 @@
   <button class="cat-tab" data-cat="geopolitics">🌐 地緣政治</button>
   <button class="cat-tab" id="futuresTab" onclick="showFutures()" style="margin-left:1rem;border-left:1px solid var(--border);padding-left:1rem;">📊 全球商品</button>
   <button class="cat-tab" id="sentimentTab" onclick="showSentiment()" style="border-left:1px solid var(--border);padding-left:1rem;">🌐 社群情緒</button>
+  <button class="cat-tab" id="heatmapTab" onclick="showHeatmap()" style="border-left:1px solid var(--border);padding-left:1rem;">🇹🇼 台股熱圖</button>
 </div>
 
 <main>
@@ -803,6 +867,48 @@
       需要 Groq Key（上方已設定），點擊「▶ 分析」開始，或點「Demo」查看效果
     </div>
   </div>
+</div>
+
+<!-- ── 台股熱圖面板 ── -->
+<div id="heatmapPanel" style="display:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+    <div style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;">🇹🇼 台股市場熱圖</div>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+      <span id="heatmapTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);"></span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);padding:0.2rem 0.5rem;border:1px solid var(--border);border-radius:4px;">面積 = 市值</span>
+      <button onclick="loadHeatmap()" style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;padding:0.3rem 0.7rem;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer;color:var(--muted);">↻ 更新</button>
+    </div>
+  </div>
+
+  <!-- 色階說明 -->
+  <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);">漲跌幅：</span>
+    <div style="display:flex;gap:3px;align-items:center;">
+      <div style="width:28px;height:12px;border-radius:2px;background:#7b1a1a;"></div>
+      <div style="width:28px;height:12px;border-radius:2px;background:#a83030;"></div>
+      <div style="width:28px;height:12px;border-radius:2px;background:#c8521a;"></div>
+      <div style="width:28px;height:12px;border-radius:2px;background:#e07850;"></div>
+      <div style="width:28px;height:12px;border-radius:2px;background:#b0a898;"></div>
+      <div style="width:28px;height:12px;border-radius:2px;background:#5aad7a;"></div>
+      <div style="width:28px;height:12px;border-radius:2px;background:#2a9d5c;"></div>
+      <div style="width:28px;height:12px;border-radius:2px;background:#1a7040;"></div>
+      <div style="width:28px;height:12px;border-radius:2px;background:#0f4a28;"></div>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);">漲</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);">←→</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent3);">跌</span>
+  </div>
+
+  <!-- 產業篩選 tabs -->
+  <div id="heatmapSectorTabs" style="display:flex;gap:5px;margin-bottom:1rem;flex-wrap:wrap;">
+    <button class="hm-sector-tab active" data-sector="all" onclick="heatmapFilterSector('all',this)">全部</button>
+  </div>
+
+  <div id="heatmapLoading" style="text-align:center;padding:3rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.78rem;"><div class="spinner" style="margin:0 auto 12px;"></div>載入台股資料中…</div>
+  <div id="heatmapGrid" style="display:none;"></div>
+
+  <!-- Tooltip -->
+  <div id="hmTooltip" style="position:fixed;display:none;background:var(--text);color:#f5f3ee;padding:10px 14px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;pointer-events:none;z-index:9999;line-height:1.7;box-shadow:0 4px 20px rgba(0,0,0,0.3);"></div>
 </div>
 
 <button class="load-more" id="loadMoreBtn" style="display:none" onclick="loadMore()">載入更多 ↓</button>
@@ -1510,14 +1616,17 @@ document.querySelectorAll('.cat-tab[data-cat]').forEach(tab => {
     document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
     this.classList.add('active');
     currentCat = this.dataset.cat;
-    // Hide futures panel, show news
+    // Hide panels, show news
     const fp = document.getElementById('futuresPanel');
-    const nf = document.getElementById('newsFeed');
-    const lm = document.getElementById('loadMoreBtn');
-    if (fp) fp.style.display = 'none';
     const sp = document.getElementById('sentimentPanel');
+    const hp = document.getElementById('heatmapPanel');
+    const nf = document.getElementById('newsFeed');
+    const fh = document.querySelector('.feed-header');
+    if (fp) fp.style.display = 'none';
     if (sp) sp.style.display = 'none';
+    if (hp) hp.style.display = 'none';
     if (nf) nf.style.display = 'block';
+    if (fh) fh.style.display = 'flex';
     renderFeed(getFiltered());
   });
 });
@@ -1778,6 +1887,7 @@ function showSentiment() {
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
   document.getElementById('futuresPanel').style.display = 'none';
+  document.getElementById('heatmapPanel').style.display = 'none';
   document.getElementById('sentimentPanel').style.display = 'block';
 }
 
@@ -2103,6 +2213,164 @@ function loadSentimentDemo() {
 }
 // ════════ end sentiment ════════
 
+// ════════ 台股熱圖 ════════
+let heatmapData = [];
+
+function showHeatmap() {
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('heatmapTab').classList.add('active');
+  document.getElementById('newsFeed').style.display = 'none';
+  document.getElementById('loadMoreBtn').style.display = 'none';
+  document.querySelector('.feed-header').style.display = 'none';
+  document.getElementById('sentimentPanel').style.display = 'none';
+  document.getElementById('futuresPanel').style.display = 'none';
+  document.getElementById('heatmapPanel').style.display = 'block';
+  if (!heatmapData.length) loadHeatmap();
+}
+
+function hideHeatmap() {
+  document.getElementById('heatmapPanel').style.display = 'none';
+  document.getElementById('newsFeed').style.display = 'block';
+  document.querySelector('.feed-header').style.display = 'flex';
+}
+
+async function loadHeatmap() {
+  document.getElementById('heatmapLoading').style.display = 'block';
+  document.getElementById('heatmapGrid').style.display = 'none';
+  try {
+    const r = await fetch('/api/news?endpoint=twheatmap');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json = await r.json();
+    if (!json.data || !json.data.length) throw new Error('no data');
+    heatmapData = json.data;
+    const date = heatmapData[0]?.date || '';
+    document.getElementById('heatmapTs').textContent = date ? `資料日期：${date}（盤後）` : '';
+    renderHeatmap(heatmapData);
+  } catch(e) {
+    document.getElementById('heatmapLoading').textContent = `資料載入失敗：${e.message}`;
+  }
+}
+
+function heatmapColor(chgPct) {
+  // 台股慣例：漲=紅，跌=綠
+  const v = chgPct * 100; // 轉成百分比
+  if (v >=  5) return { bg:'#7b1a1a', fg:'#fff' };
+  if (v >=  3) return { bg:'#a83030', fg:'#fff' };
+  if (v >=  2) return { bg:'#c8521a', fg:'#fff' };
+  if (v >=  1) return { bg:'#e07850', fg:'#fff' };
+  if (v >=  0.2) return { bg:'#e8a07a', fg:'#fff' };
+  if (v > -0.2) return { bg:'#b0a898', fg:'#fff' };
+  if (v > -1) return { bg:'#5aad7a', fg:'#fff' };
+  if (v > -2) return { bg:'#2a9d5c', fg:'#fff' };
+  if (v > -3) return { bg:'#1a7040', fg:'#fff' };
+  return { bg:'#0f4a28', fg:'#fff' };
+}
+
+function heatmapFilterSector(sector, btn) {
+  document.querySelectorAll('.hm-sector-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = sector === 'all' ? heatmapData : heatmapData.filter(d => d.sector === sector);
+  renderHeatmap(filtered, true);
+}
+
+function renderHeatmap(data, skipTabRebuild) {
+  document.getElementById('heatmapLoading').style.display = 'none';
+  document.getElementById('heatmapGrid').style.display = 'flex';
+
+  // 建立產業 tabs（只在全部渲染時重建）
+  if (!skipTabRebuild) {
+    const sectors = [...new Set(data.map(d => d.sector))];
+    const tabBar = document.getElementById('heatmapSectorTabs');
+    tabBar.innerHTML = `<button class="hm-sector-tab active" data-sector="all" onclick="heatmapFilterSector('all',this)">全部</button>`;
+    sectors.forEach(s => {
+      tabBar.innerHTML += `<button class="hm-sector-tab" data-sector="${s}" onclick="heatmapFilterSector('${s}',this)">${s}</button>`;
+    });
+  }
+
+  // 依產業分組
+  const sectorMap = {};
+  data.forEach(d => {
+    if (!sectorMap[d.sector]) sectorMap[d.sector] = [];
+    sectorMap[d.sector].push(d);
+  });
+
+  // 計算最大市值（用於計算 tile 大小）
+  const maxMcap = Math.max(...data.map(d => d.mcap));
+
+  const grid = document.getElementById('heatmapGrid');
+  grid.innerHTML = '';
+
+  // 產業顯示順序
+  const sectorOrder = ['半導體','IC設計','DRAM','記憶體','電子製造','電子零件','光學','網通','工業電腦','電腦','金融','電信','石化','鋼鐵','汽車','零售','食品','紡織','橡膠'];
+
+  const orderedSectors = [
+    ...sectorOrder.filter(s => sectorMap[s]),
+    ...Object.keys(sectorMap).filter(s => !sectorOrder.includes(s))
+  ];
+
+  orderedSectors.forEach(sector => {
+    const stocks = sectorMap[sector];
+    if (!stocks) return;
+
+    const block = document.createElement('div');
+    block.className = 'hm-sector-block';
+
+    const label = document.createElement('div');
+    label.className = 'hm-sector-label';
+    label.textContent = sector;
+    block.appendChild(label);
+
+    const tiles = document.createElement('div');
+    tiles.className = 'hm-tiles';
+
+    stocks.sort((a,b) => b.mcap - a.mcap).forEach(stock => {
+      const { bg, fg } = heatmapColor(stock.chgPct);
+      const pct = stock.chgPct * 100;
+      const sign = pct >= 0 ? '+' : '';
+
+      // tile 大小依市值 root scale（min 52, max 140px）
+      const ratio = Math.sqrt(stock.mcap / maxMcap);
+      const size = Math.round(52 + ratio * 88);
+      const fontSize = size > 90 ? '0.8rem' : size > 70 ? '0.72rem' : '0.6rem';
+      const idSize = size > 80 ? '0.6rem' : '0.52rem';
+      const chgSize = size > 80 ? '0.72rem' : '0.6rem';
+
+      const tile = document.createElement('div');
+      tile.className = 'hm-tile';
+      tile.style.cssText = `width:${size}px;height:${Math.round(size*0.75)}px;background:${bg};`;
+
+      tile.innerHTML = `
+        <div class="hm-tile-name" style="color:${fg};font-size:${fontSize};">${stock.name}</div>
+        <div class="hm-tile-id" style="color:${fg};font-size:${idSize};">${stock.id}</div>
+        <div class="hm-tile-chg" style="color:${fg};font-size:${chgSize};">${sign}${pct.toFixed(2)}%</div>
+      `;
+
+      // Tooltip
+      tile.addEventListener('mousemove', (e) => {
+        const tt = document.getElementById('hmTooltip');
+        const priceStr = stock.price ? stock.price.toLocaleString('zh-TW', {minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+        const prevStr = stock.prev ? stock.prev.toLocaleString('zh-TW', {minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+        tt.innerHTML = `<b>${stock.name} (${stock.id})</b><br>收盤：${priceStr}<br>前日：${prevStr}<br>漲跌：${sign}${pct.toFixed(2)}%<br>產業：${stock.sector}<br>市值：約${(stock.mcap/10000).toFixed(1)}兆`;
+        tt.style.display = 'block';
+        tt.style.left = (e.clientX + 12) + 'px';
+        tt.style.top  = (e.clientY - 10) + 'px';
+      });
+      tile.addEventListener('mouseleave', () => {
+        document.getElementById('hmTooltip').style.display = 'none';
+      });
+      tile.addEventListener('click', () => {
+        window.open(`https://tw.tradingview.com/chart/?symbol=TWSE:${stock.id}`, '_blank');
+      });
+
+      tiles.appendChild(tile);
+    });
+
+    block.appendChild(tiles);
+    grid.appendChild(block);
+  });
+}
+// ════════ end heatmap ════════
+
 function showFutures() {
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('futuresTab').classList.add('active');
@@ -2110,6 +2378,7 @@ function showFutures() {
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
   document.getElementById('sentimentPanel').style.display = 'none';
+  document.getElementById('heatmapPanel').style.display = 'none';
   document.getElementById('futuresPanel').style.display = 'block';
   if (!futuresData.length) loadFutures();
 }
