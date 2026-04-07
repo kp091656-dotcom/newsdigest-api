@@ -576,9 +576,9 @@ export default async function handler(req, res) {
       return d.data || [];
     };
 
-    // 嘗試最近 3 個交易日（避免當天還沒更新）
+    // 嘗試最近 7 個交易日（避免連假超過 3 天）
     let optData = [], instData = [];
-    for (let i = 0; i <= 3; i++) {
+    for (let i = 0; i <= 7; i++) {
       const date = getTradeDate(i);
       const ctrl = new AbortController();
       setTimeout(() => ctrl.abort(), 8000);
@@ -662,6 +662,94 @@ export default async function handler(req, res) {
       maxPain,
       strikes: strikes.slice(0, 30), // 前30個履約價供前端視覺化
     });
+    return;
+  }
+
+  // ── 台股熱圖（前50大市值股票）──
+  if (endpoint === 'twheatmap') {
+    const TOKEN = process.env.FINMIND_TOKEN;
+    if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
+
+    // 台灣前50大市值股票（2025年資料，含市值億元、產業分類）
+    const TW50 = [
+      { id:'2330', name:'台積電',   sector:'半導體', mcap:200000 },
+      { id:'2454', name:'聯發科',   sector:'半導體', mcap:5800 },
+      { id:'2317', name:'鴻海',     sector:'電子製造', mcap:4200 },
+      { id:'2308', name:'台達電',   sector:'電子零件', mcap:3200 },
+      { id:'2382', name:'廣達',     sector:'電子製造', mcap:2900 },
+      { id:'3711', name:'日月光投控',sector:'半導體', mcap:2800 },
+      { id:'2303', name:'聯電',     sector:'半導體', mcap:2600 },
+      { id:'2881', name:'富邦金',   sector:'金融', mcap:2500 },
+      { id:'2412', name:'中華電',   sector:'電信', mcap:2400 },
+      { id:'2882', name:'國泰金',   sector:'金融', mcap:2300 },
+      { id:'2886', name:'兆豐金',   sector:'金融', mcap:2100 },
+      { id:'2891', name:'中信金',   sector:'金融', mcap:2000 },
+      { id:'1301', name:'台塑',     sector:'石化', mcap:1900 },
+      { id:'1303', name:'南亞',     sector:'石化', mcap:1800 },
+      { id:'1326', name:'台化',     sector:'石化', mcap:1700 },
+      { id:'2002', name:'中鋼',     sector:'鋼鐵', mcap:1600 },
+      { id:'2884', name:'玉山金',   sector:'金融', mcap:1550 },
+      { id:'2892', name:'第一金',   sector:'金融', mcap:1500 },
+      { id:'5880', name:'合庫金',   sector:'金融', mcap:1450 },
+      { id:'2885', name:'元大金',   sector:'金融', mcap:1400 },
+      { id:'2887', name:'台新金',   sector:'金融', mcap:1350 },
+      { id:'2890', name:'永豐金',   sector:'金融', mcap:1300 },
+      { id:'2883', name:'開發金',   sector:'金融', mcap:1250 },
+      { id:'3034', name:'聯詠',     sector:'IC設計', mcap:1200 },
+      { id:'2379', name:'瑞昱',     sector:'IC設計', mcap:1150 },
+      { id:'3008', name:'大立光',   sector:'光學', mcap:1100 },
+      { id:'2395', name:'研華',     sector:'工業電腦', mcap:1050 },
+      { id:'4938', name:'和碩',     sector:'電子製造', mcap:1000 },
+      { id:'2327', name:'國巨',     sector:'電子零件', mcap:950 },
+      { id:'2345', name:'智邦',     sector:'網通', mcap:900 },
+      { id:'6505', name:'台塑化',   sector:'石化', mcap:880 },
+      { id:'1402', name:'遠東新',   sector:'紡織', mcap:860 },
+      { id:'2207', name:'和泰車',   sector:'汽車', mcap:840 },
+      { id:'2408', name:'南亞科',   sector:'DRAM', mcap:820 },
+      { id:'2357', name:'華碩',     sector:'電腦', mcap:800 },
+      { id:'2353', name:'宏碁',     sector:'電腦', mcap:780 },
+      { id:'2324', name:'仁寶',     sector:'電子製造', mcap:760 },
+      { id:'2356', name:'英業達',   sector:'電子製造', mcap:740 },
+      { id:'3045', name:'台灣大',   sector:'電信', mcap:720 },
+      { id:'4904', name:'遠傳',     sector:'電信', mcap:700 },
+      { id:'9910', name:'豐泰',     sector:'橡膠', mcap:680 },
+      { id:'1216', name:'統一',     sector:'食品', mcap:660 },
+      { id:'2912', name:'統一超',   sector:'零售', mcap:640 },
+      { id:'2801', name:'彰銀',     sector:'金融', mcap:620 },
+      { id:'5871', name:'中租-KY', sector:'金融', mcap:600 },
+      { id:'6669', name:'緯穎',     sector:'電子製造', mcap:580 },
+      { id:'3533', name:'嘉澤',     sector:'電子零件', mcap:560 },
+      { id:'2376', name:'技嘉',     sector:'電腦', mcap:540 },
+      { id:'2337', name:'旺宏',     sector:'記憶體', mcap:520 },
+      { id:'6415', name:'矽力-KY', sector:'IC設計', mcap:500 },
+    ];
+
+    const BASE = 'https://api.finmindtrade.com/api/v4/data';
+    const start = new Date(Date.now() - 7*24*60*60*1000).toISOString().slice(0,10);
+
+    // 批次抓取，每批10支，避免超時
+    const BATCH = 10;
+    const results = [];
+    for (let i = 0; i < TW50.length; i += BATCH) {
+      const batch = TW50.slice(i, i + BATCH);
+      const batchResults = await Promise.all(batch.map(async s => {
+        try {
+          const url = `${BASE}?dataset=TaiwanStockPrice&data_id=${s.id}&start_date=${start}&token=${TOKEN}`;
+          const r = await fetch(url, { signal: (()=>{ const c=new AbortController(); setTimeout(()=>c.abort(),8000); return c.signal; })() });
+          const json = await r.json();
+          const rows = (json.data || []).filter(d => d.close > 0).sort((a,b) => a.date.localeCompare(b.date));
+          if (rows.length < 1) return null;
+          const curr = rows[rows.length-1].close;
+          const prev = rows.length >= 2 ? rows[rows.length-2].close : curr;
+          const chgPct = prev ? (curr - prev) / prev : 0;
+          return { ...s, price: curr, prev, chgPct, date: rows[rows.length-1].date };
+        } catch(e) { return null; }
+      }));
+      results.push(...batchResults);
+    }
+
+    const data = results.filter(Boolean);
+    res.status(200).json({ data, count: data.length });
     return;
   }
 
