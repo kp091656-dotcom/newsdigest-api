@@ -2355,194 +2355,219 @@ function renderTreemap(data) {
   wrap.style.display = 'block';
 
   const SVG_W = wrap.clientWidth || 900;
-  const SVG_H = Math.round(SVG_W * 0.62); // 約 16:10 比例
-  const PAD = 2; // tile gap
+  const SVG_H = Math.round(SVG_W * 0.60);
+  const GAP = 3;          // 產業區塊間距
+  const HEADER_H = 20;    // 產業標題列高度
+  const TILE_GAP = 1.5;   // 個股 tile 間距
 
   const svg = document.getElementById('heatmapSvg');
   svg.setAttribute('viewBox', `0 0 ${SVG_W} ${SVG_H}`);
   svg.setAttribute('height', SVG_H);
   svg.innerHTML = '';
 
-  // 建立產業圖例
-  const sectors = [...new Set(data.map(d => d.sector))];
-  const legend = document.getElementById('heatmapLegend');
-  legend.innerHTML = sectors.map(s => {
-    const c = SECTOR_COLORS[s] || DEFAULT_SECTOR_COLOR;
-    return `<div class="hm-legend-item"><div class="hm-legend-dot" style="background:${c};"></div>${s}</div>`;
-  }).join('');
+  const ns = 'http://www.w3.org/2000/svg';
+  const tooltip = document.getElementById('hmTooltip');
 
-  // 依產業分組，先在組內按市值排序，再讓整個 treemap 按組排（大產業先）
-  const sectorOrder = ['半導體','金融','電子製造','IC設計','電子零件','電腦','電信','石化','DRAM','記憶體','光學','網通','工業電腦','鋼鐵','汽車','零售','食品','紡織','橡膠'];
+  // 隱藏舊圖例（改用產業標題顯示）
+  document.getElementById('heatmapLegend').innerHTML = '';
+
+  // ── 第一層：依產業分組並計算各產業總市值 ──
   const sectorMap = {};
   data.forEach(d => {
     if (!sectorMap[d.sector]) sectorMap[d.sector] = [];
     sectorMap[d.sector].push(d);
   });
 
-  // 按產業總市值排序（大產業優先），組內按個股市值排序
-  const orderedSectors = Object.keys(sectorMap).sort((a, b) => {
-    const sumA = sectorMap[a].reduce((s, d) => s + d.mcap, 0);
-    const sumB = sectorMap[b].reduce((s, d) => s + d.mcap, 0);
-    return sumB - sumA;
-  });
+  // 產業依總市值排序，構成第一層 treemap 的 items
+  const sectorItems = Object.keys(sectorMap).map(sector => ({
+    sector,
+    value: sectorMap[sector].reduce((s, d) => s + d.mcap, 0),
+    stocks: sectorMap[sector].sort((a, b) => b.mcap - a.mcap),
+  })).sort((a, b) => b.value - a.value);
 
-  // 把所有股票攤平，先依產業順序，組內依市值排序
-  const items = [];
-  orderedSectors.forEach(sector => {
-    sectorMap[sector]
-      .sort((a, b) => b.mcap - a.mcap)
-      .forEach(d => items.push({ ...d, value: d.mcap }));
-  });
+  // ── 第一層 squarify：算出每個產業的區塊位置 ──
+  const sectorRects = squarify(sectorItems, 0, 0, SVG_W, SVG_H);
 
-  // 執行 treemap
-  const rects = squarify(items, 0, 0, SVG_W, SVG_H);
+  // ── 背景底色（整個熱圖背景）──
+  const bg0 = document.createElementNS(ns, 'rect');
+  bg0.setAttribute('x', 0); bg0.setAttribute('y', 0);
+  bg0.setAttribute('width', SVG_W); bg0.setAttribute('height', SVG_H);
+  bg0.setAttribute('fill', '#1a1a18');
+  svg.appendChild(bg0);
 
-  // 畫 tiles
-  const tooltip = document.getElementById('hmTooltip');
-  const ns = 'http://www.w3.org/2000/svg';
+  sectorRects.forEach(sr => {
+    const bx = sr.x + GAP / 2;
+    const by = sr.y + GAP / 2;
+    const bw = sr.w - GAP;
+    const bh = sr.h - GAP;
+    if (bw < 8 || bh < 8) return;
 
-  rects.forEach(r => {
-    const tileW = r.w - PAD;
-    const tileH = r.h - PAD;
-    if (tileW < 4 || tileH < 4) return;
+    // ── 產業區塊背景 ──
+    const sectorBg = document.createElementNS(ns, 'rect');
+    sectorBg.setAttribute('x', bx); sectorBg.setAttribute('y', by);
+    sectorBg.setAttribute('width', bw); sectorBg.setAttribute('height', bh);
+    sectorBg.setAttribute('fill', '#2a2a28');
+    sectorBg.setAttribute('rx', 4);
+    svg.appendChild(sectorBg);
 
-    const bg = heatmapBgColor(r.chgPct);
-    const sectorColor = SECTOR_COLORS[r.sector] || DEFAULT_SECTOR_COLOR;
-    const pct = r.chgPct * 100;
-    const sign = pct >= 0 ? '+' : '';
+    // ── 產業標題列（只在足夠寬時顯示）──
+    const showHeader = bh > HEADER_H + 10 && bw > 40;
+    let innerY = by;
+    let innerH = bh;
 
-    const g = document.createElementNS(ns, 'g');
-    g.style.cursor = 'pointer';
+    if (showHeader) {
+      // 標題列背景
+      const hdrBg = document.createElementNS(ns, 'rect');
+      hdrBg.setAttribute('x', bx); hdrBg.setAttribute('y', by);
+      hdrBg.setAttribute('width', bw); hdrBg.setAttribute('height', HEADER_H);
+      hdrBg.setAttribute('fill', '#333330');
+      hdrBg.setAttribute('rx', 4);
+      svg.appendChild(hdrBg);
 
-    // 底色矩形
-    const rect = document.createElementNS(ns, 'rect');
-    rect.setAttribute('x', r.x + PAD/2);
-    rect.setAttribute('y', r.y + PAD/2);
-    rect.setAttribute('width', tileW);
-    rect.setAttribute('height', tileH);
-    rect.setAttribute('fill', bg);
-    rect.setAttribute('rx', tileW > 30 ? 3 : 1);
-    g.appendChild(rect);
+      // 蓋住下半圓角
+      const hdrFix = document.createElementNS(ns, 'rect');
+      hdrFix.setAttribute('x', bx); hdrFix.setAttribute('y', by + HEADER_H - 4);
+      hdrFix.setAttribute('width', bw); hdrFix.setAttribute('height', 4);
+      hdrFix.setAttribute('fill', '#333330');
+      svg.appendChild(hdrFix);
 
-    // 產業色條（頂部細線）
-    if (tileH > 16) {
-      const stripe = document.createElementNS(ns, 'rect');
-      stripe.setAttribute('x', r.x + PAD/2);
-      stripe.setAttribute('y', r.y + PAD/2);
-      stripe.setAttribute('width', tileW);
-      stripe.setAttribute('height', Math.min(3, tileH * 0.08));
-      stripe.setAttribute('fill', sectorColor);
-      stripe.setAttribute('rx', tileW > 30 ? 3 : 1);
-      g.appendChild(stripe);
+      // 產業名稱文字
+      const sLabel = document.createElementNS(ns, 'text');
+      sLabel.setAttribute('x', bx + 8);
+      sLabel.setAttribute('y', by + HEADER_H / 2 + 1);
+      sLabel.setAttribute('dominant-baseline', 'middle');
+      sLabel.setAttribute('fill', '#e8e4dc');
+      sLabel.setAttribute('font-size', Math.min(11, Math.max(8, bw / 12)));
+      sLabel.setAttribute('font-family', 'Noto Sans TC, sans-serif');
+      sLabel.setAttribute('font-weight', '600');
+      sLabel.setAttribute('letter-spacing', '0.02em');
+      // 截斷長產業名
+      const maxChars = Math.floor(bw / 10);
+      sLabel.textContent = sr.sector.length > maxChars ? sr.sector.slice(0, maxChars) + '…' : sr.sector + ' ›';
+      svg.appendChild(sLabel);
+
+      innerY = by + HEADER_H;
+      innerH = bh - HEADER_H;
     }
 
-    // 文字（依 tile 大小決定顯示內容）
-    const cx = r.x + PAD/2 + tileW / 2;
-    const cy = r.y + PAD/2 + tileH / 2;
+    if (innerH < 6 || bw < 6) return;
 
-    if (tileW > 55 && tileH > 38) {
-      // 完整：名稱 + 代碼 + 漲跌
-      const nameSize = Math.min(13, Math.max(8, tileW / 7));
-      const idSize   = Math.min(10, Math.max(6, tileW / 10));
-      const chgSize  = Math.min(11, Math.max(7, tileW / 8));
+    // ── 第二層 squarify：在產業區塊內排個股 ──
+    const stockItems = sr.stocks.map(d => ({ ...d, value: d.mcap }));
+    const stockRects = squarify(stockItems, bx, innerY, bw, innerH);
 
-      const tName = document.createElementNS(ns, 'text');
-      tName.setAttribute('x', cx); tName.setAttribute('y', cy - chgSize * 0.8);
-      tName.setAttribute('text-anchor', 'middle'); tName.setAttribute('dominant-baseline', 'middle');
-      tName.setAttribute('fill', '#fff'); tName.setAttribute('font-size', nameSize);
-      tName.setAttribute('font-family', 'Noto Sans TC, sans-serif'); tName.setAttribute('font-weight', '700');
-      tName.textContent = r.name;
-      g.appendChild(tName);
+    stockRects.forEach(r => {
+      const tw = r.w - TILE_GAP;
+      const th = r.h - TILE_GAP;
+      const tx = r.x + TILE_GAP / 2;
+      const ty = r.y + TILE_GAP / 2;
+      if (tw < 3 || th < 3) return;
 
-      if (tileH > 55) {
-        const tId = document.createElementNS(ns, 'text');
-        tId.setAttribute('x', cx); tId.setAttribute('y', cy + nameSize * 0.6);
-        tId.setAttribute('text-anchor', 'middle'); tId.setAttribute('dominant-baseline', 'middle');
-        tId.setAttribute('fill', 'rgba(255,255,255,0.75)'); tId.setAttribute('font-size', idSize);
-        tId.setAttribute('font-family', 'IBM Plex Mono, monospace');
-        tId.textContent = r.id;
-        g.appendChild(tId);
+      const tileBg = heatmapBgColor(r.chgPct);
+      const pct = r.chgPct * 100;
+      const sign = pct >= 0 ? '+' : '';
+
+      const g = document.createElementNS(ns, 'g');
+      g.style.cursor = 'pointer';
+
+      // 股票底色
+      const tile = document.createElementNS(ns, 'rect');
+      tile.setAttribute('x', tx); tile.setAttribute('y', ty);
+      tile.setAttribute('width', tw); tile.setAttribute('height', th);
+      tile.setAttribute('fill', tileBg);
+      tile.setAttribute('rx', tw > 20 ? 2 : 0);
+      g.appendChild(tile);
+
+      // 文字層
+      const cx = tx + tw / 2;
+      const cy = ty + th / 2;
+
+      if (tw > 52 && th > 36) {
+        // 大 tile：名稱 + 代碼 + 漲跌幅
+        const nSz = Math.min(14, Math.max(9, tw / 6.5));
+        const iSz = Math.min(10, Math.max(7, tw / 9));
+        const cSz = Math.min(12, Math.max(8, tw / 7.5));
+        const lineH = nSz * 1.3;
+
+        const hasId = th > 54;
+        const totalLines = hasId ? 3 : 2;
+        const totalTextH = totalLines * lineH;
+        const startY = cy - totalTextH / 2 + lineH / 2;
+
+        const tN = document.createElementNS(ns, 'text');
+        tN.setAttribute('x', cx); tN.setAttribute('y', startY);
+        tN.setAttribute('text-anchor', 'middle'); tN.setAttribute('dominant-baseline', 'middle');
+        tN.setAttribute('fill', '#fff'); tN.setAttribute('font-size', nSz);
+        tN.setAttribute('font-family', 'Noto Sans TC, sans-serif'); tN.setAttribute('font-weight', '700');
+        tN.textContent = r.name; g.appendChild(tN);
+
+        if (hasId) {
+          const tI = document.createElementNS(ns, 'text');
+          tI.setAttribute('x', cx); tI.setAttribute('y', startY + lineH);
+          tI.setAttribute('text-anchor', 'middle'); tI.setAttribute('dominant-baseline', 'middle');
+          tI.setAttribute('fill', 'rgba(255,255,255,0.65)'); tI.setAttribute('font-size', iSz);
+          tI.setAttribute('font-family', 'IBM Plex Mono, monospace');
+          tI.textContent = r.id; g.appendChild(tI);
+        }
+
+        const tC = document.createElementNS(ns, 'text');
+        tC.setAttribute('x', cx); tC.setAttribute('y', startY + lineH * (hasId ? 2 : 1));
+        tC.setAttribute('text-anchor', 'middle'); tC.setAttribute('dominant-baseline', 'middle');
+        tC.setAttribute('fill', '#fff'); tC.setAttribute('font-size', cSz);
+        tC.setAttribute('font-family', 'IBM Plex Mono, monospace'); tC.setAttribute('font-weight', '600');
+        tC.textContent = `${sign}${pct.toFixed(2)}%`; g.appendChild(tC);
+
+      } else if (tw > 28 && th > 20) {
+        // 中 tile：名稱 + 漲跌
+        const nSz = Math.min(10, Math.max(7, tw / 8));
+        const cSz = Math.min(9, Math.max(7, tw / 9));
+        const tN = document.createElementNS(ns, 'text');
+        tN.setAttribute('x', cx); tN.setAttribute('y', cy - cSz * 0.6);
+        tN.setAttribute('text-anchor', 'middle'); tN.setAttribute('dominant-baseline', 'middle');
+        tN.setAttribute('fill', '#fff'); tN.setAttribute('font-size', nSz);
+        tN.setAttribute('font-family', 'Noto Sans TC, sans-serif'); tN.setAttribute('font-weight', '700');
+        tN.textContent = r.name; g.appendChild(tN);
+        const tC = document.createElementNS(ns, 'text');
+        tC.setAttribute('x', cx); tC.setAttribute('y', cy + cSz * 0.9);
+        tC.setAttribute('text-anchor', 'middle'); tC.setAttribute('dominant-baseline', 'middle');
+        tC.setAttribute('fill', 'rgba(255,255,255,0.9)'); tC.setAttribute('font-size', cSz);
+        tC.setAttribute('font-family', 'IBM Plex Mono, monospace');
+        tC.textContent = `${sign}${pct.toFixed(2)}%`; g.appendChild(tC);
+
+      } else if (tw > 16 && th > 13) {
+        // 小 tile：只顯示漲跌幅
+        const cSz = Math.min(8, Math.max(6, Math.min(tw, th) / 2.8));
+        const tC = document.createElementNS(ns, 'text');
+        tC.setAttribute('x', cx); tC.setAttribute('y', cy);
+        tC.setAttribute('text-anchor', 'middle'); tC.setAttribute('dominant-baseline', 'middle');
+        tC.setAttribute('fill', 'rgba(255,255,255,0.8)'); tC.setAttribute('font-size', cSz);
+        tC.setAttribute('font-family', 'IBM Plex Mono, monospace');
+        tC.textContent = `${sign}${pct.toFixed(1)}%`; g.appendChild(tC);
       }
 
-      const tChg = document.createElementNS(ns, 'text');
-      tChg.setAttribute('x', cx); tChg.setAttribute('y', tileH > 55 ? cy + nameSize * 1.8 : cy + nameSize * 1.1);
-      tChg.setAttribute('text-anchor', 'middle'); tChg.setAttribute('dominant-baseline', 'middle');
-      tChg.setAttribute('fill', '#fff'); tChg.setAttribute('font-size', chgSize);
-      tChg.setAttribute('font-family', 'IBM Plex Mono, monospace'); tChg.setAttribute('font-weight', '600');
-      tChg.textContent = `${sign}${pct.toFixed(2)}%`;
-      g.appendChild(tChg);
+      // hover overlay
+      const hov = document.createElementNS(ns, 'rect');
+      hov.setAttribute('x', tx); hov.setAttribute('y', ty);
+      hov.setAttribute('width', tw); hov.setAttribute('height', th);
+      hov.setAttribute('fill', 'rgba(255,255,255,0)');
+      hov.setAttribute('rx', tw > 20 ? 2 : 0);
+      g.appendChild(hov);
 
-    } else if (tileW > 30 && tileH > 22) {
-      // 精簡：名稱 + 漲跌
-      const nameSize = Math.min(10, Math.max(7, tileW / 8));
-      const chgSize  = Math.min(9, Math.max(6, tileW / 9));
+      g.addEventListener('mouseenter', () => hov.setAttribute('fill', 'rgba(255,255,255,0.18)'));
+      g.addEventListener('mouseleave', () => { hov.setAttribute('fill', 'rgba(255,255,255,0)'); tooltip.style.display = 'none'; });
+      g.addEventListener('mousemove', e => {
+        const priceStr = r.price ? r.price.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+        const prevStr  = r.prev  ? r.prev.toLocaleString('zh-TW', {minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+        const mcapStr  = r.mcap >= 10000 ? `${(r.mcap/10000).toFixed(1)} 兆` : `${r.mcap.toLocaleString()} 億`;
+        tooltip.innerHTML = `<b style="font-size:0.8rem;">${r.name} (${r.id})</b><br>產業：${r.sector}<br>收盤：${priceStr}　前日：${prevStr}<br>漲跌：<span style="color:${pct>=0?'#ff9a7a':'#7adaaa'};font-weight:700;">${sign}${pct.toFixed(2)}%</span><br>市值：約 ${mcapStr}`;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top  = (e.clientY - 10) + 'px';
+      });
+      g.addEventListener('click', () => window.open(`https://tw.tradingview.com/chart/?symbol=TWSE:${r.id}`, '_blank'));
 
-      const tName = document.createElementNS(ns, 'text');
-      tName.setAttribute('x', cx); tName.setAttribute('y', cy - chgSize * 0.5);
-      tName.setAttribute('text-anchor', 'middle'); tName.setAttribute('dominant-baseline', 'middle');
-      tName.setAttribute('fill', '#fff'); tName.setAttribute('font-size', nameSize);
-      tName.setAttribute('font-family', 'Noto Sans TC, sans-serif'); tName.setAttribute('font-weight', '700');
-      tName.textContent = r.name;
-      g.appendChild(tName);
-
-      const tChg = document.createElementNS(ns, 'text');
-      tChg.setAttribute('x', cx); tChg.setAttribute('y', cy + chgSize * 0.9);
-      tChg.setAttribute('text-anchor', 'middle'); tChg.setAttribute('dominant-baseline', 'middle');
-      tChg.setAttribute('fill', '#fff'); tChg.setAttribute('font-size', chgSize);
-      tChg.setAttribute('font-family', 'IBM Plex Mono, monospace');
-      tChg.textContent = `${sign}${pct.toFixed(2)}%`;
-      g.appendChild(tChg);
-
-    } else if (tileW > 18 && tileH > 14) {
-      // 極小：只顯示代碼
-      const sz = Math.min(9, Math.max(6, Math.min(tileW, tileH) / 3));
-      const tId = document.createElementNS(ns, 'text');
-      tId.setAttribute('x', cx); tId.setAttribute('y', cy);
-      tId.setAttribute('text-anchor', 'middle'); tId.setAttribute('dominant-baseline', 'middle');
-      tId.setAttribute('fill', 'rgba(255,255,255,0.85)'); tId.setAttribute('font-size', sz);
-      tId.setAttribute('font-family', 'IBM Plex Mono, monospace');
-      tId.textContent = r.id;
-      g.appendChild(tId);
-    }
-
-    // hover 效果（overlay rect）
-    const hover = document.createElementNS(ns, 'rect');
-    hover.setAttribute('x', r.x + PAD/2);
-    hover.setAttribute('y', r.y + PAD/2);
-    hover.setAttribute('width', tileW);
-    hover.setAttribute('height', tileH);
-    hover.setAttribute('fill', 'rgba(255,255,255,0)');
-    hover.setAttribute('rx', tileW > 30 ? 3 : 1);
-    hover.style.transition = 'fill 0.12s';
-    g.appendChild(hover);
-
-    g.addEventListener('mouseenter', () => {
-      hover.setAttribute('fill', 'rgba(255,255,255,0.15)');
+      svg.appendChild(g);
     });
-    g.addEventListener('mouseleave', () => {
-      hover.setAttribute('fill', 'rgba(255,255,255,0)');
-      tooltip.style.display = 'none';
-    });
-    g.addEventListener('mousemove', (e) => {
-      const priceStr = r.price ? r.price.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
-      const prevStr  = r.prev  ? r.prev.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})  : '—';
-      const mcapStr  = r.mcap >= 10000 ? `${(r.mcap/10000).toFixed(1)} 兆` : `${r.mcap.toLocaleString()} 億`;
-      tooltip.innerHTML = `<b style="font-size:0.8rem;">${r.name} (${r.id})</b><br>產業：${r.sector}<br>收盤：${priceStr}　前日：${prevStr}<br>漲跌：<span style="color:${pct>=0?'#ff9a7a':'#7adaaa'};font-weight:700;">${sign}${pct.toFixed(2)}%</span><br>市值：約 ${mcapStr}`;
-      tooltip.style.display = 'block';
-      tooltip.style.left = (e.clientX + 14) + 'px';
-      tooltip.style.top  = (e.clientY - 10) + 'px';
-    });
-    g.addEventListener('click', () => {
-      window.open(`https://tw.tradingview.com/chart/?symbol=TWSE:${r.id}`, '_blank');
-    });
-
-    svg.appendChild(g);
-  });
-
-  // 產業邊界標記（在每個產業左上角畫產業標籤）
-  const sectorFirstRect = {};
-  rects.forEach(r => {
-    if (!sectorFirstRect[r.sector]) sectorFirstRect[r.sector] = r;
   });
 }
 // ════════ end heatmap ════════
