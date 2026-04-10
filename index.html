@@ -875,6 +875,12 @@
         </div>
         <span style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);">點擊開啟 TradingView · 滑鼠懸停查看詳情</span>
       </div>
+      <!-- 產業漲跌幅 bar -->
+      <div id="hmSectorBar" style="margin-bottom:10px;display:none;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:6px;">產業漲跌幅（市值加權）· 點擊篩選</div>
+        <div id="hmSectorBarRows" style="display:flex;flex-direction:column;gap:4px;"></div>
+      </div>
+
       <!-- 產業篩選 -->
       <div id="hmSectorFilter" style="display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap;">
         <button class="hm-filter-btn active" data-sector="all" onclick="hmFilterSector('all',this)">全部</button>
@@ -2343,6 +2349,7 @@ function hideHeatmap() {
 function hmFilterSector(sector, btn) {
   document.querySelectorAll('.hm-filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  window._hmActiveSector = sector;
   const filtered = sector === 'all' ? heatmapData : heatmapData.filter(d => d.sector === sector);
   renderTreemap(filtered, true);
 }
@@ -2729,7 +2736,89 @@ function renderTreemap(data, skipFilterRebuild) {
       svg.appendChild(g);
     });
   });
+  // 產業漲跌幅 bar（市值加權）— 始終用完整資料，只標記當前篩選
+  renderSectorBar(window.heatmapData || data, window._hmActiveSector || 'all');
 }
+
+// ── 產業漲跌幅 bar（純前端，市值加權平均） ──
+function renderSectorBar(data, activeSector) {
+  const barWrap = document.getElementById('hmSectorBar');
+  const barRows = document.getElementById('hmSectorBarRows');
+  if (!barWrap || !barRows || !data || !data.length) return;
+
+  // 按產業分組，計算市值加權漲跌幅
+  const sectorMap = {};
+  for (const d of data) {
+    if (!d.sector) continue;
+    if (!sectorMap[d.sector]) sectorMap[d.sector] = { totalMcap: 0, weightedChg: 0, count: 0 };
+    const mcap = d.mcap || 1;
+    sectorMap[d.sector].totalMcap    += mcap;
+    sectorMap[d.sector].weightedChg  += (d.chgPct || 0) * mcap;
+    sectorMap[d.sector].count        += 1;
+  }
+
+  // 計算加權平均，排序：漲最多在前
+  const sectors = Object.entries(sectorMap).map(([sector, v]) => ({
+    sector,
+    chgPct: v.totalMcap > 0 ? v.weightedChg / v.totalMcap : 0,
+    count: v.count,
+  })).sort((a, b) => b.chgPct - a.chgPct);
+
+  if (!sectors.length) return;
+
+  // 最大絕對值，用來定比例尺（最少 1%）
+  const maxAbs = Math.max(1, ...sectors.map(s => Math.abs(s.chgPct)));
+
+  barRows.innerHTML = sectors.map(s => {
+    const color = SECTOR_COLORS[s.sector] || DEFAULT_SECTOR_COLOR;
+    const pct   = s.chgPct;
+    const sign  = pct >= 0 ? '+' : '';
+    // 顏色：台股慣例 漲=紅 跌=綠
+    const barColor = pct >= 0.2 ? '#c8521a' : pct <= -0.2 ? '#2a9d5c' : '#8a8480';
+    // bar 寬度：以最大絕對值為 100%，正負各半，中線在 45% 處
+    const midPct  = 45;
+    const scale   = (Math.abs(pct) / maxAbs) * midPct;
+    const isPos   = pct >= 0;
+    // positive bar: grows right from midPct; negative: grows left from midPct
+    const barLeft  = isPos ? midPct : midPct - scale;
+    const barWidth = scale;
+
+    const isActive = activeSector && activeSector !== 'all' && activeSector === s.sector;
+    return `<div style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:1px 0;border-radius:3px;${isActive ? 'background:var(--surface);padding:1px 3px;box-shadow:0 0 0 1px var(--border-dark);' : ''}"
+      onclick="hmFilterSectorByName('${s.sector}')"
+      onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+      <div style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--text);width:52px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.sector}</div>
+      <div style="flex:1;height:8px;background:var(--bg);border-radius:1px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:${barLeft.toFixed(1)}%;width:${Math.max(1,barWidth).toFixed(1)}%;height:100%;background:${barColor};border-radius:1px;transition:width 0.5s,left 0.5s;"></div>
+        <div style="position:absolute;top:0;left:${midPct}%;width:1px;height:100%;background:var(--border-dark);"></div>
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;font-weight:700;color:${barColor};width:46px;text-align:right;flex-shrink:0;">${sign}${pct.toFixed(2)}%</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);width:18px;text-align:right;flex-shrink:0;">${s.count}</div>
+    </div>`;
+  }).join('');
+
+  barWrap.style.display = 'block';
+}
+
+// 從產業 bar 點擊觸發篩選（同步 filter btn 狀態）
+function hmFilterSectorByName(sector) {
+  window._hmActiveSector = sector;
+  const btns = document.querySelectorAll('.hm-filter-btn');
+  let found = false;
+  btns.forEach(btn => {
+    if (btn.dataset.sector === sector) {
+      hmFilterSector(sector, btn);
+      found = true;
+    }
+  });
+  // 若 btn 還沒建立（資料未完全載入），直接用 heatmapData 篩選
+  if (!found && window.heatmapData) {
+    const filtered = heatmapData.filter(d => d.sector === sector);
+    if (filtered.length) renderTreemap(filtered, true);
+  }
+}
+
 // ════════ end heatmap ════════
 
 function showFutures() {
