@@ -50,6 +50,14 @@ export default async function handler(req, res) {
 
   // Global Futures via stooq.com (server-side, no CORS issues)
   if (endpoint === 'futures') {
+    const CACHE_TTL = 30 * 60 * 1000; // 30 分鐘
+    if (!global._futuresCache) global._futuresCache = { data: null, ts: 0 };
+    const now = Date.now();
+    if (global._futuresCache.data && (now - global._futuresCache.ts) < CACHE_TTL) {
+      const ageMin = ((now - global._futuresCache.ts) / 60000).toFixed(1);
+      return res.status(200).json({ ...global._futuresCache.data, cached: true, cacheAgeMin: parseFloat(ageMin) });
+    }
+
     const SYMBOLS = [
       // 美股指數 (confirmed working)
       // 美股指數：透過 FinMind USStockPrice 取得（稍後合併）
@@ -162,7 +170,9 @@ export default async function handler(req, res) {
         ...usData.filter(Boolean),
         ...stooqData,
       ];
-      res.status(200).json({ data, count: data.length });
+      const payload = { data, count: data.length };
+      global._futuresCache = { data: payload, ts: Date.now() };
+      res.status(200).json({ ...payload, cached: false });
     } catch(e) {
       res.status(500).json({ error: e.message });
     }
@@ -557,6 +567,14 @@ export default async function handler(req, res) {
     const TOKEN = process.env.FINMIND_TOKEN;
     if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
 
+    const CACHE_TTL = 60 * 60 * 1000; // 60 分鐘（盤後日資料）
+    if (!global._optionsCache) global._optionsCache = { data: null, ts: 0 };
+    const now = Date.now();
+    if (global._optionsCache.data && (now - global._optionsCache.ts) < CACHE_TTL) {
+      const ageMin = ((now - global._optionsCache.ts) / 60000).toFixed(1);
+      return res.status(200).json({ ...global._optionsCache.data, cached: true, cacheAgeMin: parseFloat(ageMin) });
+    }
+
     const today = new Date();
     // 若今天是週末或非交易時間，往前找最近交易日
     const getTradeDate = (offset = 0) => {
@@ -652,7 +670,7 @@ export default async function handler(req, res) {
     }
 
     const dataDate = optData[0]?.date?.slice(0, 10) || '';
-    res.status(200).json({
+    const optPayload = {
       date: dataDate,
       pcRatio: { volume: pcVolRatio ? +pcVolRatio.toFixed(3) : null,
                  oi:     pcOIRatio  ? +pcOIRatio.toFixed(3)  : null,
@@ -660,8 +678,10 @@ export default async function handler(req, res) {
                  callOI:  Math.round(callOI),  putOI:  Math.round(putOI) },
       institution,
       maxPain,
-      strikes: strikes.slice(0, 30), // 前30個履約價供前端視覺化
-    });
+      strikes: strikes.slice(0, 30),
+    };
+    global._optionsCache = { data: optPayload, ts: Date.now() };
+    res.status(200).json({ ...optPayload, cached: false });
     return;
   }
 
@@ -669,6 +689,14 @@ export default async function handler(req, res) {
   if (endpoint === 'institutional') {
     const TOKEN = process.env.FINMIND_TOKEN;
     if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
+
+    const CACHE_TTL = 60 * 60 * 1000; // 60 分鐘
+    if (!global._instCache) global._instCache = { data: null, ts: 0 };
+    const now = Date.now();
+    if (global._instCache.data && (now - global._instCache.ts) < CACHE_TTL) {
+      const ageMin = ((now - global._instCache.ts) / 60000).toFixed(1);
+      return res.status(200).json({ ...global._instCache.data, cached: true, cacheAgeMin: parseFloat(ageMin) });
+    }
     const BASE = 'https://api.finmindtrade.com/api/v4/data';
     try {
       // 取最近 20 個交易日
@@ -706,7 +734,9 @@ export default async function handler(req, res) {
         else if (streak < 0 && net < 0) streak--;
         else break;
       }
-      return res.status(200).json({ data: sorted, streak, latestDate: sorted[0]?.date || null });
+      const instPayload = { data: sorted, streak, latestDate: sorted[0]?.date || null };
+      global._instCache = { data: instPayload, ts: Date.now() };
+      return res.status(200).json({ ...instPayload, cached: false });
     } catch(e) {
       return res.status(500).json({ error: e.message });
     }
@@ -716,6 +746,14 @@ export default async function handler(req, res) {
   if (endpoint === 'margin') {
     const TOKEN = process.env.FINMIND_TOKEN;
     if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
+
+    const CACHE_TTL = 60 * 60 * 1000; // 60 分鐘
+    if (!global._marginCache) global._marginCache = { data: null, ts: 0 };
+    const now = Date.now();
+    if (global._marginCache.data && (now - global._marginCache.ts) < CACHE_TTL) {
+      const ageMin = ((now - global._marginCache.ts) / 60000).toFixed(1);
+      return res.status(200).json({ ...global._marginCache.data, cached: true, cacheAgeMin: parseFloat(ageMin) });
+    }
     const BASE = 'https://api.finmindtrade.com/api/v4/data';
     try {
       const endDate = new Date().toISOString().slice(0, 10);
@@ -751,7 +789,7 @@ export default async function handler(req, res) {
         ? latest.marginBalance - latest.marginYesBalance : null;
       const shortChange  = latest.shortBalance && latest.shortYesBalance
         ? latest.shortBalance - latest.shortYesBalance : null;
-      return res.status(200).json({
+      const marginPayload = {
         data: sorted,
         latestDate: latest.date || null,
         latest: {
@@ -760,7 +798,9 @@ export default async function handler(req, res) {
           shortBalance:  latest.shortBalance  || null,
           shortChange,
         }
-      });
+      };
+      global._marginCache = { data: marginPayload, ts: Date.now() };
+      return res.status(200).json({ ...marginPayload, cached: false });
     } catch(e) {
       return res.status(500).json({ error: e.message });
     }
