@@ -2771,21 +2771,21 @@ function renderSectorBar(data, activeSector) {
     sectorMap[d.sector].count        += 1;
   }
 
-  // 計算加權平均，排序：漲最多在前
+  // 計算加權平均（×100 轉成 %），排序：漲最多在前
   const sectors = Object.entries(sectorMap).map(([sector, v]) => ({
     sector,
-    chgPct: v.totalMcap > 0 ? v.weightedChg / v.totalMcap : 0,
+    chgPct: v.totalMcap > 0 ? (v.weightedChg / v.totalMcap) * 100 : 0, // 已轉成百分比
     count: v.count,
   })).sort((a, b) => b.chgPct - a.chgPct);
 
   if (!sectors.length) return;
 
-  // 最大絕對值，用來定比例尺（最少 1%）
-  const maxAbs = Math.max(1, ...sectors.map(s => Math.abs(s.chgPct)));
+  // 最大絕對值，用來定比例尺（最少 0.5%，避免全部是 0 時 bar 消失）
+  const maxAbs = Math.max(0.5, ...sectors.map(s => Math.abs(s.chgPct)));
 
   barRows.innerHTML = sectors.map(s => {
     const color = SECTOR_COLORS[s.sector] || DEFAULT_SECTOR_COLOR;
-    const pct   = s.chgPct;
+    const pct   = s.chgPct; // 已是百分比，例如 +2.35
     const sign  = pct >= 0 ? '+' : '';
     // 顏色：台股慣例 漲=紅 跌=綠
     const barColor = pct >= 0.2 ? '#c8521a' : pct <= -0.2 ? '#2a9d5c' : '#8a8480';
