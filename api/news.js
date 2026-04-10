@@ -813,7 +813,7 @@ export default async function handler(req, res) {
 
     // ── Server-side cache（Vercel warm instance，TTL 10 分鐘）──
     // 每次有人按「更新」才會打 FinMind（86 req）；10 分鐘內再按直接回快取
-    const CACHE_TTL = 10 * 60 * 1000; // 10 分鐘
+    const CACHE_TTL = 60 * 60 * 1000; // 60 分鐘（盤後日資料，一天更新一次）
     if (!global._hmCache) global._hmCache = { data: null, ts: 0 };
     const now = Date.now();
     const forceRefresh = req.query.refresh === '1';
