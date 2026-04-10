@@ -805,8 +805,8 @@ export default async function handler(req, res) {
       { id:'6415', name:'矽力-KY',   sector:'IC設計',   mcap:500 },
       { id:'3231', name:'緯創',      sector:'IC設計',   mcap:480 },
       { id:'4967', name:'十銓',      sector:'IC設計',   mcap:300 },
-      // ── DRAM／記憶體 ──
-      { id:'2408', name:'南亞科',    sector:'DRAM',     mcap:820 },
+      // ── 記憶體（含 DRAM）──
+      { id:'2408', name:'南亞科',    sector:'記憶體',   mcap:820 },
       { id:'2337', name:'旺宏',      sector:'記憶體',   mcap:520 },
       { id:'3260', name:'威剛',      sector:'記憶體',   mcap:280 },
       // ── 電子製造 ──
