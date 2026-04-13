@@ -986,6 +986,16 @@
         </div>
       </div>
 
+      <!-- ④ 多空訊號回測 -->
+      <div style="border-radius:10px;padding:0.85rem 1rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.5rem;">📐 訊號回測</div>
+        <div id="ms_backtestSection">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);text-align:center;padding:0.75rem;">
+            資料累積中…<br><span style="font-size:0.55rem;opacity:0.7;">建議累積 5 個交易日後查看</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 免責聲明 -->
       <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);line-height:1.5;padding:0 0.2rem;">
         ⚠️ 盤後資料，僅供參考，不構成投資建議
@@ -1182,6 +1192,73 @@
     </div>
   </aside>
 </main>
+
+<!-- ── 個股歷史走勢圖 Modal ── -->
+<div id="stockModal" onclick="if(event.target===this)closeStockModal()">
+  <div id="stockModalBox">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalStockName">—</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);margin-top:2px;" id="modalStockMeta"></div>
+      </div>
+      <button class="modal-close" onclick="closeStockModal()">✕</button>
+    </div>
+
+    <!-- 今日數據 -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-bottom:1rem;" id="modalTodayStats"></div>
+
+    <!-- 歷史走勢圖 -->
+    <div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:0.4rem;">
+        收盤走勢（近 <span id="modalDays">—</span> 個交易日）
+        <span id="modalDataSource" style="margin-left:0.5rem;opacity:0.6;"></span>
+      </div>
+      <div id="modalChartWrap">
+        <div id="modalLoading" style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--muted);padding:2rem 0;text-align:center;">
+          <div class="spinner" style="margin:0 auto 8px;"></div>載入歷史資料中…
+        </div>
+        <div id="modalChart" style="display:none;">
+          <div class="chart-bar-wrap" id="modalBars"></div>
+          <div style="display:flex;gap:3px;" id="modalBarDates"></div>
+          <!-- 統計摘要 -->
+          <div id="modalStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-top:0.9rem;"></div>
+        </div>
+        <div id="modalNoData" style="display:none;font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);padding:2rem;text-align:center;border-radius:8px;background:var(--surface);box-shadow:0 0 0 1px var(--border);">
+          <div style="font-size:1.5rem;margin-bottom:0.5rem;">📊</div>
+          <div>歷史資料累積中</div>
+          <div style="font-size:0.62rem;margin-top:0.3rem;opacity:0.7;">每日盤後自動收集，建議 5 個交易日後再查看</div>
+          <div style="margin-top:0.8rem;">
+            <a id="modalTVLink" href="#" target="_blank" style="font-size:0.65rem;color:var(--accent2);text-decoration:none;">→ 前往 TradingView 查看</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 法人籌碼（個股暫無，說明） -->
+    <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:0.3rem;">快速連結</div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <a id="modalTVLink2" href="#" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;padding:0.25rem 0.65rem;border-radius:6px;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);color:var(--muted);text-decoration:none;">📈 TradingView</a>
+        <a id="modalGoodInfoLink" href="#" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;padding:0.25rem 0.65rem;border-radius:6px;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);color:var(--muted);text-decoration:none;">🔍 GoodInfo</a>
+        <a id="modalAnueLink" href="#" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;padding:0.25rem 0.65rem;border-radius:6px;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);color:var(--muted);text-decoration:none;">📰 鉅亨網</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://fdxedcwtmlurumfjmlys.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
+
+async function sbFetch(table, params) {
+  const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`;
+  const r = await fetch(url, {
+    headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}`);
+  return r.json();
+}
+</script>
 
 <script>
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
@@ -2744,7 +2821,7 @@ function renderTreemap(data, skipFilterRebuild) {
         tooltip.style.left = left + 'px';
         tooltip.style.top = (e.clientY - 10) + 'px';
       });
-      g.addEventListener('click', () => window.open(`https://tw.tradingview.com/chart/?symbol=TWSE:${r.id}`, '_blank'));
+      g.addEventListener('click', () => openStockModal(r));
 
       svg.appendChild(g);
     });
@@ -3093,6 +3170,10 @@ async function loadMktSignals() {
   titleEl.style.color       = signalColor;
   descEl.textContent        = signalDesc;
   scoreEl.style.color       = signalColor;
+
+  // 載入完當日資料後，非同步補充 Supabase 歷史資料
+  loadInstitutionalHistory();
+  loadSignalBacktest();
 }
 
 // ── 台指選擇權：P/C Ratio + 三大法人 + Max Pain ──
@@ -3160,6 +3241,238 @@ async function loadOptions() {
   } catch(e) {
     document.getElementById('optLoading').textContent = `選擇權資料載入失敗：${e.message}`;
     console.warn('loadOptions error:', e);
+  }
+}
+
+// ════════ 個股歷史走勢圖 Modal ════════
+
+async function openStockModal(stock) {
+  const modal = document.getElementById('stockModal');
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // 標題
+  const sign  = stock.chgPct >= 0 ? '+' : '';
+  const pct   = (stock.chgPct * 100).toFixed(2);
+  const color = stock.chgPct >= 0 ? 'var(--accent)' : 'var(--accent3)';
+  document.getElementById('modalStockName').textContent = `${stock.id} ${stock.name}`;
+  document.getElementById('modalStockMeta').textContent = `${stock.sector} · 市值 ${stock.mcap >= 10000 ? (stock.mcap/10000).toFixed(1)+'兆' : stock.mcap.toLocaleString()+'億'}`;
+
+  // 今日統計
+  document.getElementById('modalTodayStats').innerHTML = [
+    { label:'收盤', val: `$${stock.price?.toFixed(2) ?? '—'}`, color: 'var(--text)' },
+    { label:'漲跌幅', val: `${sign}${pct}%`, color },
+    { label:'昨收', val: `$${stock.prev?.toFixed(2) ?? '—'}`, color: 'var(--muted)' },
+    { label:'漲跌', val: `${sign}${((stock.price - stock.prev) || 0).toFixed(2)}`, color },
+  ].map(s => `<div style="background:var(--surface);border-radius:8px;padding:0.5rem 0.7rem;box-shadow:0 0 0 1px var(--border);">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);">${s.label}</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:800;color:${s.color};">${s.val}</div>
+  </div>`).join('');
+
+  // 快速連結
+  document.getElementById('modalTVLink').href      = `https://tw.tradingview.com/chart/?symbol=TWSE:${stock.id}`;
+  document.getElementById('modalTVLink2').href     = `https://tw.tradingview.com/chart/?symbol=TWSE:${stock.id}`;
+  document.getElementById('modalGoodInfoLink').href = `https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID=${stock.id}`;
+  document.getElementById('modalAnueLink').href    = `https://www.cnyes.com/twstock/${stock.id}`;
+
+  // 重置顯示
+  document.getElementById('modalLoading').style.display = 'block';
+  document.getElementById('modalChart').style.display   = 'none';
+  document.getElementById('modalNoData').style.display  = 'none';
+  document.getElementById('modalTVLink').style.display  = 'inline';
+
+  // 從 Supabase 抓歷史資料
+  try {
+    const rows = await sbFetch('stock_daily',
+      `stock_id=eq.${stock.id}&order=date.desc&limit=60&select=date,close,chg_pct`);
+
+    if (!rows || rows.length < 2) {
+      document.getElementById('modalLoading').style.display = 'none';
+      document.getElementById('modalNoData').style.display  = 'block';
+      document.getElementById('modalTVLink').href = `https://tw.tradingview.com/chart/?symbol=TWSE:${stock.id}`;
+      return;
+    }
+
+    const data = rows.slice().reverse(); // 舊→新
+    document.getElementById('modalDays').textContent    = data.length;
+    document.getElementById('modalDataSource').textContent = '· Supabase';
+
+    // 畫 bar chart
+    const closes  = data.map(d => d.close);
+    const minC    = Math.min(...closes);
+    const maxC    = Math.max(...closes);
+    const rangeC  = maxC - minC || 1;
+
+    document.getElementById('modalBars').innerHTML = data.map((d, i) => {
+      const h     = ((d.close - minC) / rangeC * 100 + 8).toFixed(1);
+      const isPos = d.chg_pct >= 0;
+      const col   = isPos ? '#c8521a' : '#2a9d5c';
+      const isLast = i === data.length - 1;
+      return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:120px;cursor:default;"
+        title="${d.date}\n$${d.close}\n${isPos?'+':''}${(d.chg_pct*100).toFixed(2)}%">
+        <div style="height:${h}px;background:${col};border-radius:2px 2px 0 0;opacity:${isLast?1:0.7};
+          ${isLast?`box-shadow:0 0 0 1.5px ${col};`:''} transition:opacity 0.2s;"
+          onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='${isLast?1:0.7}'"></div>
+      </div>`;
+    }).join('');
+
+    // 日期軸（每5天顯示一次）
+    document.getElementById('modalBarDates').innerHTML = data.map((d, i) =>
+      `<div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.4rem;color:var(--muted);text-align:center;overflow:hidden;">
+        ${i % 5 === 0 ? d.date.slice(5) : ''}
+      </div>`
+    ).join('');
+
+    // 統計摘要
+    const chgPcts  = data.map(d => d.chg_pct * 100);
+    const upDays   = chgPcts.filter(p => p >= 0).length;
+    const maxGain  = Math.max(...chgPcts).toFixed(2);
+    const maxLoss  = Math.min(...chgPcts).toFixed(2);
+    const totalChg = ((data[data.length-1].close - data[0].close) / data[0].close * 100).toFixed(2);
+
+    document.getElementById('modalStats').innerHTML = [
+      { label:`${data.length}日累積漲跌`, val:`${totalChg >= 0 ? '+':''}${totalChg}%`, color: totalChg >= 0 ? 'var(--accent)' : 'var(--accent3)' },
+      { label:'上漲天數', val:`${upDays} / ${data.length}`, color:'var(--accent2)' },
+      { label:'單日最大漲/跌', val:`+${maxGain}% / ${maxLoss}%`, color:'var(--muted)' },
+    ].map(s => `<div style="background:var(--surface);border-radius:8px;padding:0.5rem 0.7rem;box-shadow:0 0 0 1px var(--border);">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);">${s.label}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;color:${s.color};margin-top:2px;">${s.val}</div>
+    </div>`).join('');
+
+    document.getElementById('modalLoading').style.display = 'none';
+    document.getElementById('modalChart').style.display   = 'block';
+
+  } catch(e) {
+    document.getElementById('modalLoading').style.display = 'none';
+    document.getElementById('modalNoData').style.display  = 'block';
+    console.warn('stockModal error:', e);
+  }
+}
+
+function closeStockModal() {
+  document.getElementById('stockModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ESC 關閉 modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeStockModal();
+});
+
+// ════════ 法人籌碼歷史趨勢（Supabase）════════
+
+async function loadInstitutionalHistory() {
+  const barsEl  = document.getElementById('ms_instBars');
+  const datesEl = document.getElementById('ms_instDates');
+  if (!barsEl) return;
+
+  try {
+    const rows = await sbFetch('institutional_daily',
+      'order=date.desc&limit=30&select=date,foreign_net,total_net');
+
+    if (!rows || rows.length < 2) return; // 資料不足，保留現有 API 資料
+
+    const data   = rows.slice().reverse();
+    const vals   = data.map(d => (d.total_net || 0) / 1e8); // 億
+    const maxAbs = Math.max(1, ...vals.map(v => Math.abs(v)));
+
+    barsEl.innerHTML = data.map(d => {
+      const bil = (d.total_net || 0) / 1e8;
+      const h   = Math.abs(bil) / maxAbs * 34;
+      const col = bil >= 0 ? 'var(--accent)' : 'var(--accent3)';
+      return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:36px;" title="${d.date}\n${bil>=0?'+':''}${bil.toFixed(1)}億">
+        <div style="height:${Math.max(2,h).toFixed(1)}px;background:${col};border-radius:2px 2px 0 0;"></div>
+      </div>`;
+    }).join('');
+
+    if (datesEl) {
+      datesEl.innerHTML = data.map((d, i) =>
+        `<div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.42rem;color:var(--muted);text-align:center;overflow:hidden;">${i % 5 === 0 ? d.date.slice(5) : ''}</div>`
+      ).join('');
+    }
+
+    // 更新標題提示
+    const instTs = document.getElementById('ms_instTs');
+    if (instTs) instTs.textContent = `Supabase · 近 ${data.length} 個交易日`;
+
+  } catch(e) {
+    console.warn('loadInstitutionalHistory error:', e);
+  }
+}
+
+// ════════ 多空訊號回測（Supabase）════════
+
+async function loadSignalBacktest() {
+  const section = document.getElementById('ms_backtestSection');
+  if (!section) return;
+
+  try {
+    // 同時抓選擇權和台指（用個股加權）
+    const [optRows, stockRows] = await Promise.all([
+      sbFetch('options_daily', 'order=date.desc&limit=30&select=date,pc_ratio_oi,foreign_opt_net'),
+      sbFetch('stock_daily',   'stock_id=eq.0050&order=date.desc&limit=31&select=date,close,chg_pct'),
+    ]);
+
+    if (!optRows?.length || optRows.length < 5) {
+      section.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);text-align:center;padding:0.75rem;">
+        資料累積中（${optRows?.length || 0}/5 天）<br><span style="font-size:0.55rem;opacity:0.7;">建議累積 5 個交易日後查看</span>
+      </div>`;
+      return;
+    }
+
+    // 計算：P/C OI 訊號 vs 隔日台指漲跌
+    const optData   = optRows.slice().reverse();
+    const stockData = stockRows.slice().reverse();
+    const stockMap  = {};
+    stockData.forEach(d => { stockMap[d.date] = d; });
+
+    let bull_right = 0, bull_wrong = 0, bear_right = 0, bear_wrong = 0;
+    const lastN = optData.slice(-20); // 最近20筆
+
+    lastN.forEach((opt, i) => {
+      if (i >= lastN.length - 1) return;
+      const nextDate = lastN[i+1]?.date;
+      const nextStock = stockMap[nextDate];
+      if (!nextStock) return;
+
+      const pcOI     = opt.pc_ratio_oi;
+      const isBull   = pcOI < 1.0; // P/C < 1 = 偏多
+      const isBear   = pcOI > 1.0;
+      const mktUp    = nextStock.chg_pct > 0;
+
+      if (isBull && mktUp)   bull_right++;
+      if (isBull && !mktUp)  bull_wrong++;
+      if (isBear && !mktUp)  bear_right++;
+      if (isBear && mktUp)   bear_wrong++;
+    });
+
+    const bullTotal = bull_right + bull_wrong;
+    const bearTotal = bear_right + bear_wrong;
+    const bullAcc   = bullTotal > 0 ? (bull_right / bullTotal * 100).toFixed(0) : '—';
+    const bearAcc   = bearTotal > 0 ? (bear_right / bearTotal * 100).toFixed(0) : '—';
+    const total     = bull_right + bull_wrong + bear_right + bear_wrong;
+    const totalAcc  = total > 0 ? ((bull_right + bear_right) / total * 100).toFixed(0) : '—';
+
+    section.innerHTML = `
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:0.5rem;">
+        📐 P/C Ratio 訊號回測（近 ${total} 次，隔日0050漲跌）
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem;margin-bottom:0.4rem;">
+        ${[
+          { label:'偏多訊號準確率', val:`${bullAcc}%`, sub:`${bull_right}/${bullTotal}次`, color:'var(--accent)' },
+          { label:'偏空訊號準確率', val:`${bearAcc}%`, sub:`${bear_right}/${bearTotal}次`, color:'var(--accent3)' },
+          { label:'整體準確率',     val:`${totalAcc}%`, sub:`${bull_right+bear_right}/${total}次`, color:'var(--accent2)' },
+        ].map(s => `<div style="background:var(--bg);border-radius:6px;padding:0.4rem 0.5rem;text-align:center;">
+          <div style="font-size:0.5rem;color:var(--muted);">${s.label}</div>
+          <div style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:800;color:${s.color};">${s.val}</div>
+          <div style="font-size:0.48rem;color:var(--muted);">${s.sub}</div>
+        </div>`).join('')}
+      </div>
+      <div style="font-size:0.5rem;color:var(--muted);opacity:0.7;">※ 回測基於歷史資料，不代表未來表現。樣本數越多越可靠。</div>
+    `;
+  } catch(e) {
+    console.warn('loadSignalBacktest error:', e);
+    section.innerHTML = '';
   }
 }
 
