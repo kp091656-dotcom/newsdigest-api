@@ -149,6 +149,126 @@ async function collectFutures() {
 }
 
 // ────────────────────────────────────────
+// 6. TWSE 個股收盤（取代 FinMind twheatmap，覆蓋全部上市股票）
+// ────────────────────────────────────────
+async function collectTWSEStockDaily() {
+  console.log('\n📈 TWSE 個股收盤（全上市）...');
+  const TWSE_BASE = 'https://openapi.twse.com.tw/v1';
+
+  // 民國日期轉西元
+  const twDateToISO = (twDate) => {
+    if (!twDate) return null;
+    const s = String(twDate);
+    const year = parseInt(s.slice(0, s.length - 4)) + 1911;
+    const mmdd = s.slice(-4);
+    return `${year}-${mmdd.slice(0,2)}-${mmdd.slice(2)}`;
+  };
+
+  const data = await fetchJson(`${TWSE_BASE}/exchangeReport/STOCK_DAY_ALL`);
+  if (!Array.isArray(data) || !data.length) { console.log('  無資料'); return; }
+
+  const isoDate = twDateToISO(data[0].Date);
+  if (!isoDate) { console.log('  日期解析失敗'); return; }
+
+  // 只處理有收盤價的股票（過濾 ETF 轉換、暫停交易等）
+  const rows = data
+    .filter(d => d.ClosingPrice && d.ClosingPrice !== '--' && d.Code && !/[A-Z]/.test(d.Code.slice(-1)))
+    .map(d => {
+      const close = parseFloat(d.ClosingPrice?.replace(/,/g,'')) || null;
+      const change = parseFloat(d.Change?.replace(/[+,]/g,'')) || 0;
+      const prev   = close && change !== null ? close - change : null;
+      return {
+        date:     isoDate,
+        stock_id: d.Code,
+        name:     d.Name,
+        close,
+        prev,
+        chg_pct:  close && prev && prev !== 0 ? (close - prev) / prev : null,
+        volume:   parseInt(d.TradeVolume?.replace(/,/g,'')) || null,
+        source:   'twse',
+      };
+    })
+    .filter(d => d.close);
+
+  await upsert('stock_daily_twse', rows, 'date,stock_id');
+  console.log(`  資料日期：${isoDate}，${rows.length} 支`);
+}
+
+// ────────────────────────────────────────
+// 7. TWSE 官方產業指數（MI_INDEX）
+// ────────────────────────────────────────
+async function collectSectorIndex() {
+  console.log('\n📊 TWSE 官方產業指數...');
+  const TWSE_BASE = 'https://openapi.twse.com.tw/v1';
+
+  const twDateToISO = (twDate) => {
+    const s = String(twDate);
+    const year = parseInt(s.slice(0, s.length - 4)) + 1911;
+    const mmdd = s.slice(-4);
+    return `${year}-${mmdd.slice(0,2)}-${mmdd.slice(2)}`;
+  };
+
+  const data = await fetchJson(`${TWSE_BASE}/exchangeReport/MI_INDEX`);
+  if (!Array.isArray(data) || !data.length) { console.log('  無資料'); return; }
+
+  const isoDate = twDateToISO(data[0]['日期']);
+
+  // 只保留產業類指數（過濾寶島指數、報酬指數等非產業指數）
+  const sectorKeywords = ['類指數', '半導體', '金融', '電子', '航運', '鋼鐵', '塑膠', '紡織', '食品', '化學', '汽車', '建材', '觀光', '資訊', '通信', '油電'];
+  const rows = data
+    .filter(d => {
+      const name = d['指數'] || '';
+      return sectorKeywords.some(k => name.includes(k)) && d['收盤指數'] && d['收盤指數'] !== '--';
+    })
+    .map(d => ({
+      date:       isoDate,
+      index_name: d['指數'],
+      close:      parseFloat(d['收盤指數']?.replace(/,/g,'')) || null,
+      change:     parseFloat(d['漲跌點數']?.replace(/[+,]/g,'').replace('▲','').replace('▼','-')) || null,
+      chg_pct:    parseFloat(d['漲跌百分比']?.replace(/[+%]/g,'')) || null,
+    }))
+    .filter(d => d.close);
+
+  await upsert('sector_index_daily', rows, 'date,index_name');
+  console.log(`  資料日期：${isoDate}，${rows.length} 個產業指數`);
+}
+
+// ────────────────────────────────────────
+// 8. TWSE 個股本益比、殖利率、PBR（BWIBBU_ALL）
+// ────────────────────────────────────────
+async function collectStockValuation() {
+  console.log('\n💹 TWSE 個股估值（PER/殖利率/PBR）...');
+  const TWSE_BASE = 'https://openapi.twse.com.tw/v1';
+
+  const twDateToISO = (twDate) => {
+    const s = String(twDate);
+    const year = parseInt(s.slice(0, s.length - 4)) + 1911;
+    const mmdd = s.slice(-4);
+    return `${year}-${mmdd.slice(0,2)}-${mmdd.slice(2)}`;
+  };
+
+  const data = await fetchJson(`${TWSE_BASE}/exchangeReport/BWIBBU_ALL`);
+  if (!Array.isArray(data) || !data.length) { console.log('  無資料'); return; }
+
+  const isoDate = twDateToISO(data[0].Date);
+
+  const rows = data
+    .filter(d => d.Code && !/[A-Z]/.test(d.Code.slice(-1)))
+    .map(d => ({
+      date:           isoDate,
+      stock_id:       d.Code,
+      name:           d.Name,
+      pe_ratio:       parseFloat(d.PEratio) || null,
+      dividend_yield: parseFloat(d.DividendYield) || null,
+      pb_ratio:       parseFloat(d.PBratio) || null,
+    }))
+    .filter(d => d.pe_ratio || d.dividend_yield || d.pb_ratio);
+
+  await upsert('stock_valuation_daily', rows, 'date,stock_id');
+  console.log(`  資料日期：${isoDate}，${rows.length} 支`);
+}
+
+// ────────────────────────────────────────
 // 主程式
 // ────────────────────────────────────────
 async function main() {
@@ -158,17 +278,23 @@ async function main() {
   console.log('═══════════════════════════════════════');
 
   const results = await Promise.allSettled([
+    // Vercel API（FinMind）
     collectStockDaily(),
     collectInstitutional(),
     collectMargin(),
     collectOptions(),
     collectFutures(),
+    // TWSE OpenAPI（免費，無 quota 限制）
+    collectTWSEStockDaily(),
+    collectSectorIndex(),
+    collectStockValuation(),
   ]);
 
   console.log('\n═══════════════════════════════════════');
   let hasError = false;
+  const names = ['台股個股(FM)', '三大法人(FM)', '融資融券(FM)', '台指選擇權(FM)', '全球商品(FM)',
+                  '台股個股(TWSE)', '產業指數(TWSE)', '個股估值(TWSE)'];
   results.forEach((r, i) => {
-    const names = ['台股個股', '三大法人', '融資融券', '台指選擇權', '全球商品'];
     if (r.status === 'rejected') {
       console.error(`❌ ${names[i]} 失敗：${r.reason?.message}`);
       hasError = true;
@@ -176,7 +302,7 @@ async function main() {
   });
 
   if (hasError) {
-    process.exit(1);  // 讓 GitHub Actions 標記為失敗並發通知
+    process.exit(1);
   }
   console.log('✅ 所有資料收集完成');
 }
