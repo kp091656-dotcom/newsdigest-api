@@ -928,7 +928,9 @@
       </div>
       <!-- 產業漲跌幅 bar -->
       <div id="hmSectorBar" style="margin-bottom:10px;display:none;">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:6px;">產業漲跌幅（市值加權）· 點擊篩選</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:6px;">
+          <span id="hmSectorBarTitle">產業漲跌幅</span><span style="opacity:0.6;"> · 點擊篩選</span>
+        </div>
         <div id="hmSectorBarRows" style="display:flex;flex-direction:column;gap:4px;"></div>
       </div>
 
@@ -2453,6 +2455,33 @@ const SECTOR_COLORS = {
 };
 const DEFAULT_SECTOR_COLOR = '#94a3b8';
 
+// TWSE 官方產業指數名稱 → SECTOR_COLORS key 對應表
+const SECTOR_INDEX_MAP = {
+  '半導體類指數':   '半導體',
+  'IC設計類指數':   'IC設計',
+  '記憶體類指數':   '記憶體',
+  '電子製造服務業類指數': '電子製造',
+  '電子零組件類指數': '電子零件',
+  '光電業類指數':   '光學',
+  '通信網路業類指數': '網通',
+  '電腦及週邊設備業類指數': '電腦',
+  '資訊服務業類指數': '電腦',  // fallback 到電腦
+  '工業電腦及週邊設備業類指數': '工業電腦',
+  '金融保險業類指數': '金融',
+  '電信業類指數':   '電信',
+  '化學工業類指數': '石化',
+  '石油煤炭類指數': '石化',
+  '鋼鐵工業類指數': '鋼鐵',
+  '汽車工業類指數': '汽車',
+  '百貨貿易類指數': '零售',
+  '貿易百貨業類指數': '零售',
+  '食品工業類指數': '食品',
+  '紡織纖維類指數': '紡織',
+  '橡膠工業類指數': '橡膠',
+};
+// 反向：SECTOR_COLORS key → 官方指數名（找 SECTOR_INDEX_MAP 第一個符合的）
+// 用於 bar 顯示
+
 function showHeatmap() {
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('heatmapTab').classList.add('active');
@@ -2475,6 +2504,7 @@ function showHeatmap() {
     document.getElementById('heatmapSvgWrap').style.display = 'none';
   }
   loadMktSignals();
+  loadSectorIndexBar(); // 官方產業指數漲跌幅（Supabase sector_index_daily）
 }
 
 function hideHeatmap() {
@@ -2881,51 +2911,117 @@ function renderTreemap(data, skipFilterRebuild) {
   renderSectorBar(window.heatmapData || data, window._hmActiveSector || 'all');
 }
 
-// ── 產業漲跌幅 bar（純前端，市值加權平均） ──
-function renderSectorBar(data, activeSector) {
+// ── 從 Supabase sector_index_daily 載入官方產業指數漲跌幅 ──
+async function loadSectorIndexBar() {
+  try {
+    // 取最新有資料的一天（往前最多找 5 天）
+    const rows = await sbFetch('sector_index_daily',
+      'order=date.desc&limit=500&select=date,index_name,chg_pct');
+    if (!rows || !rows.length) return;
+
+    // 找最新日期
+    const latestDate = rows[0].date;
+    const dayRows = rows.filter(r => r.date === latestDate);
+
+    // 只保留有對應 SECTOR_COLORS key 的指數
+    const sectorData = [];
+    const seen = new Set();
+    for (const r of dayRows) {
+      const key = SECTOR_INDEX_MAP[r.index_name];
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      sectorData.push({
+        sector:   key,
+        chgPct:   typeof r.chg_pct === 'number' ? r.chg_pct * 100 : parseFloat(r.chg_pct || 0),
+        // chg_pct 在 Supabase 存的是小數（如 0.0235），×100 轉成百分比
+        official: true,
+        indexName: r.index_name,
+        date: latestDate,
+      });
+    }
+
+    if (!sectorData.length) return;
+    window._sectorIndexData = sectorData; // 快取
+    renderSectorBar(null, window._hmActiveSector || 'all', sectorData);
+  } catch (e) {
+    console.warn('loadSectorIndexBar error:', e);
+  }
+}
+
+// ── 產業漲跌幅 bar（官方指數優先，fallback 市值加權） ──
+function renderSectorBar(data, activeSector, officialData) {
   const barWrap = document.getElementById('hmSectorBar');
   const barRows = document.getElementById('hmSectorBarRows');
-  if (!barWrap || !barRows || !data || !data.length) return;
+  if (!barWrap || !barRows) return;
 
-  // 按產業分組，計算市值加權漲跌幅
-  const sectorMap = {};
-  for (const d of data) {
-    if (!d.sector) continue;
-    if (!sectorMap[d.sector]) sectorMap[d.sector] = { totalMcap: 0, weightedChg: 0, count: 0 };
-    const mcap = d.mcap || 1;
-    sectorMap[d.sector].totalMcap    += mcap;
-    sectorMap[d.sector].weightedChg  += (d.chgPct || 0) * mcap;
-    sectorMap[d.sector].count        += 1;
+  // ── 決定資料來源 ──
+  // 優先：官方指數（傳入 officialData，或快取 window._sectorIndexData）
+  // Fallback：熱圖市值加權
+  const srcOfficial = officialData || window._sectorIndexData || null;
+
+  let sectors;
+  let isOfficial = false;
+
+  if (srcOfficial && srcOfficial.length) {
+    // 官方指數模式：直接排序
+    sectors = [...srcOfficial].sort((a, b) => b.chgPct - a.chgPct);
+    isOfficial = true;
+  } else {
+    // Fallback：市值加權（需要 data）
+    if (!data || !data.length) return;
+    const sectorMap = {};
+    for (const d of data) {
+      if (!d.sector) continue;
+      if (!sectorMap[d.sector]) sectorMap[d.sector] = { totalMcap: 0, weightedChg: 0, count: 0 };
+      const mcap = d.mcap || 1;
+      sectorMap[d.sector].totalMcap   += mcap;
+      sectorMap[d.sector].weightedChg += (d.chgPct || 0) * mcap;
+      sectorMap[d.sector].count       += 1;
+    }
+    sectors = Object.entries(sectorMap).map(([sector, v]) => ({
+      sector,
+      chgPct: v.totalMcap > 0 ? (v.weightedChg / v.totalMcap) * 100 : 0,
+      count: v.count,
+      official: false,
+    })).sort((a, b) => b.chgPct - a.chgPct);
   }
-
-  // 計算加權平均（×100 轉成 %），排序：漲最多在前
-  const sectors = Object.entries(sectorMap).map(([sector, v]) => ({
-    sector,
-    chgPct: v.totalMcap > 0 ? (v.weightedChg / v.totalMcap) * 100 : 0, // 已轉成百分比
-    count: v.count,
-  })).sort((a, b) => b.chgPct - a.chgPct);
 
   if (!sectors.length) return;
 
-  // 最大絕對值，用來定比例尺（最少 0.5%，避免全部是 0 時 bar 消失）
+  // 更新標題標籤：官方指數 or 市值加權
+  const titleEl = document.getElementById('hmSectorBarTitle');
+  if (titleEl) {
+    if (isOfficial && sectors[0]?.date) {
+      titleEl.textContent = `產業指數 ${sectors[0].date}`;
+    } else if (isOfficial) {
+      titleEl.textContent = '產業指數（官方）';
+    } else {
+      titleEl.textContent = '產業漲跌幅（市值加權）';
+    }
+  }
+
+  // 最大絕對值，用來定比例尺
   const maxAbs = Math.max(0.5, ...sectors.map(s => Math.abs(s.chgPct)));
 
   barRows.innerHTML = sectors.map(s => {
-    const color = SECTOR_COLORS[s.sector] || DEFAULT_SECTOR_COLOR;
-    const pct   = s.chgPct; // 已是百分比，例如 +2.35
-    const sign  = pct >= 0 ? '+' : '';
-    // 顏色：台股慣例 漲=紅 跌=綠
+    const color    = SECTOR_COLORS[s.sector] || DEFAULT_SECTOR_COLOR;
+    const pct      = s.chgPct;
+    const sign     = pct >= 0 ? '+' : '';
     const barColor = pct >= 0.2 ? '#c8521a' : pct <= -0.2 ? '#2a9d5c' : '#8a8480';
-    // bar 寬度：以最大絕對值為 100%，正負各半，中線在 45% 處
-    const midPct  = 45;
-    const scale   = (Math.abs(pct) / maxAbs) * midPct;
-    const isPos   = pct >= 0;
-    // positive bar: grows right from midPct; negative: grows left from midPct
+    const midPct   = 45;
+    const scale    = (Math.abs(pct) / maxAbs) * midPct;
+    const isPos    = pct >= 0;
     const barLeft  = isPos ? midPct : midPct - scale;
     const barWidth = scale;
-
     const isActive = activeSector && activeSector !== 'all' && activeSector === s.sector;
-    return `<div style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:1px 0;border-radius:3px;${isActive ? 'background:var(--surface);padding:1px 3px;box-shadow:0 0 0 1px var(--border-dark);' : ''}"
+    // 右側標籤：官方指數顯示「官方」，fallback 顯示股票數
+    const tagLabel = s.official
+      ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--accent2);width:22px;text-align:right;flex-shrink:0;opacity:0.8;">官方</div>`
+      : `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);width:22px;text-align:right;flex-shrink:0;">${s.count || ''}</div>`;
+    // tooltip：官方模式顯示完整指數名稱
+    const titleAttr = s.indexName ? `title="${s.indexName}"` : '';
+
+    return `<div ${titleAttr} style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:1px 0;border-radius:3px;${isActive ? 'background:var(--surface);padding:1px 3px;box-shadow:0 0 0 1px var(--border-dark);' : ''}"
       onclick="hmFilterSectorByName('${s.sector}')"
       onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
       <div style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0;"></div>
@@ -2935,7 +3031,7 @@ function renderSectorBar(data, activeSector) {
         <div style="position:absolute;top:0;left:${midPct}%;width:1px;height:100%;background:var(--border-dark);"></div>
       </div>
       <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;font-weight:700;color:${barColor};width:46px;text-align:right;flex-shrink:0;">${sign}${pct.toFixed(2)}%</div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);width:18px;text-align:right;flex-shrink:0;">${s.count}</div>
+      ${tagLabel}
     </div>`;
   }).join('');
 
