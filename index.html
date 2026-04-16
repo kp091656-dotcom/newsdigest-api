@@ -2987,11 +2987,12 @@ async function loadSectorIndexBar() {
 
     const sectorData = [];
     const seen = new Set();
+    const unmatched = [];
     for (const r of dayRows) {
       const key = matchKey(r.index_name);
-      if (!key || seen.has(key)) continue;
+      if (!key) { unmatched.push(r.index_name); continue; }
+      if (seen.has(key)) continue;
       seen.add(key);
-      // chg_pct 在 Supabase 已是百分比（如 3.12 代表 +3.12%），直接用
       const pct = parseFloat(r.chg_pct || 0);
       sectorData.push({
         sector:    key,
@@ -3002,6 +3003,9 @@ async function loadSectorIndexBar() {
       });
     }
 
+    // DEBUG: 印出所有未命中的指數名稱，貼給開發者確認
+    if (unmatched.length) console.log('[SectorBar] 未命中指數（請回報）:', unmatched);
+    console.log('[SectorBar] 已命中:', sectorData.map(s => `${s.sector}←${s.indexName}`));
     if (!sectorData.length) return;
     window._sectorIndexData = sectorData;
     renderSectorBar(null, window._hmActiveSector || 'all', sectorData);
