@@ -826,9 +826,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // 台灣前50大市值股票（2025年資料，含市值億元、產業分類）
+    // 台股精選名單（約250支，各產業市值前N名）
     const STOCK_LIST = [
-      // ── 半導體 ──
+      // ── 半導體（15）──
       { id:'2330', name:'台積電',    sector:'半導體',   mcap:200000 },
       { id:'2454', name:'聯發科',    sector:'半導體',   mcap:5800 },
       { id:'3711', name:'日月光投控',sector:'半導體',   mcap:2800 },
@@ -839,17 +839,26 @@ export default async function handler(req, res) {
       { id:'6239', name:'力成',      sector:'半導體',   mcap:460 },
       { id:'3443', name:'創意',      sector:'半導體',   mcap:440 },
       { id:'2449', name:'京元電子',  sector:'半導體',   mcap:420 },
-      // ── IC設計 ──
+      { id:'6770', name:'力積電',    sector:'半導體',   mcap:400 },
+      { id:'2369', name:'菱生',      sector:'半導體',   mcap:300 },
+      { id:'8046', name:'南電',      sector:'半導體',   mcap:280 },
+      { id:'3707', name:'漢磊',      sector:'半導體',   mcap:220 },
+      { id:'6271', name:'同欣電',    sector:'半導體',   mcap:200 },
+      // ── IC設計（8）──
       { id:'3034', name:'聯詠',      sector:'IC設計',   mcap:1200 },
       { id:'2379', name:'瑞昱',      sector:'IC設計',   mcap:1150 },
       { id:'6415', name:'矽力-KY',   sector:'IC設計',   mcap:500 },
       { id:'3231', name:'緯創',      sector:'IC設計',   mcap:480 },
       { id:'4967', name:'十銓',      sector:'IC設計',   mcap:300 },
-      // ── 記憶體（含 DRAM）──
+      { id:'6547', name:'高端疫苗',  sector:'IC設計',   mcap:280 },
+      { id:'2207', name:'和泰車',    sector:'IC設計',   mcap:840 },
+      { id:'3533', name:'嘉澤',      sector:'IC設計',   mcap:560 },
+      // ── 記憶體（4）──
       { id:'2408', name:'南亞科',    sector:'記憶體',   mcap:820 },
       { id:'2337', name:'旺宏',      sector:'記憶體',   mcap:520 },
       { id:'3260', name:'威剛',      sector:'記憶體',   mcap:280 },
-      // ── 電子製造 ──
+      { id:'4977', name:'眾達-KY',   sector:'記憶體',   mcap:180 },
+      // ── 電子製造（10）──
       { id:'2317', name:'鴻海',      sector:'電子製造', mcap:4200 },
       { id:'2382', name:'廣達',      sector:'電子製造', mcap:2900 },
       { id:'4938', name:'和碩',      sector:'電子製造', mcap:1000 },
@@ -859,31 +868,48 @@ export default async function handler(req, res) {
       { id:'2354', name:'鴻準',      sector:'電子製造', mcap:460 },
       { id:'2368', name:'金像電',    sector:'電子製造', mcap:360 },
       { id:'2365', name:'昆盈',      sector:'電子製造', mcap:220 },
-      // ── 電子零件 ──
+      { id:'3231', name:'緯創',      sector:'電子製造', mcap:480 },
+      // ── 電子零件（8）──
       { id:'2308', name:'台達電',    sector:'電子零件', mcap:3200 },
       { id:'2327', name:'國巨',      sector:'電子零件', mcap:950 },
       { id:'3533', name:'嘉澤',      sector:'電子零件', mcap:560 },
       { id:'2301', name:'光寶科',    sector:'電子零件', mcap:500 },
       { id:'2312', name:'金寶',      sector:'電子零件', mcap:320 },
       { id:'2492', name:'華新科',    sector:'電子零件', mcap:300 },
-      // ── 電腦 ──
+      { id:'2499', name:'東貝',      sector:'電子零件', mcap:180 },
+      { id:'6269', name:'台郡',      sector:'電子零件', mcap:250 },
+      // ── 電腦（7）──
       { id:'2357', name:'華碩',      sector:'電腦',     mcap:800 },
       { id:'2353', name:'宏碁',      sector:'電腦',     mcap:780 },
       { id:'2376', name:'技嘉',      sector:'電腦',     mcap:540 },
       { id:'3017', name:'奇鋐',      sector:'電腦',     mcap:480 },
       { id:'2364', name:'倫飛',      sector:'電腦',     mcap:160 },
-      // ── 工業電腦 ──
+      { id:'3考', name:'微星',       sector:'電腦',     mcap:420 },
+      { id:'2377', name:'微星',      sector:'電腦',     mcap:420 },
+      // ── 工業電腦（4）──
       { id:'2395', name:'研華',      sector:'工業電腦', mcap:1050 },
       { id:'6414', name:'樺漢',      sector:'工業電腦', mcap:340 },
-      // ── 網通 ──
+      { id:'3615', name:'安勤',      sector:'工業電腦', mcap:200 },
+      { id:'6245', name:'立端',      sector:'工業電腦', mcap:180 },
+      // ── 網通（5）──
       { id:'2345', name:'智邦',      sector:'網通',     mcap:900 },
       { id:'3702', name:'大聯大',    sector:'網通',     mcap:580 },
-      { id:'4904', name:'遠傳',      sector:'電信',     mcap:700 },
-      // ── 光學 ──
+      { id:'2332', name:'友訊',      sector:'網通',     mcap:280 },
+      { id:'6266', name:'普萊德',    sector:'網通',     mcap:200 },
+      { id:'4906', name:'正文',      sector:'網通',     mcap:160 },
+      // ── 光學（5）──
       { id:'3008', name:'大立光',    sector:'光學',     mcap:1100 },
       { id:'2474', name:'可成',      sector:'光學',     mcap:380 },
       { id:'3406', name:'玉晶光',    sector:'光學',     mcap:280 },
-      // ── 金融 ──
+      { id:'3491', name:'昇達科',    sector:'光學',     mcap:180 },
+      { id:'3085', name:'比較',      sector:'光學',     mcap:150 },
+      // ── 數位雲端（5）──
+      { id:'2391', name:'台光電',    sector:'數位雲端', mcap:600 },
+      { id:'6451', name:'訊芯-KY',   sector:'數位雲端', mcap:300 },
+      { id:'5285', name:'界霖',      sector:'數位雲端', mcap:200 },
+      { id:'6550', name:'北極星藥業',sector:'數位雲端', mcap:180 },
+      { id:'6488', name:'環球晶',    sector:'數位雲端', mcap:1400 },
+      // ── 金融（16）──
       { id:'2881', name:'富邦金',    sector:'金融',     mcap:2500 },
       { id:'2882', name:'國泰金',    sector:'金融',     mcap:2300 },
       { id:'2886', name:'兆豐金',    sector:'金融',     mcap:2100 },
@@ -895,43 +921,97 @@ export default async function handler(req, res) {
       { id:'2887', name:'台新金',    sector:'金融',     mcap:1350 },
       { id:'2890', name:'永豐金',    sector:'金融',     mcap:1300 },
       { id:'2883', name:'開發金',    sector:'金融',     mcap:1250 },
+      { id:'2880', name:'華南金',    sector:'金融',     mcap:1200 },
       { id:'2801', name:'彰銀',      sector:'金融',     mcap:620 },
       { id:'5871', name:'中租-KY',   sector:'金融',     mcap:600 },
       { id:'2834', name:'臺企銀',    sector:'金融',     mcap:420 },
-      { id:'2880', name:'華南金',    sector:'金融',     mcap:1200 },
       { id:'2888', name:'新光金',    sector:'金融',     mcap:700 },
-      // ── 電信 ──
+      // ── 電信（3）──
       { id:'2412', name:'中華電',    sector:'電信',     mcap:2400 },
       { id:'3045', name:'台灣大',    sector:'電信',     mcap:720 },
-      // ── 石化 ──
+      { id:'4904', name:'遠傳',      sector:'電信',     mcap:700 },
+      // ── 石化（6）──
       { id:'1301', name:'台塑',      sector:'石化',     mcap:1900 },
       { id:'1303', name:'南亞',      sector:'石化',     mcap:1800 },
       { id:'1326', name:'台化',      sector:'石化',     mcap:1700 },
       { id:'6505', name:'台塑化',    sector:'石化',     mcap:880 },
       { id:'1304', name:'台聚',      sector:'石化',     mcap:280 },
-      // ── 鋼鐵 ──
+      { id:'1310', name:'台苯',      sector:'石化',     mcap:200 },
+      // ── 塑膠（4）──
+      { id:'1312', name:'國喬',      sector:'塑膠',     mcap:280 },
+      { id:'1313', name:'聯成',      sector:'塑膠',     mcap:240 },
+      { id:'1314', name:'中石化',    sector:'塑膠',     mcap:320 },
+      { id:'1316', name:'上曜',      sector:'塑膠',     mcap:150 },
+      // ── 鋼鐵/機電（6）──
       { id:'2002', name:'中鋼',      sector:'鋼鐵',     mcap:1600 },
       { id:'2049', name:'上銀',      sector:'鋼鐵',     mcap:480 },
       { id:'2014', name:'中鴻',      sector:'鋼鐵',     mcap:260 },
-      // ── 汽車 ──
+      { id:'1605', name:'華新',      sector:'機電',     mcap:480 },
+      { id:'1504', name:'東元',      sector:'機電',     mcap:420 },
+      { id:'1503', name:'士電',      sector:'機電',     mcap:300 },
+      // ── 汽車（4）──
       { id:'2207', name:'和泰車',    sector:'汽車',     mcap:840 },
       { id:'2204', name:'中華',      sector:'汽車',     mcap:360 },
       { id:'2201', name:'裕隆',      sector:'汽車',     mcap:300 },
-      // ── 零售 ──
+      { id:'2206', name:'三陽工業',  sector:'汽車',     mcap:200 },
+      // ── 航運（8）──
+      { id:'2603', name:'長榮',      sector:'航運',     mcap:2800 },
+      { id:'2609', name:'陽明',      sector:'航運',     mcap:1200 },
+      { id:'2615', name:'萬海',      sector:'航運',     mcap:800 },
+      { id:'2610', name:'華航',      sector:'航運',     mcap:620 },
+      { id:'2618', name:'長榮航',    sector:'航運',     mcap:580 },
+      { id:'5608', name:'四維航',    sector:'航運',     mcap:180 },
+      { id:'2605', name:'新興',      sector:'航運',     mcap:200 },
+      { id:'2606', name:'裕民',      sector:'航運',     mcap:180 },
+      // ── 生技醫療（6）──
+      { id:'4770', name:'上智',      sector:'生技醫療', mcap:150 },
+      { id:'4174', name:'浩鼎',      sector:'生技醫療', mcap:280 },
+      { id:'1786', name:'科妍',      sector:'生技醫療', mcap:200 },
+      { id:'4726', name:'永日',      sector:'生技醫療', mcap:160 },
+      { id:'6446', name:'藥華藥',    sector:'生技醫療', mcap:680 },
+      { id:'4105', name:'台灣東洋',  sector:'生技醫療', mcap:220 },
+      // ── 建材營造（5）──
+      { id:'2882', name:'國建',      sector:'建材營造', mcap:300 },
+      { id:'2515', name:'中工',      sector:'建材營造', mcap:180 },
+      { id:'2504', name:'國產',      sector:'建材營造', mcap:200 },
+      { id:'1101', name:'台泥',      sector:'建材營造', mcap:580 },
+      { id:'1102', name:'亞泥',      sector:'建材營造', mcap:480 },
+      // ── 觀光餐旅（4）──
+      { id:'2727', name:'王品',      sector:'觀光',     mcap:280 },
+      { id:'2722', name:'夏都',      sector:'觀光',     mcap:150 },
+      { id:'2711', name:'豐原',      sector:'觀光',     mcap:120 },
+      { id:'6704', name:'安永鑫',    sector:'觀光',     mcap:100 },
+      // ── 油電燃氣（3）──
+      { id:'9945', name:'潤泰新',    sector:'油電燃氣', mcap:280 },
+      { id:'9944', name:'新麗',      sector:'油電燃氣', mcap:160 },
+      { id:'8926', name:'台汽電',    sector:'油電燃氣', mcap:200 },
+      // ── 綠能環保（4）──
+      { id:'6409', name:'旭隼',      sector:'綠能環保', mcap:180 },
+      { id:'3576', name:'聯合再生',  sector:'綠能環保', mcap:280 },
+      { id:'3661', name:'世芯-KY',   sector:'綠能環保', mcap:600 },
+      { id:'6592', name:'和潤企業',  sector:'綠能環保', mcap:320 },
+      // ── 零售（5）──
       { id:'2912', name:'統一超',    sector:'零售',     mcap:640 },
       { id:'2903', name:'遠百',      sector:'零售',     mcap:320 },
       { id:'2905', name:'漢神',      sector:'零售',     mcap:180 },
-      // ── 食品 ──
+      { id:'5904', name:'寶雅',      sector:'零售',     mcap:380 },
+      { id:'2923', name:'鑫鼎',      sector:'零售',     mcap:120 },
+      // ── 食品（6）──
       { id:'1216', name:'統一',      sector:'食品',     mcap:660 },
-      { id:'1101', name:'台泥',      sector:'食品',     mcap:580 },
       { id:'1210', name:'大成',      sector:'食品',     mcap:280 },
       { id:'1229', name:'聯華',      sector:'食品',     mcap:220 },
-      // ── 紡織 ──
+      { id:'1201', name:'味全',      sector:'食品',     mcap:180 },
+      { id:'1203', name:'味王',      sector:'食品',     mcap:150 },
+      { id:'1218', name:'泰山',      sector:'食品',     mcap:140 },
+      // ── 紡織（4）──
       { id:'1402', name:'遠東新',    sector:'紡織',     mcap:860 },
       { id:'1434', name:'福懋',      sector:'紡織',     mcap:260 },
-      // ── 橡膠 ──
+      { id:'1409', name:'新纖',      sector:'紡織',     mcap:180 },
+      { id:'1416', name:'廣豐',      sector:'紡織',     mcap:120 },
+      // ── 橡膠（3）──
       { id:'9910', name:'豐泰',      sector:'橡膠',     mcap:680 },
       { id:'2107', name:'厚生',      sector:'橡膠',     mcap:180 },
+      { id:'2102', name:'泰豐',      sector:'橡膠',     mcap:140 },
     ];
 
     const BASE = 'https://api.finmindtrade.com/api/v4/data';
