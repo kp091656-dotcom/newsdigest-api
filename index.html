@@ -2825,6 +2825,7 @@ async function loadHeatmap() {
         name:   s.name,
         sector: s.sector,
         price:  close,
+        prev:   parseFloat(t.prev) || 0,
         chgPct,
         mcap,
         date:   latestDate,
@@ -3823,15 +3824,17 @@ async function openStockModal(stock) {
     const minC    = Math.min(...closes);
     const maxC    = Math.max(...closes);
     const rangeC  = maxC - minC || 1;
+    const BAR_H   = 100; // px，固定高度
 
     document.getElementById('modalBars').innerHTML = data.map((d, i) => {
-      const h     = ((d.close - minC) / rangeC * 100 + 8).toFixed(1);
+      const hPct  = (d.close - minC) / rangeC * 85 + 10; // 10%~95% 範圍內
+      const hPx   = (hPct / 100 * BAR_H).toFixed(1);
       const isPos = d.chg_pct >= 0;
       const col   = isPos ? '#c8521a' : '#2a9d5c';
       const isLast = i === data.length - 1;
-      return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:120px;cursor:default;"
+      return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:${BAR_H}px;cursor:default;"
         title="${d.date}\n$${d.close}\n${isPos?'+':''}${(d.chg_pct*100).toFixed(2)}%">
-        <div style="height:${h}px;background:${col};border-radius:2px 2px 0 0;opacity:${isLast?1:0.7};
+        <div style="height:${hPx}px;background:${col};border-radius:2px 2px 0 0;opacity:${isLast?1:0.7};
           ${isLast?`box-shadow:0 0 0 1.5px ${col};`:''} transition:opacity 0.2s;"
           onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='${isLast?1:0.7}'"></div>
       </div>`;
