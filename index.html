@@ -1288,7 +1288,7 @@
         </div>
         <div id="modalChart" style="display:none;">
           <div class="chart-bar-wrap" id="modalBars"></div>
-          <div style="display:flex;gap:3px;" id="modalBarDates"></div>
+          <div id="modalBarDates" style="overflow-x:auto;overflow-y:hidden;"></div>
           <!-- 統計摘要 -->
           <div id="modalStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-top:0.9rem;"></div>
         </div>
@@ -3824,29 +3824,39 @@ async function openStockModal(stock) {
     const closes  = data.map(d => d.close);
     const minC    = Math.min(...closes);
     const maxC    = Math.max(...closes);
-    const rangeC  = maxC - minC || 1;
-    const BAR_H   = 100; // px，固定高度
+    const rangeC  = maxC - minC || (minC * 0.01) || 1; // 避免 range=0
+    const BAR_H   = 100; // container 高度 px
+    const BAR_W   = Math.max(4, Math.min(14, Math.floor(560 / data.length))); // 自動寬度 4~14px
+    const GAP     = data.length > 30 ? 1 : 2;
 
-    document.getElementById('modalBars').innerHTML = data.map((d, i) => {
-      const hPct  = (d.close - minC) / rangeC * 85 + 10; // 10%~95% 範圍內
-      const hPx   = (hPct / 100 * BAR_H).toFixed(1);
-      const isPos = d.chg_pct >= 0;
-      const col   = isPos ? '#c8521a' : '#2a9d5c';
-      const isLast = i === data.length - 1;
-      return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:${BAR_H}px;cursor:default;"
-        title="${d.date}\n$${d.close}\n${isPos?'+':''}${(d.chg_pct*100).toFixed(2)}%">
-        <div style="height:${hPx}px;background:${col};border-radius:2px 2px 0 0;opacity:${isLast?1:0.7};
-          ${isLast?`box-shadow:0 0 0 1.5px ${col};`:''} transition:opacity 0.2s;"
-          onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='${isLast?1:0.7}'"></div>
-      </div>`;
-    }).join('');
+    const barsWrap = document.getElementById('modalBars');
+    barsWrap.style.overflowX = 'auto';
+    barsWrap.style.overflowY = 'hidden';
 
-    // 日期軸（每5天顯示一次）
-    document.getElementById('modalBarDates').innerHTML = data.map((d, i) =>
-      `<div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.4rem;color:var(--muted);text-align:center;overflow:hidden;">
-        ${i % 5 === 0 ? d.date.slice(5) : ''}
-      </div>`
-    ).join('');
+    barsWrap.innerHTML = `<div style="display:flex;align-items:flex-end;gap:${GAP}px;height:${BAR_H}px;min-width:100%;">` +
+      data.map((d, i) => {
+        const hPct  = (d.close - minC) / rangeC * 80 + 15; // 15%~95%
+        const hPx   = Math.max(4, (hPct / 100 * BAR_H)).toFixed(1);
+        const isPos = d.chg_pct >= 0;
+        const col   = isPos ? '#c8521a' : '#2a9d5c';
+        const isLast = i === data.length - 1;
+        const opacity = isLast ? 1 : 0.65;
+        return `<div style="flex-shrink:0;width:${BAR_W}px;display:flex;flex-direction:column;justify-content:flex-end;height:${BAR_H}px;cursor:default;"
+          title="${d.date}\n$${d.close}\n${isPos?'+':''}${(d.chg_pct*100).toFixed(2)}%">
+          <div style="height:${hPx}px;background:${col};border-radius:2px 2px 0 0;opacity:${opacity};
+            ${isLast?`outline:1.5px solid ${col};outline-offset:-1px;`:''}"
+            onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='${opacity}'"></div>
+        </div>`;
+      }).join('') + '</div>';
+
+    // 日期軸（每5天顯示一次，貼著 bars 底部）
+    document.getElementById('modalBarDates').innerHTML =
+      `<div style="display:flex;gap:${GAP}px;">` +
+      data.map((d, i) =>
+        `<div style="flex-shrink:0;width:${BAR_W}px;font-family:'IBM Plex Mono',monospace;font-size:0.4rem;color:var(--muted);text-align:center;overflow:hidden;">
+          ${i % 5 === 0 ? d.date.slice(5) : ''}
+        </div>`
+      ).join('') + '</div>';
 
     // 統計摘要
     const chgPcts  = data.map(d => d.chg_pct * 100);
