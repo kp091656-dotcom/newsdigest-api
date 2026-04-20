@@ -650,6 +650,7 @@
   @media (max-width: 1100px) {
     #heatmapPanel > div:first-child { grid-template-columns: 1fr !important; }
     #mktSignalPanel { max-width: 100%; }
+    #mktSignalPanel > div[style*="repeat(3"] { grid-template-columns: 1fr 1fr !important; }
   }
 
   /* ── 個股走勢圖 Modal ── */
@@ -965,21 +966,21 @@
   <div id="mktSignalPanel" style="display:flex;flex-direction:column;gap:1rem;">
 
     <!-- 第一列：綜合訊號（全寬橫條） -->
-    <div id="mktSignalSummary" style="border-radius:12px;padding:1.2rem 1.6rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:1.4rem;">
+    <div id="mktSignalSummary" style="border-radius:12px;padding:1.2rem 1.6rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);display:flex;align-items:center;gap:1.4rem;min-width:0;">
       <div id="mktSignalDot" style="width:20px;height:20px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background 0.4s;box-shadow:0 0 0 5px var(--bg);"></div>
-      <div>
+      <div style="flex:1;min-width:0;">
         <div id="mktSignalTitle" style="font-family:'IBM Plex Mono',monospace;font-size:0.9rem;font-weight:700;letter-spacing:0.04em;">載入中…</div>
         <div id="mktSignalDesc" style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:var(--muted);margin-top:4px;"></div>
       </div>
-      <div style="width:1px;height:36px;background:var(--border);"></div>
-      <div style="text-align:right;">
+      <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
+      <div style="text-align:right;flex-shrink:0;">
         <div id="mktSignalScore" style="font-family:'Playfair Display',serif;font-size:2.4rem;font-weight:800;color:var(--muted);line-height:1;">—</div>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-top:2px;letter-spacing:0.06em;">多空得分</div>
       </div>
     </div>
 
     <!-- 第二列：三欄 grid（選擇權 | 三大法人 | 融資融券） -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;align-items:start;">
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;align-items:start;">
 
       <!-- 欄①：台指選擇權 -->
       <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
@@ -2785,14 +2786,14 @@ async function loadHeatmap() {
     const twseMap = {};
     twseRows.filter(r => r.date === latestDate).forEach(r => { twseMap[r.stock_id] = r; });
 
-    // ② stock_valuation_daily：分兩批查（避免 URL 過長導致 400）
+    // ② stock_valuation_daily：分兩批查，用 select=* 確保欄位名正確
     const half = Math.ceil(ids.length / 2);
     const [valRows1, valRows2] = await Promise.all([
       sbFetch('stock_valuation_daily',
-        `stock_id=in.(${ids.slice(0, half).join(',')})&order=date.desc&limit=${half * 3}&select=stock_id,date,pbr,listed_shares`),
+        `stock_id=in.(${ids.slice(0, half).join(',')})&order=date.desc&limit=${half * 2}&select=stock_id,date,pbr,dividend_yield,per`),
       sbFetch('stock_valuation_daily',
-        `stock_id=in.(${ids.slice(half).join(',')})&order=date.desc&limit=${half * 3}&select=stock_id,date,pbr,listed_shares`),
-    ]);
+        `stock_id=in.(${ids.slice(half).join(',')})&order=date.desc&limit=${half * 2}&select=stock_id,date,pbr,dividend_yield,per`),
+    ]).catch(() => [[], []]);
     const valRows = [...(valRows1 || []), ...(valRows2 || [])];
 
     // valuation lookup（每支取最新有 pbr 的一筆）
@@ -2812,11 +2813,15 @@ async function loadHeatmap() {
       // chg_pct 已是小數（如 0.0122 = +1.22%），直接用
       const chgPct  = parseFloat(t.chg_pct) || 0;
 
-      // 市值推算：PBR × 股本（千股）× 收盤價 / 100000 ≈ 億元
+      // 市值推算：優先用 stock_daily_twse 的 volume×close 估算，或靜態 mcap
+      // valuation 欄位待確認，暫用靜態值
       let mcap = s.mcap;
       const v = valMap[s.id];
-      if (v && parseFloat(v.pbr) > 0 && parseFloat(v.listed_shares) > 0) {
-        mcap = parseFloat(v.pbr) * parseFloat(v.listed_shares) * close / 100000;
+      if (v) {
+        // 嘗試各種可能的 PBR 欄位名
+        const pbr = parseFloat(v.pbr || v.PBratio || v.pb_ratio || 0);
+        const shares = parseFloat(v.listed_shares || v.shares || v.issued_shares || 0);
+        if (pbr > 0 && shares > 0) mcap = pbr * shares * close / 100000;
       }
 
       data.push({
