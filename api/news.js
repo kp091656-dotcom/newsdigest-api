@@ -480,15 +480,28 @@ export default async function handler(req, res) {
     }
     const mkC = (ms) => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c; };
     const rssUrl = `https://www.reddit.com/r/${sub}/${sort}.rss?limit=${Math.min(parseInt(limit)||25,50)}`;
+    const redditHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
     try {
-      const r = await fetch(rssUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-        },
-        signal: mkC(12000).signal,
-      });
-      if (!r.ok) throw new Error(`Reddit RSS HTTP ${r.status}`);
+      let r;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          r = await fetch(rssUrl, { headers: redditHeaders, signal: mkC(12000).signal });
+          if (r.ok) break;
+          if (attempt === 0 && (r.status === 429 || r.status === 403)) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          throw new Error(`Reddit RSS HTTP ${r.status}`);
+        } catch(fetchErr) {
+          if (attempt === 1) throw fetchErr;
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      if (!r || !r.ok) throw new Error(`Reddit RSS HTTP ${r?.status || 'unknown'}`);
       const xml = await r.text();
 
       const cleanHtml = (s) => s
