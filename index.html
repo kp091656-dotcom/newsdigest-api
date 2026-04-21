@@ -2270,48 +2270,53 @@ async function sentFetchPTT() {
 }
 
 async function sentFetchReddit(sub) {
-  // 直接從瀏覽器抓 Reddit JSON API（繞過 Vercel IP 封鎖）
+  // 透過 Vercel proxy 抓 Reddit RSS（server-side fetch，無 CORS 問題）
   const srcKey = sub === 'wallstreetbets' ? 'wsb' : 'inv';
   const now24  = Date.now() - 24 * 60 * 60 * 1000;
   const seen   = new Set();
   let posts    = [];
 
   for (const sort of ['hot', 'new']) {
-    try {
-      const url = `https://www.reddit.com/r/${sub}/${sort}.json?limit=25&raw_json=1`;
-      const res = await fetch(url, {
-        headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const items = json?.data?.children || [];
-      for (const item of items) {
-        const p = item.data;
-        if (!p || seen.has(p.id)) continue;
-        seen.add(p.id);
-        const ts = (p.created_utc || 0) * 1000;
-        // 清理 selftext
-        const body = (p.selftext || '')
-          .replace(/\n+/g, ' ')
-          .replace(/https?:\/\/\S+/g, '')
-          .trim()
-          .slice(0, 200);
-        posts.push({
-          title:    p.title || '',
-          body,
-          time:     ts ? new Date(ts).toLocaleDateString('zh-TW') : '',
-          score:    p.score || 0,
-          rank:     posts.length + 1,
-          comments: p.num_comments || 0,
-          url:      p.url ? `https://www.reddit.com${p.permalink}` : '',
-          source:   srcKey,
-          sentiment: null,
-          reason:   '',
-          ts,
-        });
+    let data = null;
+    // 最多 retry 2 次（Vercel IP 偶爾被封）
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const url = `${API_BASE}?endpoint=reddit&sub=${sub}&sort=${sort}&limit=25`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+        data = json.data || [];
+        break; // 成功就跳出 retry
+      } catch(e) {
+        if (attempt === 0) {
+          console.warn(`Reddit ${sub}/${sort} attempt 1 failed: ${e.message}, retrying...`);
+          await new Promise(r => setTimeout(r, 3000)); // 等 3 秒再試
+        } else {
+          console.warn(`Reddit ${sub}/${sort} failed after retry: ${e.message}`);
+        }
       }
-    } catch(e) { console.warn(`Reddit ${sub}/${sort} failed:`, e.message); continue; }
+    }
+    if (!data) continue;
+
+    for (const p of data) {
+      if (!p || seen.has(p.id)) continue;
+      seen.add(p.id);
+      const ts = (p.created || 0) * 1000;
+      posts.push({
+        title:    p.title || '',
+        body:     p.body || '',
+        time:     ts ? new Date(ts).toLocaleDateString('zh-TW') : '',
+        score:    p.score || 0,
+        rank:     p.rank || posts.length + 1,
+        comments: p.num_comments || 0,
+        url:      p.url || '',
+        source:   srcKey,
+        sentiment: null,
+        reason:   '',
+        ts,
+      });
+    }
   }
   const recent = posts.filter(p => p.ts >= now24);
   const older  = posts.filter(p => p.ts < now24);
