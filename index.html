@@ -728,11 +728,9 @@
     <span class="api-hint">RSS 直連 Reuters · CNBC · Bloomberg · WSJ · MarketWatch · FT · 無請求限制</span>
   </div>
   <div class="api-row" style="flex-wrap:nowrap;">
-    <label>◆ GROQ KEY</label>
-    <input class="api-input" id="groqKey" type="password" placeholder="Groq API Key（console.groq.com 免費申請，不需信用卡）">
-    <button class="api-fetch-btn" style="background:var(--accent2)" onclick="saveGroqKey()">儲存</button>
-    <span class="api-status" id="groqStatus">未設定</span>
-    <span class="api-hint">免費申請：<a href="https://console.groq.com/keys" target="_blank">console.groq.com</a> · 不需信用卡</span>
+    <label>◆ AI 引擎</label>
+    <span class="api-status ok" id="groqStatus" style="margin-left:0;">✓ 已啟用（已記住）</span>
+    <span class="api-hint">Gemini 1.5 Flash · Google AI · 每日 1,500 次免費請求</span>
   </div>
 
   </div>
@@ -755,7 +753,7 @@
     <!-- 今日市場摘要 -->
     <div id="marketSummaryBox" style="display:none;margin-bottom:1.5rem;background:#fff;border:1.5px solid var(--accent);border-radius:10px;overflow:hidden;">
       <div style="background:var(--accent);padding:0.6rem 1.2rem;display:flex;align-items:center;justify-content:space-between;">
-        <span style="color:#fff;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;">◆ 今日市場摘要 · Groq AI</span>
+        <span style="color:#fff;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;">◆ 今日市場摘要 · Gemini AI</span>
         <div style="display:flex;align-items:center;gap:0.6rem;">
           <span id="summaryTs" style="color:rgba(255,255,255,0.75);font-family:'IBM Plex Mono',monospace;font-size:0.62rem;"></span>
           <button onclick="generateMarketSummary()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:0.65rem;padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">↻ 重新生成</button>
@@ -887,7 +885,7 @@
   </div>
   <div id="sentPostList" style="display:flex;flex-direction:column;gap:8px;">
     <div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;">
-      需要 Groq Key（上方已設定），點擊「▶ 分析」開始，或點「Demo」查看效果
+      點擊「▶ 分析」開始，或點「Demo」查看效果
     </div>
   </div>
     </div><!-- end sentimentPanel -->
@@ -1081,7 +1079,7 @@
   <aside class="sidebar">
     
     <div class="sidebar-section">
-      <div class="sidebar-header">🇺🇸 美股簡報 <span>◆ Groq AI</span></div>
+      <div class="sidebar-header">🇺🇸 美股簡報 <span>◆ Gemini AI</span></div>
       <div class="daily-brief">
         <div class="brief-ts" id="briefTsTech"></div>
         <div id="dailyBriefTech"><div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:65%"></div></div></div>
@@ -1089,7 +1087,7 @@
       </div>
     </div>
     <div class="sidebar-section">
-      <div class="sidebar-header">🇹🇼 台股簡報 <span>◆ Groq AI</span></div>
+      <div class="sidebar-header">🇹🇼 台股簡報 <span>◆ Gemini AI</span></div>
       <div class="daily-brief">
         <div class="brief-ts" id="briefTsEcon"></div>
         <div id="dailyBriefEcon"><div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:65%"></div></div></div>
@@ -1331,7 +1329,7 @@ async function sbFetch(table, params) {
 
 <script>
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
-let groqApiKey = '';
+const geminiReady = true; // Gemini key 存在 Vercel 環境變數
 let allArticles = [];
 let displayedCount = 0;
 const PAGE_SIZE = 50;
@@ -1430,21 +1428,21 @@ function createCard(article, idx) {
       <span class="expand-icon">▸</span> <span class="expand-label">展開閱讀摘要</span>
     </button>
     <div class="card-read-more">
-      <div class="read-loading" style="color:var(--muted);font-size:0.78rem;">⏳ 點擊展開後由 Groq AI 生成完整摘要…</div>
+      <div class="read-loading" style="color:var(--muted);font-size:0.78rem;">⏳ 點擊展開後由 Gemini AI 生成完整摘要…</div>
       <div class="read-content" style="display:none;"></div>
       <div class="read-original" style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px solid var(--border);">
         ${article.url && article.url !== '#' ? `<a href="${article.url}" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:var(--accent2);">↗ 閱讀原文</a>` : ''}
       </div>
     </div>
     <div class="ai-analysis-area">
-      <div class="ai-analysis-label">◆ Groq AI 分析</div>
+      <div class="ai-analysis-label">◆ Gemini AI 分析</div>
       <div id="sum-${id}">
         <button class="analyze-btn" id="btn-${id}"
           data-cardid="${id}"
           data-title="${encodeURIComponent(article.title||'')}"
           data-desc="${encodeURIComponent(article.description||'')}"
           onclick="doSummarize(this.dataset.cardid, decodeURIComponent(this.dataset.title), decodeURIComponent(this.dataset.desc))">
-          ✦ 點擊生成 Groq AI 分析
+          ✦ 點擊生成 Gemini AI 分析
         </button>
       </div>
     </div>
@@ -1571,13 +1569,7 @@ async function fetchMarketaux() {
     generateBrief();
 
 
-    const savedGroq = groqApiKey || localStorage.getItem('nd_groq_key') || '';
-    if (savedGroq) {
-      groqApiKey = savedGroq;
-      document.getElementById('groqKey').value = savedGroq;
-      setGroqStatus('✓ 已啟用（已記住）', 'ok');
-      translateArticles();
-    }
+    translateArticles(); // Gemini API via Vercel proxy
 
   } catch(e) {
     setStatus(`✗ ${e.message}`, 'err');
@@ -1592,7 +1584,7 @@ async function fetchMarketaux() {
 
 // ── Translate articles to Traditional Chinese via Groq ──
 async function translateArticles() {
-  if (!groqApiKey || !allArticles.length) return;
+  if (!allArticles.length) return;
 
   // 只翻英文文章（跳過已是中文的 PTT 文章）
   const targets = allArticles.filter(a => !/[\u4e00-\u9fff]/.test(a.title));
@@ -1672,7 +1664,7 @@ async function translateArticles() {
 
 // ── Market Summary ──
 async function generateMarketSummary() {
-  if (!groqApiKey || !allArticles.length) return;
+  if (!allArticles.length) return;
   const box = document.getElementById('marketSummaryBox');
   const el = document.getElementById('marketSummaryContent');
   const ts = document.getElementById('summaryTs');
@@ -1688,7 +1680,7 @@ async function generateMarketSummary() {
     el.innerHTML = points.map(p =>
       `<div style="padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.82rem;line-height:1.6;color:var(--text);">${p.replace(/^[•\-\*]\s*/,'<span style="color:var(--accent);font-weight:700;margin-right:0.4rem;">◆</span>')}</div>`
     ).join('');
-    ts.textContent = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}) + ' · Groq 生成';
+    ts.textContent = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}) + ' · Gemini 生成';
   } catch(e) {
     el.innerHTML = `<span style="color:var(--muted);font-size:0.78rem;">生成失敗：${e.message}</span>`;
   }
@@ -1725,12 +1717,12 @@ async function toggleReadMode(btn) {
   const title = titleEl?.textContent?.trim() || '';
   const desc = descEl?.textContent?.trim() || '';
 
-  if (!groqApiKey) {
-    readLoading.textContent = '⚠ 請先設定 Groq API Key 以啟用閱讀模式';
+  if (false) {
+    readLoading.textContent = '';
     return;
   }
 
-  readLoading.textContent = '⏳ Groq AI 生成中…';
+  readLoading.textContent = '⏳ Gemini AI 生成中…';
 
   try {
     const prompt = `你是財經記者。根據以下新聞標題和描述，用繁體中文撰寫一段完整的新聞摘要（150-200字），包含：事件背景、主要影響、市場反應。語氣專業客觀。
@@ -1747,24 +1739,15 @@ async function toggleReadMode(btn) {
 }
 
 // ── AI: summarize via Gemini API ──
-async function callGemini(prompt) {
-  if (!groqApiKey) throw new Error('請先輸入並儲存 Groq API Key');
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+async function callGemini(prompt, maxTokens = 800, temperature = 0.7) {
+  const res = await fetch(`${API_BASE}?endpoint=gemini`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${groqApiKey}`
-    },
-    body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 800,
-      temperature: 0.7
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, maxTokens, temperature })
   });
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-  return data.choices?.[0]?.message?.content || '無法生成內容。';
+  if (data.error) throw new Error(data.error);
+  return data.text || '無法生成內容。';
 }
 
 async function doSummarize(id, title, desc) {
@@ -1773,7 +1756,7 @@ async function doSummarize(id, title, desc) {
   if (btnEl) btnEl.disabled = true;
 
   sumEl.innerHTML = `
-    <div class="ai-analysis-label" style="color:var(--accent2)">◆ Groq 分析中…</div>
+    <div class="ai-analysis-label" style="color:var(--accent2)">◆ Gemini 分析中…</div>
     <div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:70%"></div></div>
   `;
 
@@ -1785,7 +1768,7 @@ async function doSummarize(id, title, desc) {
 
     const text = await callGemini(prompt);
     sumEl.innerHTML = `
-      <div class="ai-analysis-label">◆ Groq AI 分析 <span style="color:var(--accent3);margin-left:0.3rem">✓ 已生成</span></div>
+      <div class="ai-analysis-label">◆ Gemini AI 分析 <span style="color:var(--accent3);margin-left:0.3rem">✓ 已生成</span></div>
       <div class="ai-analysis-text">${text}</div>
     `;
   } catch(e) {
@@ -1812,7 +1795,7 @@ async function generateBrief(market) {
   const tsEl = document.getElementById(tsId);
 
   const now = new Date();
-  tsEl.textContent = `◆ ${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} · Groq 生成`;
+  tsEl.textContent = `◆ ${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} · Gemini 生成`;
   el.innerHTML = `<div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:55%"></div></div>`;
 
   // Filter articles by market category + take top 8
@@ -1825,8 +1808,8 @@ async function generateBrief(market) {
     tw: '台股今日維持震盪整理，半導體族群表現強勁，外資動向與美股走勢為主要觀察重點，投資人持續關注供應鏈變化。'
   };
 
-  if (!groqApiKey || !articles.length) {
-    el.innerHTML = `<div class="brief-text">${fallbacks[market]}<br><small style="color:var(--muted);font-size:0.68rem;margin-top:0.4rem;display:block">${!groqApiKey ? '⚠ 請設定 Groq API Key 以啟用 AI 簡報' : '⚠ 請先載入財經新聞'}</small></div>`;
+  if (!articles.length) {
+    el.innerHTML = `<div class="brief-text">${fallbacks[market]}<br><small style="color:var(--muted);font-size:0.68rem;margin-top:0.4rem;display:block">'⚠ 請先載入財經新聞'</small></div>`;
     return;
   }
 
@@ -2344,22 +2327,8 @@ ${postLines}`;
     let analyzed = false;
     for (let attempt = 0; attempt < 3 && !analyzed; attempt++) {
       try {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqApiKey}`},
-          body: JSON.stringify({ model:'llama-3.1-8b-instant', messages:[{role:'user',content:prompt}], temperature:0.15, max_tokens:900 })
-        });
-        const d = await res.json();
-        if (d.error) {
-          const is429 = d.error.message?.includes('429') || d.error.code === 'rate_limit_exceeded' || res.status === 429;
-          if (is429 && attempt < 2) {
-            const waitSec = attempt === 0 ? 20 : 40;
-            console.warn(`Groq 429，等 ${waitSec} 秒後重試（第 ${attempt+1} 次）`); if(onStatus) onStatus(`Groq 速率限制，等待 ${waitSec} 秒後重試…`);
-            await new Promise(r => setTimeout(r, waitSec * 1000));
-            continue;
-          }
-          throw new Error(d.error.message);
-        }
-        const parsed = JSON.parse(d.choices[0].message.content.replace(/```json|```/g,'').trim());
+        const rawText = await callGemini(prompt, 900, 0.15);
+        const parsed = JSON.parse(rawText.replace(/```json|```/g,'').trim());
         parsed.forEach(r => {
           if (batch[r.idx]) {
             batch[r.idx].sentiment   = r.sentiment;
@@ -2373,10 +2342,10 @@ ${postLines}`;
         const is429 = e.message?.includes('429') || e.message?.includes('rate_limit');
         if (is429 && attempt < 2) {
           const waitSec = attempt === 0 ? 20 : 40;
-          console.warn(`Groq 429 (catch)，等 ${waitSec} 秒後重試`); if(onStatus) onStatus(`Groq 速率限制，等待 ${waitSec} 秒後重試…`);
+          console.warn(`Gemini 429，等 ${waitSec} 秒後重試`); if(onStatus) onStatus(`AI 速率限制，等待 ${waitSec} 秒後重試…`);
           await new Promise(r => setTimeout(r, waitSec * 1000));
         } else {
-          console.warn('Groq 分析失敗:', e.message);
+          console.warn('Gemini 分析失敗:', e.message);
           batch.forEach(p => { p.sentiment = p.sentiment || 'neutral'; p.confidence = 'low'; });
           analyzed = true; // 放棄這個 batch
         }
@@ -2397,17 +2366,12 @@ async function sentGenerateSummary(posts) {
 
 請分析：1)整體情緒傾向 2)各來源差異 3)主要關注議題 4)短期市場風險提示`;
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqApiKey}`},
-      body: JSON.stringify({ model:'llama-3.1-8b-instant', messages:[{role:'user',content:prompt}], temperature:0.5, max_tokens:400 })
-    });
-    const d = await res.json();
-    return d.choices?.[0]?.message?.content || null;
+    return await callGemini(prompt, 400, 0.5);
   } catch(e) { return null; }
 }
 
 async function startSentimentAnalysis() {
-  if (!groqApiKey) { alert('請先在上方設定並儲存 Groq API Key'); return; }
+  // Gemini ready
   const btn = document.getElementById('sentimentAnalyzeBtn');
   const setMsg = (msg) => {
     document.getElementById('sentPostList').innerHTML = `<div style="text-align:center;padding:36px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;"><div class="spinner" style="margin:0 auto 12px;"></div>${msg}</div>`;
@@ -2441,7 +2405,7 @@ async function startSentimentAnalysis() {
     }
 
     btn.textContent = `⏳ AI 分析 ${posts.length} 篇...`;
-    setMsg(`Groq AI 情緒分析中（共 ${posts.length} 篇）…`);
+    setMsg(`Gemini AI 情緒分析中（共 ${posts.length} 篇）…`);
     posts = await sentAnalyzeGroq(posts, setMsg);
     const summary = await sentGenerateSummary(posts);
     if (summary) { document.getElementById('sentAiText').textContent=summary; document.getElementById('sentAiSummary').style.display='block'; }
@@ -3482,6 +3446,7 @@ function hideFutures() {
 function setGroqStatus(msg, type) {
   const el = document.getElementById('groqStatus');
   if (!el) return;
+  if (!el) return;
   el.textContent = msg;
   el.className = 'api-status' + (type ? ' ' + type : '');
 }
@@ -3489,14 +3454,13 @@ function setGroqStatus(msg, type) {
 function saveGroqKey() {
   const key = document.getElementById('groqKey').value.trim();
   if (!key) { setGroqStatus('請輸入 Key', 'err'); return; }
-  groqApiKey = key;
-  localStorage.setItem('nd_groq_key', key);
+  localStorage.setItem('nd_groq_key', key); // legacy
   setGroqStatus('✓ 已啟用（已記住）', 'ok');
 }
 
 function loadSavedKeys() {
   const gemk = localStorage.getItem('nd_groq_key');
-  if (gemk) { groqApiKey = gemk; document.getElementById('groqKey').value = gemk; setGroqStatus('✓ 已啟用（已記住）', 'ok'); }
+  // Gemini ready - no key needed in frontend
 
 }
 
