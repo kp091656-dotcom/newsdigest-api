@@ -316,6 +316,37 @@ export default async function handler(req, res) {
 
   // ── PTT Stock 板 RSS proxy + 內文摘要 ──
   // ── PTT 單篇文章內文 + 推文數（供前端逐篇呼叫）──
+  // ── Gemini AI proxy ──
+  if (endpoint === 'gemini') {
+    const GEMINI_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+    const body = req.method === 'POST' && req.body ? req.body : {};
+    const prompt = body.prompt || req.query.prompt;
+    if (!prompt) return res.status(400).json({ error: 'prompt required' });
+    const maxTokens = parseInt(body.maxTokens || req.query.maxTokens || '1024');
+    const temperature = parseFloat(body.temperature || req.query.temperature || '0.5');
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature, maxOutputTokens: maxTokens }
+          })
+        }
+      );
+      const data = await r.json();
+      if (data.error) return res.status(500).json({ error: data.error.message });
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      res.status(200).json({ text });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+    return;
+  }
+
   if (endpoint === 'ptt_article') {
     const { url: articleUrl } = req.query;
     if (!articleUrl || !articleUrl.includes('ptt.cc')) {
