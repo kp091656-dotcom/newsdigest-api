@@ -2323,7 +2323,7 @@ async function sentFetchReddit(sub) {
   return [...recent, ...older].slice(0, 20);
 }
 
-async function sentAnalyzeGroq(posts) {
+async function sentAnalyzeGroq(posts, onStatus) {
   const BATCH = 8; // 含內文後 token 較多，縮小 batch
   for (let i = 0; i < posts.length; i += BATCH) {
     const batch = posts.slice(i, i+BATCH);
@@ -2359,24 +2359,48 @@ confidence規則：
 貼文：
 ${postLines}`;
 
-    try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqApiKey}`},
-        body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], temperature:0.15, max_tokens:1200 })
-      });
-      const d = await res.json();
-      if (d.error) throw new Error(d.error.message);
-      const parsed = JSON.parse(d.choices[0].message.content.replace(/```json|```/g,'').trim());
-      parsed.forEach(r => {
-        if (batch[r.idx]) {
-          batch[r.idx].sentiment   = r.sentiment;
-          batch[r.idx].reason      = r.reason || '';
-          batch[r.idx].confidence  = r.confidence || 'mid';
-          if (r.title_zh) batch[r.idx].title_zh = r.title_zh;
+    let analyzed = false;
+    for (let attempt = 0; attempt < 3 && !analyzed; attempt++) {
+      try {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqApiKey}`},
+          body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], temperature:0.15, max_tokens:1200 })
+        });
+        const d = await res.json();
+        if (d.error) {
+          const is429 = d.error.message?.includes('429') || d.error.code === 'rate_limit_exceeded' || res.status === 429;
+          if (is429 && attempt < 2) {
+            const waitSec = attempt === 0 ? 20 : 40;
+            console.warn(`Groq 429，等 ${waitSec} 秒後重試（第 ${attempt+1} 次）`); if(onStatus) onStatus(`Groq 速率限制，等待 ${waitSec} 秒後重試…`);
+            await new Promise(r => setTimeout(r, waitSec * 1000));
+            continue;
+          }
+          throw new Error(d.error.message);
         }
-      });
-    } catch(e) { batch.forEach(p=>{ p.sentiment = p.sentiment||'neutral'; p.confidence='low'; }); }
-    if (i+BATCH < posts.length) await new Promise(r=>setTimeout(r,400));
+        const parsed = JSON.parse(d.choices[0].message.content.replace(/```json|```/g,'').trim());
+        parsed.forEach(r => {
+          if (batch[r.idx]) {
+            batch[r.idx].sentiment   = r.sentiment;
+            batch[r.idx].reason      = r.reason || '';
+            batch[r.idx].confidence  = r.confidence || 'mid';
+            if (r.title_zh) batch[r.idx].title_zh = r.title_zh;
+          }
+        });
+        analyzed = true;
+      } catch(e) {
+        const is429 = e.message?.includes('429') || e.message?.includes('rate_limit');
+        if (is429 && attempt < 2) {
+          const waitSec = attempt === 0 ? 20 : 40;
+          console.warn(`Groq 429 (catch)，等 ${waitSec} 秒後重試`); if(onStatus) onStatus(`Groq 速率限制，等待 ${waitSec} 秒後重試…`);
+          await new Promise(r => setTimeout(r, waitSec * 1000));
+        } else {
+          console.warn('Groq 分析失敗:', e.message);
+          batch.forEach(p => { p.sentiment = p.sentiment || 'neutral'; p.confidence = 'low'; });
+          analyzed = true; // 放棄這個 batch
+        }
+      }
+    }
+    if (i+BATCH < posts.length) await new Promise(r=>setTimeout(r,800));
   }
   return posts;
 }
@@ -2436,7 +2460,7 @@ async function startSentimentAnalysis() {
 
     btn.textContent = `⏳ AI 分析 ${posts.length} 篇...`;
     setMsg(`Groq AI 情緒分析中（共 ${posts.length} 篇）…`);
-    posts = await sentAnalyzeGroq(posts);
+    posts = await sentAnalyzeGroq(posts, setMsg);
     const summary = await sentGenerateSummary(posts);
     if (summary) { document.getElementById('sentAiText').textContent=summary; document.getElementById('sentAiSummary').style.display='block'; }
     sentAllPosts = posts;
