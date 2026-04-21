@@ -3592,7 +3592,7 @@ async function loadMktSignals() {
       const val = inst[name];
       if (val == null) return '';
       const pos   = val >= 0;
-      const color = pos ? 'var(--accent)' : 'var(--accent3)';
+      const color = pos ? '#dc2626' : '#16a34a';
       const sign  = pos ? '+' : '';
       const barW  = Math.min(100, Math.abs(val) / 5000 * 100);
       if (name === '外資') score += pos ? 1 : -1;
@@ -3781,7 +3781,7 @@ async function loadOptions() {
       const val = inst[name];
       if (val == null) return '';
       const pos  = val >= 0;
-      const color = pos ? 'var(--accent)' : 'var(--accent3)'; // 多=紅 空=綠
+      const color = pos ? '#dc2626' : '#16a34a'; // 多=紅 空=綠
       const sign  = pos ? '+' : '';
       const label = pos ? '淨多' : '淨空';
       const barW  = Math.min(100, Math.abs(val) / 5000 * 100); // 5000口為滿格
