@@ -1566,10 +1566,7 @@ async function fetchMarketaux() {
 
     renderFeed(getFiltered());
     renderTrending();
-    generateBrief();
-
-
-    translateArticles(); // 翻譯走 Gemini，分析走 Groq
+    translateArticles(); // 翻譯完成後會自動呼叫 generateBrief（Groq 佇列依序執行）
 
   } catch(e) {
     setStatus(`✗ ${e.message}`, 'err');
@@ -1711,16 +1708,44 @@ async function callGemini(prompt, maxTokens = 800, temperature = 0.7) {
   return await callGroq(prompt, maxTokens, temperature);
 }
 
-async function callGroq(prompt, maxTokens = 800, temperature = 0.7) {
-  // 情緒分析/簡報/摘要：走 Vercel proxy（Key 存在環境變數）
-  const res = await fetch(`${API_BASE}?endpoint=groq`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, maxTokens, temperature })
+// ── Groq 請求佇列（避免 TPM 超限）──
+const _groqQueue = [];
+let _groqBusy = false;
+const GROQ_MIN_GAP_MS = 12000; // 每個請求間隔 12 秒（6000 TPM / ~500 avg tokens = 12 req/min 上限，保守取 12s）
+let _groqLastCall = 0;
+
+function _groqEnqueue(fn) {
+  return new Promise((resolve, reject) => {
+    _groqQueue.push({ fn, resolve, reject });
+    _groqDrain();
   });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data.text || '無法生成內容。';
+}
+
+async function _groqDrain() {
+  if (_groqBusy || !_groqQueue.length) return;
+  _groqBusy = true;
+  while (_groqQueue.length) {
+    const { fn, resolve, reject } = _groqQueue.shift();
+    const now = Date.now();
+    const wait = Math.max(0, _groqLastCall + GROQ_MIN_GAP_MS - now);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    _groqLastCall = Date.now();
+    try { resolve(await fn()); } catch(e) { reject(e); }
+  }
+  _groqBusy = false;
+}
+
+async function callGroq(prompt, maxTokens = 800, temperature = 0.7) {
+  return _groqEnqueue(async () => {
+    const res = await fetch(`${API_BASE}?endpoint=groq`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, maxTokens, temperature })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.text || '無法生成內容。';
+  });
 }
 
 async function doSummarize(id, title, desc) {
@@ -1756,7 +1781,8 @@ async function doSummarize(id, title, desc) {
 // ── Claude: daily brief ──
 async function generateBrief(market) {
   if (!market) {
-    await Promise.all([generateBrief('us'), generateBrief('tw')]);
+    await generateBrief('us');
+    await generateBrief('tw');
     return;
   }
 
@@ -2315,16 +2341,16 @@ ${postLines}`;
         const is429 = e.message?.includes('429') || e.message?.includes('rate_limit');
         if (is429 && attempt < 2) {
           const waitSec = attempt === 0 ? 35 : 65;
-          console.warn(`Gemini 429，等 ${waitSec} 秒後重試`); if(onStatus) onStatus(`AI 速率限制，等待 ${waitSec} 秒後重試…`);
+          console.warn(`Groq 429，等 ${waitSec} 秒後重試`); if(onStatus) onStatus(`AI 速率限制，等待 ${waitSec} 秒後重試…`);
           await new Promise(r => setTimeout(r, waitSec * 1000));
         } else {
-          console.warn('Gemini 分析失敗:', e.message);
+          console.warn('Groq 分析失敗:', e.message);
           batch.forEach(p => { p.sentiment = p.sentiment || 'neutral'; p.confidence = 'low'; });
           analyzed = true; // 放棄這個 batch
         }
       }
     }
-    if (i+BATCH < posts.length) await new Promise(r=>setTimeout(r,4500)); // Gemini 免費 15 RPM
+    if (i+BATCH < posts.length) await new Promise(r=>setTimeout(r,4500)); // Groq TPM 限速緩衝
   }
   return posts;
 }
