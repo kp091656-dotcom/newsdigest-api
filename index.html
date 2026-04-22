@@ -1594,65 +1594,46 @@ async function translateArticles() {
     return;
   }
 
-  const BATCH      = 8;    // 每批 8 篇，約 1,200 tokens，安全邊際夠
-  const HALF       = 25;   // 第一分鐘翻前 25 篇，第二分鐘翻剩下
-  const MIN_WAIT   = 62000; // 兩波之間等 62 秒（跨過 1 分鐘 TPM 重置）
+  // ── 逐篇翻譯（每篇獨立請求，避免 Vercel 30s timeout）──
+  // 每篇間隔 4.5 秒，符合 Gemini 免費 15 RPM 限制
+  const DELAY_MS = 4500;
+  const MAX_ARTICLES = 30; // 最多翻 30 篇（約 2.5 分鐘）
+  const toTranslate = targets.slice(0, MAX_ARTICLES);
 
-  const translateBatch = async (arts, labelOffset) => {
-    for (let i = 0; i < arts.length; i += BATCH) {
-      const batch = arts.slice(i, i + BATCH);
-      const lines = batch.map((a, j) =>
-        `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,40).replace(/[|]/g,' ')}`
-      ).join('\n');
-      const prompt = `你是財經翻譯專員。翻譯成繁體中文，格式不變，每行「編號. 標題 ||| 描述」，不要加說明。\n\n${lines}`;
+  for (let i = 0; i < toTranslate.length; i++) {
+    const art = toTranslate[i];
+    const prompt = `翻譯成繁體中文，只輸出「標題 ||| 描述」一行，不要其他說明。\n標題：${art.title.replace(/[|]/g,' ')}\n描述：${(art.description||'').slice(0,60).replace(/[|]/g,' ')}`;
 
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const raw = await callGemini(prompt);
-          raw.trim().split('\n').filter(l => l.match(/^\d+\./)).forEach(line => {
-            const nm = line.match(/^(\d+)\.\s*/);
-            if (!nm) return;
-            const idx  = parseInt(nm[1]) - 1;
-            const rest = line.replace(/^\d+\.\s*/, '');
-            const parts = rest.split('|||');
-            const art = arts[i + idx];
-            if (!art) return;
-            if (parts[0]?.trim()) art.title       = parts[0].trim();
-            if (parts[1]?.trim()) art.description = parts[1].trim();
-          });
-          break;
-        } catch(e) {
-          const is429 = e.message?.includes('429') || e.message?.includes('Rate limit');
-          if (is429 && attempt === 0) {
-            setStatus('Gemini 流量限制，等待 35 秒…', 'loading');
-            await new Promise(r => setTimeout(r, 20000));
-          }
+    let retryCount = 0;
+    while (retryCount < 2) {
+      try {
+        const raw = await callGemini(prompt, 200, 0.3);
+        const parts = raw.trim().split('|||');
+        if (parts[0]?.trim()) art.title       = parts[0].trim();
+        if (parts[1]?.trim()) art.description = parts[1].trim();
+        break;
+      } catch(e) {
+        const is429 = e.message?.includes('429') || e.message?.includes('quota') || e.message?.includes('RESOURCE_EXHAUSTED');
+        if (is429 && retryCount === 0) {
+          // 解析 retry 時間，最少等 15 秒
+          const retryMatch = e.message?.match(/retry in ([\d.]+)s/i);
+          const waitSec = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) + 3 : 15;
+          setStatus(`Gemini 流量限制，等待 ${waitSec} 秒… (${i+1}/${toTranslate.length})`, 'loading');
+          await new Promise(r => setTimeout(r, waitSec * 1000));
+          retryCount++;
+        } else {
+          break; // 非 429 或已重試，跳過這篇
         }
       }
-
-      const done = labelOffset + Math.min(i + BATCH, arts.length);
-      setStatus(`Gemini 翻譯中… ${done}/${targets.length}`, 'loading');
-      renderFeed(getFiltered()); // 邊翻邊顯示
-      if (i + BATCH < arts.length) await new Promise(r => setTimeout(r, 4500)); // Gemini 免費 15 RPM
     }
-  };
 
-  // ── 第一波：前 25 篇 ──
-  const wave1 = targets.slice(0, HALF);
-  const wave2 = targets.slice(HALF);
-  setStatus(`Gemini 翻譯中（第 1 波，共 ${wave1.length} 篇）…`, 'loading');
-  await translateBatch(wave1, 0);
+    setStatus(`Gemini 翻譯中… ${i+1}/${toTranslate.length}`, 'loading');
+    renderFeed(getFiltered()); // 邊翻邊顯示
 
-  // 有剩下的篇數才等待第二波
-  if (wave2.length > 0) {
-    setStatus(`第 1 波完成，等待 1 分鐘後繼續翻譯剩餘 ${wave2.length} 篇…`, 'loading');
-    // 倒數顯示
-    for (let s = Math.floor(MIN_WAIT/1000); s > 0; s--) {
-      await new Promise(r => setTimeout(r, 1000));
-      setStatus(`等待 TPM 重置… ${s} 秒後繼續翻譯剩餘 ${wave2.length} 篇`, 'loading');
+    // 最後一篇不需等待
+    if (i < toTranslate.length - 1) {
+      await new Promise(r => setTimeout(r, DELAY_MS));
     }
-    setStatus(`Gemini 翻譯中（第 2 波，共 ${wave2.length} 篇）…`, 'loading');
-    await translateBatch(wave2, wave1.length);
   }
 
   setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
