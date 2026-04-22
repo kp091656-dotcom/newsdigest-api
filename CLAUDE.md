@@ -1,14 +1,14 @@
-# NewsDigest.AI — 專案記憶文件 (CLAUDE.md)
-> 更新日期：2026-04-20
+# AlphaScope — 專案記憶文件 (CLAUDE.md)
+> 更新日期：2026-04-22
 > 給 Claude 看的專案上下文。每次新對話開始請先讀這個檔案。
 
 ---
 
 ## 專案概覽
 
-**名稱：** NewsDigest.AI — AI 驅動財經新聞網站  
-**網址：** https://newsdigest-api.vercel.app  
-**GitHub：** github.com/kp091656-dotcom/newsdigest-api  
+**名稱：** AlphaScope — AI 驅動財經市場情報網站  
+**網址：** https://alphascope-fin.vercel.app  
+**GitHub：** github.com/kp091656-dotcom/alphascope-api  
 **架構：** 單一 Vercel repo（前端 + 後端 API）+ Supabase 歷史資料庫  
 **分支：** main → 自動部署到 Vercel
 
@@ -60,6 +60,7 @@ id, date, stock_id, name, close, prev, chg_pct, volume, source, created_at
 - `pbr`：確認存在
 - `listed_shares`：⚠️ 可能不存在（查詢會 400），欄位名未確認
 - 目前熱圖市值用靜態 `mcap` fallback
+- `per` 欄位名稱也待確認（查詢用 `select=stock_id,date,pbr,dividend_yield,per` 會 400）
 
 ### Supabase 查詢語法注意
 - 多 ID 篩選用 `stock_id=in.(2330,2454,...)` 而非 `or=(stock_id.eq.2330,...)`
@@ -77,12 +78,6 @@ async function sbFetch(table, params) {
   });
   return r.json();
 }
-// 例：查台積電近60天（stock_daily_twse）
-sbFetch('stock_daily_twse', 'stock_id=eq.2330&order=date.desc&limit=60&select=date,close,chg_pct,prev');
-// 例：查半導體類指數
-sbFetch('sector_index_daily', 'index_name=eq.半導體類指數&order=date.desc&limit=30');
-// 例：多股批次查詢
-sbFetch('stock_daily_twse', 'stock_id=in.(2330,2454,2317)&order=date.desc&limit=10&select=stock_id,date,close,chg_pct');
 ```
 
 ### GitHub Actions 每日收集
@@ -120,7 +115,7 @@ sbFetch('stock_daily_twse', 'stock_id=in.(2330,2454,2317)&order=date.desc&limit=
 
 ## Vercel API 端點
 
-**Base URL：** `https://newsdigest-api.vercel.app/api/news`
+**Base URL：** `https://alphascope-fin.vercel.app/api/news`
 
 | endpoint | 說明 | Cache TTL |
 |----------|------|-----------|
@@ -134,7 +129,9 @@ sbFetch('stock_daily_twse', 'stock_id=in.(2330,2454,2317)&order=date.desc&limit=
 | `?endpoint=twheatmap` | 舊熱圖（已廢棄，前端改用 Supabase）| **60 分鐘** |
 | `?endpoint=ptt` | PTT 股票版 | 無 |
 | `?endpoint=ptt_article&url=...` | PTT 文章內文 | 無 |
-| `?endpoint=reddit&sub=...` | Reddit RSS（⚠️ Vercel IP 被封，已改前端直抓）| 無 |
+| `?endpoint=reddit&sub=...` | Reddit RSS（Vercel proxy，時好時壞）| 無 |
+| `?endpoint=gemini` | Gemini AI proxy（Key 存 Vercel env）| 無 |
+| `?endpoint=groq` | Groq AI proxy（Key 存 Vercel env）| 無 |
 
 ---
 
@@ -142,7 +139,7 @@ sbFetch('stock_daily_twse', 'stock_id=in.(2330,2454,2317)&order=date.desc&limit=
 
 ```js
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? '/api/news' : 'https://newsdigest-api.vercel.app/api/news';
+  ? '/api/news' : 'https://alphascope-fin.vercel.app/api/news';
 const SUPABASE_URL  = 'https://fdxedcwtmlurumfjmlys.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
 ```
@@ -154,9 +151,9 @@ const SUPABASE_ANON = 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
 - **155支股票**，27個產業，改從 **Supabase** 讀取（不再打 FinMind）
 - **資料來源：** `stock_daily_twse`（收盤/漲跌）+ `stock_valuation_daily`（市值推算）
 - **手動載入**：需按「↻ 更新」
-- **個股 Modal**：點股票開走勢圖，讀 `stock_daily_twse`（已改，原為 `stock_daily`）
-- **產業漲跌幅 bar**：讀 `sector_index_daily` 官方指數（已改，原為市值加權）
-- **市值**：優先用 `stock_valuation_daily` PBR×股本推算，fallback 靜態值（listed_shares 欄位名未確認）
+- **個股 Modal**：點股票開走勢圖，讀 `stock_daily_twse`
+- **產業漲跌幅 bar**：讀 `sector_index_daily` 官方指數
+- **市值**：優先用 `stock_valuation_daily` PBR×股本推算，fallback 靜態值
 
 ### HM_STOCK_LIST（前端內建，155支）
 存在 `index.html` 的 `const HM_STOCK_LIST = [...]`，涵蓋27個產業：
@@ -179,11 +176,12 @@ const SUPABASE_ANON = 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
 - 用 KEYWORD_MAP 模糊比對 TWSE 指數名 → SECTOR_COLORS key
 - `chg_pct` 在 `sector_index_daily` 已是百分比（直接用，不需 ×100）
 - 排除「報酬指數」、槓桿/反向版本
+- ⚠️ 目前 22/69 命中，47 個未命中（KEYWORD_MAP 待補齊）
 
 ### 多空訊號（獨立 tab）
 - **📡 多空訊號** 已移為獨立 tab（在台股熱圖後面）
 - 版面：全寬訊號燈 → 三欄 grid（選擇權 | 三大法人 | 融資融券+回測）
-- `loadMktSignals()` 在切換到多空訊號 tab 時才呼叫（不在熱圖載入時呼叫）
+- `loadMktSignals()` 在切換到多空訊號 tab 時才呼叫
 - Max Pain = **賣方（法人）獲利最大點**
 
 ---
@@ -202,15 +200,10 @@ Tab 切換邏輯：每個 show 函式都要隱藏其他所有 panel（含 signal
 
 ## 社群情緒
 
-### Reddit（已改前端直抓）
-```js
-// 直接從瀏覽器抓，繞過 Vercel IP 封鎖
-fetch(`https://www.reddit.com/r/${sub}/${sort}.json?limit=25&raw_json=1`)
-// 欄位：title, selftext, score, num_comments, permalink, created_utc
-// url = 'https://www.reddit.com' + p.permalink
-```
-- **WSB** = r/wallstreetbets（散戶高風險）
-- **r/investing**（較理性的長期投資討論）
+### Reddit（Vercel proxy，時好時壞）
+- 走 `?endpoint=reddit&sub=xxx&sort=xxx`
+- 失敗時 retry 一次（等 3 秒）
+- **WSB** = r/wallstreetbets、**INV** = r/investing
 
 ### PTT
 - 透過 Vercel `?endpoint=ptt` proxy
@@ -225,25 +218,41 @@ fetch(`https://www.reddit.com/r/${sub}/${sort}.json?limit=25&raw_json=1`)
 ## 設計規範
 
 ```css
---accent: #c8521a   /* 漲/多頭（紅）*/
---accent2: #1a6bc8  /* 藍 */
---accent3: #2a9d5c  /* 跌/空頭（綠）*/
---bg: #f7f6f2  --surface: #ffffff  --border: #e4e2d9  --border-dark: #c8c5b8
---text: #1a1a18  --muted: #7a7870
+--accent: #6366f1   /* 主色（紫藍）*/
+--accent2: #0ea5e9  /* 天藍 */
+--accent3: #10b981  /* 綠 */
+--bg: #f4f4f8  --surface: #ffffff  --border: #e0e0ea  --border-dark: #c0c0d0
+--text: #18181b  --muted: #71717a  --header-bg: #0f0f1a
 /* ring shadow */
 box-shadow: 0 0 0 1px var(--border-dark);
 ```
 
-**字體：** Playfair Display + IBM Plex Mono + Noto Sans TC  
-**台股慣例：漲=🔴紅、跌=🟢綠**
+**漲跌色：** 多頭/漲 = `#dc2626`（紅）、空頭/跌 = `#16a34a`（綠）  
+**台股慣例：漲=🔴紅、跌=🟢綠**  
+**字體：** IBM Plex Mono（Logo/等寬）+ Noto Sans TC（內文）
 
 ---
 
 ## AI 引擎
 
-**Groq：** `llama-3.3-70b-versatile`  
-**歷史遺留函式名：** `callGemini()` = Groq、`fetchMarketaux()` = RSS  
-**翻譯：** 兩波策略，各25篇，間隔62秒，429時等20秒重試
+**全部使用 Groq：** `llama-3.1-8b-instant`  
+**Key 管理：** `GROQ_API_KEY` 存在 Vercel 環境變數，前端不需輸入  
+**Vercel proxy：** `?endpoint=groq`（POST，body: `{prompt, maxTokens, temperature}`）  
+**歷史遺留函式名：** `callGemini()` 內部呼叫 `callGroq()`、`fetchMarketaux()` = RSS  
+
+### AI 功能分工
+| 功能 | 函式 | max_tokens | 備註 |
+|------|------|-----------|------|
+| 新聞翻譯 | `translateArticles()` → `callGroq()` | 1200 | 只翻熱門以上（score≥80），一次全部 |
+| 情緒分析 | `sentAnalyzeGroq()` → `callGroq()` | 900 | batch 10篇，間隔 4.5s |
+| 情緒摘要 | `sentGenerateSummary()` → `callGroq()` | 400 | |
+| 台股/美股簡報 | `generateBrief()` → `callGroq()` | 800 | 取前6篇新聞 |
+| 單篇摘要 | `doSummarize()` → `callGroq()` | 800 | 手動點擊 |
+
+### Groq 限制與對策
+- 免費方案：每日 100,000 tokens（TPD）、每分鐘 6,000 tokens（TPM）
+- 429 時：等 35~65 秒重試（情緒分析），翻譯只翻熱門篇降低用量
+- `?endpoint=groq` Vercel proxy 有 Exponential Backoff（最多 3 次）
 
 ---
 
@@ -252,15 +261,15 @@ box-shadow: 0 0 0 1px var(--border-dark);
 | 功能 | 狀態 | 備註 |
 |------|------|------|
 | RSS 新聞 | ✅ | 手動觸發 |
-| AI 翻譯 | ✅ | Groq 兩波 |
+| AI 翻譯 | ✅ | Groq，只翻熱門以上（score≥80） |
 | Fear & Greed | ✅ | CNN + 加密 |
 | VIX term structure | ✅ | |
 | 全球商品排行榜 | ✅ | |
 | K 棒圖 | ✅ | |
-| 社群情緒（PTT+Reddit）| ✅ | Reddit 改前端直抓 |
+| 社群情緒（PTT+Reddit）| ✅ | Reddit 走 Vercel proxy |
 | 台指選擇權籌碼 | ✅ | 60min cache |
 | 台股熱圖 | ✅ | **155支**，Supabase，手動載入 |
-| 產業漲跌幅 bar | ✅ | **官方指數**（sector_index_daily） |
+| 產業漲跌幅 bar | ⚠️ | 22/69 命中，KEYWORD_MAP 待補齊 |
 | 多空訊號儀表板 | ✅ | **獨立 tab**，三欄全寬版面 |
 | 個股走勢圖 Modal | ✅ | 改讀 stock_daily_twse |
 | 貼文點擊連結 | ✅ | PTT/Reddit 貼文可點開原文 |
@@ -268,9 +277,9 @@ box-shadow: 0 0 0 1px var(--border-dark);
 | 官方產業指數收集 | ✅ | TWSE → sector_index_daily |
 | 全上市股票收盤 | ✅ | TWSE → stock_daily_twse |
 | 個股估值收集 | ✅ | TWSE → stock_valuation_daily |
-| **Modal 加估值資料** | 🔜 | PER/殖利率/PBR（需確認 listed_shares 欄位名）|
+| **stock_valuation_daily 欄位確認** | 🔜 | `per`、`listed_shares` 欄位名待確認（查詢 400）|
+| **Modal 加估值資料** | 🔜 | PER/殖利率/PBR（待欄位確認）|
 | **月營收收集** | 🔜 | TWSE t187ap05_L |
-| **stock_valuation_daily 欄位確認** | 🔜 | 執行 `sbFetch('stock_valuation_daily','limit=1&select=*')` |
 | 台股 VIX | ❌ | 無免費來源 |
 
 ---
@@ -279,10 +288,11 @@ box-shadow: 0 0 0 1px var(--border-dark);
 
 | 問題 | 解法 |
 |------|------|
-| 函式 undefined | 檢查 `saveGroqKey`/`fetchMarketaux`/`showFutures`/`showHeatmap` |
+| 函式 undefined | 檢查 `callGroq`/`fetchMarketaux`/`showFutures`/`showHeatmap` |
 | FinMind 空 | 檢查 dataset 大小寫；USStockPrice 欄位大寫 |
 | Vercel env 不生效 | 新增後必須 Redeploy |
-| Groq 429 | 翻譯有 retry；社群分析等 20 秒 |
+| Groq 429 | 等明天 UTC 00:00（台灣 08:00）重置；或降低請求量 |
+| Vercel 30s timeout | AI proxy 每次只處理單一請求，不做批次等待 |
 | options 無資料 | 往前找 7 個交易日 |
 | 熱圖條紋 | squarify 需正方形版面 |
 | Supabase 400 | 改用 `in.(...)` 語法；欄位名不存在；URL 過長要分批 |
@@ -290,9 +300,10 @@ box-shadow: 0 0 0 1px var(--border-dark);
 | Modal 無法彈出 | 確認 #stockModal CSS 有 display:flex (.open) |
 | Supabase 無法寫入 | 確認用 service_role key |
 | TWSE 從 Vercel 403 | 只能從 GitHub Actions 或瀏覽器呼叫 |
-| Reddit 500 from Vercel | Reddit 封鎖 Vercel IP，改前端直抓 .json API |
+| Reddit 失敗 | Vercel proxy 時好時壞，retry 一次；完全失敗顯示「無資料」 |
 | sidebar 跑到下方 | 確認所有 panel 在左欄 `<div>` 內，`</div>` 在 loadMoreBtn 後才關閉 |
 | 產業指數 chgPct 顯示 300%+ | sector_index_daily 的 chg_pct 已是百分比，不需 ×100 |
+| Gemini quota 耗盡 | 已改回全用 Groq，Gemini proxy 保留但不使用 |
 
 ---
 
