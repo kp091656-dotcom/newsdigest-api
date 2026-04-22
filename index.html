@@ -2752,6 +2752,9 @@ async function loadHeatmap() {
   loadingEl.innerHTML = `<div class="spinner" style="margin:0 auto 12px;"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--muted);">從 Supabase 載入台股資料中（${total} 支）…</span>`;
   document.getElementById('heatmapSvgWrap').style.display = 'none';
 
+  // 產業 bar 與 treemap 並行載入
+  loadSectorIndexBar();
+
   try {
     const ids = HM_STOCK_LIST.map(s => s.id);
     // PostgREST in() 語法：stock_id=in.(2330,2454,...)
@@ -2806,7 +2809,7 @@ async function loadHeatmap() {
       const v = valMap[s.id];
       if (v) {
         // 嘗試各種可能的 PBR 欄位名
-        const pbr = parseFloat(v.pbr || v.PBratio || v.pb_ratio || 0);
+        const pbr = parseFloat(v.pb_ratio || v.pbr || v.PBratio || 0);
         const shares = parseFloat(v.listed_shares || v.shares || v.issued_shares || 0);
         if (pbr > 0 && shares > 0) mcap = pbr * shares * close / 100000;
       }
@@ -2829,12 +2832,13 @@ async function loadHeatmap() {
     heatmapData = data;
     document.getElementById('heatmapTs').textContent = `資料日期：${latestDate}（盤後）· 即時資料`;
     renderTreemap(heatmapData);
-    // 同步更新產業 bar
-    loadSectorIndexBar();
 
   } catch(e) {
     loadingEl.innerHTML = `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--muted);">資料載入失敗：${e.message}</span>`;
     console.error('loadHeatmap error:', e);
+  } finally {
+    // 不論成功或失敗都同步刷新產業 bar
+    loadSectorIndexBar();
   }
 }
 
