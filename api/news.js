@@ -146,7 +146,7 @@ export default async function handler(req, res) {
       const usData = TOKEN ? await Promise.all(usSymbols.map(async s => {
         try {
           const start = new Date(Date.now() - 5*24*60*60*1000).toISOString().slice(0,10);
-          const r = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=USStockPrice&data_id=${encodeURIComponent(s.symbol)}&start_date=${start}&token=${TOKEN}`);
+          const r = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=USStockPrice&data_id=${encodeURIComponent(s.symbol)}&start_date=${start}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
           const json = await r.json();
           const rows = (json.data || []).filter(d => d.Close > 0).sort((a,b) => a.date.localeCompare(b.date));
           if (rows.length < 1) return null;
@@ -252,9 +252,9 @@ export default async function handler(req, res) {
       const start = new Date(today - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
       const [goldRes, wtiRes, brentRes] = await Promise.all([
-        fetch(`https://api.finmindtrade.com/api/v4/data?dataset=GoldPrice&start_date=${start}&token=${TOKEN}`),
-        fetch(`https://api.finmindtrade.com/api/v4/data?dataset=CrudeOilPrices&data_id=WTI&start_date=${start}&token=${TOKEN}`),
-        fetch(`https://api.finmindtrade.com/api/v4/data?dataset=CrudeOilPrices&data_id=Brent&start_date=${start}&token=${TOKEN}`),
+        fetch(`https://api.finmindtrade.com/api/v4/data?dataset=GoldPrice&start_date=${start}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+        fetch(`https://api.finmindtrade.com/api/v4/data?dataset=CrudeOilPrices&data_id=WTI&start_date=${start}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+        fetch(`https://api.finmindtrade.com/api/v4/data?dataset=CrudeOilPrices&data_id=Brent&start_date=${start}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
       ]);
 
       const [goldJson, wtiJson, brentJson] = await Promise.all([
@@ -302,10 +302,10 @@ export default async function handler(req, res) {
     if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
 
     const { dataset = 'TaiwanFuturesDaily', symbol = 'TX', start = '2024-01-01' } = req.query;
-    const url = `https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${symbol}&start_date=${start}&token=${TOKEN}`;
+    const url = `https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${symbol}&start_date=${start}`;
 
     try {
-      const r = await fetch(url);
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } });
       const data = await r.json();
       res.status(200).json(data);
     } catch(e) {
@@ -721,8 +721,8 @@ export default async function handler(req, res) {
 
     const BASE = 'https://api.finmindtrade.com/api/v4/data';
     const fetchFM = async (params) => {
-      const url = BASE + '?' + new URLSearchParams({ token: TOKEN, ...params });
-      const r = await fetch(url, { signal: (new AbortController()).signal });
+      const url = BASE + '?' + new URLSearchParams(params);
+      const r = await fetch(url, { signal: (new AbortController()).signal, headers: { Authorization: `Bearer ${TOKEN}` } });
       const d = await r.json();
       return d.data || [];
     };
@@ -735,8 +735,8 @@ export default async function handler(req, res) {
       setTimeout(() => ctrl.abort(), 8000);
       try {
         const [opt, inst] = await Promise.all([
-          fetch(`${BASE}?dataset=TaiwanOptionDaily&data_id=TXO&start_date=${date}&end_date=${date}&token=${TOKEN}`, { signal: ctrl.signal }).then(r => r.json()),
-          fetch(`${BASE}?dataset=TaiwanOptionInstitutionalInvestors&data_id=TXO&start_date=${date}&end_date=${date}&token=${TOKEN}`, { signal: ctrl.signal }).then(r => r.json()),
+          fetch(`${BASE}?dataset=TaiwanOptionDaily&data_id=TXO&start_date=${date}&end_date=${date}`, { signal: ctrl.signal, headers: { Authorization: `Bearer ${TOKEN}` } }).then(r => r.json()),
+          fetch(`${BASE}?dataset=TaiwanOptionInstitutionalInvestors&data_id=TXO&start_date=${date}&end_date=${date}`, { signal: ctrl.signal, headers: { Authorization: `Bearer ${TOKEN}` } }).then(r => r.json()),
         ]);
         optData  = (opt.data  || []).filter(d => d.trading_session === 'position');
         instData = inst.data || [];
@@ -835,8 +835,8 @@ export default async function handler(req, res) {
       // 取最近 20 個交易日
       const endDate = new Date().toISOString().slice(0, 10);
       const startD  = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      const url = `${BASE}?dataset=TaiwanStockTotalInstitutionalInvestors&start_date=${startD}&end_date=${endDate}&token=${TOKEN}`;
-      const r = await fetch(url);
+      const url = `${BASE}?dataset=TaiwanStockTotalInstitutionalInvestors&start_date=${startD}&end_date=${endDate}`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } });
       const d = await r.json();
       const rows = d.data || [];
       // 依日期分組，每日加總三大法人
@@ -891,8 +891,8 @@ export default async function handler(req, res) {
     try {
       const endDate = new Date().toISOString().slice(0, 10);
       const startD  = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      const url = `${BASE}?dataset=TaiwanStockTotalMarginPurchaseShortSale&start_date=${startD}&end_date=${endDate}&token=${TOKEN}`;
-      const r = await fetch(url);
+      const url = `${BASE}?dataset=TaiwanStockTotalMarginPurchaseShortSale&start_date=${startD}&end_date=${endDate}`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } });
       const d = await r.json();
       const rows = d.data || [];
       // 分離融資(MarginPurchase)和融券(ShortSale)
@@ -1156,8 +1156,8 @@ export default async function handler(req, res) {
       try {
         const ctrl = new AbortController();
         setTimeout(() => ctrl.abort(), 8000);
-        const url = `${BASE}?dataset=TaiwanStockPrice&data_id=${s.id}&start_date=${start}&token=${TOKEN}`;
-        const r = await fetch(url, { signal: ctrl.signal });
+        const url = `${BASE}?dataset=TaiwanStockPrice&data_id=${s.id}&start_date=${start}`;
+        const r = await fetch(url, { signal: ctrl.signal, headers: { Authorization: `Bearer ${TOKEN}` } });
         const json = await r.json();
         const rows = (json.data || []).filter(d => d.close > 0).sort((a,b) => a.date.localeCompare(b.date));
         if (rows.length < 1) return null;
