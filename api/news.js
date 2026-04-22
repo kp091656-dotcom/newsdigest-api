@@ -337,33 +337,52 @@ export default async function handler(req, res) {
     if (!prompt) return res.status(400).json({ error: 'prompt required' });
     const maxTokens = parseInt(body.maxTokens || req.query.maxTokens || '1024');
     const temperature = parseFloat(body.temperature || req.query.temperature || '0.5');
-    try {
-      console.log('[Gemini] Request start, prompt length:', prompt.length, 'maxTokens:', maxTokens);
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature, maxOutputTokens: maxTokens }
-          })
+    // Exponential Backoff：最多重試 3 次，延遲 10s / 20s / 40s
+    const MAX_RETRY = 3;
+    let lastError = null;
+    for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
+      try {
+        console.log(`[Gemini] Attempt ${attempt + 1}, prompt length:`, prompt.length);
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature, maxOutputTokens: maxTokens }
+            })
+          }
+        );
+        const data = await r.json();
+        console.log(`[Gemini] Response status: ${r.status}, hasError: ${!!data.error}`);
+        if (data.error) {
+          const is429 = r.status === 429 || data.error.code === 429;
+          console.error(`[Gemini] API Error (attempt ${attempt + 1}):`, data.error.message);
+          if (is429 && attempt < MAX_RETRY - 1) {
+            // 從錯誤訊息解析 retryDelay，若無則用指數退避
+            const retryMatch = data.error.message?.match(/retry in ([\d.]+)s/i);
+            const retrySec = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) + 2 : Math.pow(2, attempt + 1) * 10;
+            console.log(`[Gemini] 429 - waiting ${retrySec}s before retry...`);
+            await new Promise(r => setTimeout(r, retrySec * 1000));
+            continue;
+          }
+          lastError = data.error;
+          break;
         }
-      );
-      const data = await r.json();
-      console.log('[Gemini] Response status:', r.status, 'hasError:', !!data.error);
-      if (data.error) {
-        console.error('[Gemini] API Error:', JSON.stringify(data.error));
-        return res.status(500).json({ error: data.error.message, details: data.error });
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        console.log('[Gemini] Success, output length:', text.length);
+        return res.status(200).json({ text });
+      } catch(e) {
+        console.error(`[Gemini] Catch Error (attempt ${attempt + 1}):`, e.message);
+        lastError = { message: e.message, stack: e.stack };
+        if (attempt < MAX_RETRY - 1) {
+          await new Promise(r => setTimeout(r, Math.pow(2, attempt + 1) * 5000));
+        }
       }
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      console.log('[Gemini] Success, output length:', text.length);
-      res.status(200).json({ text });
-    } catch(e) {
-      console.error('[Gemini] Catch Error:', e.message, e.stack);
-      res.status(500).json({ error: e.message, details: e.stack });
     }
-    return;
+    console.error('[Gemini] All attempts failed:', lastError);
+    return res.status(500).json({ error: lastError?.message || 'Gemini failed', details: lastError });
   }
 
   // ── Groq AI proxy ──
