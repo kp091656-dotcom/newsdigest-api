@@ -338,6 +338,7 @@ export default async function handler(req, res) {
     const maxTokens = parseInt(body.maxTokens || req.query.maxTokens || '1024');
     const temperature = parseFloat(body.temperature || req.query.temperature || '0.5');
     try {
+      console.log('[Gemini] Request start, prompt length:', prompt.length, 'maxTokens:', maxTokens);
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`,
         {
@@ -350,11 +351,17 @@ export default async function handler(req, res) {
         }
       );
       const data = await r.json();
-      if (data.error) return res.status(500).json({ error: data.error.message });
+      console.log('[Gemini] Response status:', r.status, 'hasError:', !!data.error);
+      if (data.error) {
+        console.error('[Gemini] API Error:', JSON.stringify(data.error));
+        return res.status(500).json({ error: data.error.message, details: data.error });
+      }
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      console.log('[Gemini] Success, output length:', text.length);
       res.status(200).json({ text });
     } catch(e) {
-      res.status(500).json({ error: e.message });
+      console.error('[Gemini] Catch Error:', e.message, e.stack);
+      res.status(500).json({ error: e.message, details: e.stack });
     }
     return;
   }
@@ -380,6 +387,7 @@ export default async function handler(req, res) {
     const maxTokens = parseInt(body.maxTokens || req.query.maxTokens || '800');
     const temperature = parseFloat(body.temperature || req.query.temperature || '0.7');
     try {
+      console.log('[Groq] Request start, prompt length:', prompt.length, 'maxTokens:', maxTokens);
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -394,11 +402,17 @@ export default async function handler(req, res) {
         })
       });
       const data = await r.json();
-      if (data.error) return res.status(500).json({ error: data.error.message });
+      console.log('[Groq] Response status:', r.status, 'hasError:', !!data.error);
+      if (data.error) {
+        console.error('[Groq] API Error:', JSON.stringify(data.error));
+        return res.status(500).json({ error: data.error.message, details: data.error });
+      }
       const text = data.choices?.[0]?.message?.content || '';
+      console.log('[Groq] Success, output length:', text.length);
       res.status(200).json({ text });
     } catch(e) {
-      res.status(500).json({ error: e.message });
+      console.error('[Groq] Catch Error:', e.message, e.stack);
+      res.status(500).json({ error: e.message, details: e.stack });
     }
     return;
   }
