@@ -272,28 +272,32 @@ async function collectStockValuation() {
 // 主程式
 // ────────────────────────────────────────
 async function main() {
+  const MODE = process.env.COLLECT_MODE || 'all';
   console.log('═══════════════════════════════════════');
-  console.log('  NewsDigest.AI — 每日資料收集');
+  console.log('  AlphaScope — 每日資料收集');
   console.log(`  執行時間：${new Date().toISOString()}`);
+  console.log(`  模式：${MODE}`);
   console.log('═══════════════════════════════════════');
 
-  const results = await Promise.allSettled([
-    // Vercel API（FinMind）
-    collectStockDaily(),
-    collectInstitutional(),
-    collectMargin(),
-    collectOptions(),
-    collectFutures(),
-    // TWSE OpenAPI（免費，無 quota 限制）
-    collectTWSEStockDaily(),
-    collectSectorIndex(),
-    collectStockValuation(),
-  ]);
+  // twse  → 台灣時間 15:00，TWSE 盤後立即可取
+  // finmind → 台灣時間 16:30，FinMind 法人/選擇權/融資券更新完畢
+  // all   → 手動觸發時全收（向下相容）
+  const tasks = [];
+  const names = [];
+
+  if (MODE === 'twse' || MODE === 'all') {
+    tasks.push(collectTWSEStockDaily(), collectSectorIndex(), collectStockValuation());
+    names.push('台股個股(TWSE)', '產業指數(TWSE)', '個股估值(TWSE)');
+  }
+  if (MODE === 'finmind' || MODE === 'all') {
+    tasks.push(collectStockDaily(), collectInstitutional(), collectMargin(), collectOptions(), collectFutures());
+    names.push('台股個股(FM)', '三大法人(FM)', '融資融券(FM)', '台指選擇權(FM)', '全球商品(FM)');
+  }
+
+  const results = await Promise.allSettled(tasks);
 
   console.log('\n═══════════════════════════════════════');
   let hasError = false;
-  const names = ['台股個股(FM)', '三大法人(FM)', '融資融券(FM)', '台指選擇權(FM)', '全球商品(FM)',
-                  '台股個股(TWSE)', '產業指數(TWSE)', '個股估值(TWSE)'];
   results.forEach((r, i) => {
     if (r.status === 'rejected') {
       console.error(`❌ ${names[i]} 失敗：${r.reason?.message}`);
@@ -301,9 +305,7 @@ async function main() {
     }
   });
 
-  if (hasError) {
-    process.exit(1);
-  }
+  if (hasError) process.exit(1);
   console.log('✅ 所有資料收集完成');
 }
 
