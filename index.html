@@ -150,6 +150,39 @@
   .lang-btn:hover  { color: rgba(255,255,255,0.75); border-color: rgba(255,255,255,0.18); }
   .lang-btn.active { color: #fff; border-color: rgba(255,255,255,0.28); background: rgba(255,255,255,0.08); }
 
+  /* Font Size Toggle */
+  .font-size-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--r-sm);
+    padding: 2px;
+  }
+  .font-size-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.45);
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 0.18rem 0.42rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
+  }
+  .font-size-btn:hover  { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.1); }
+  .font-size-btn.active { color: #fff; background: rgba(99,102,241,0.5); }
+  .font-size-btn.sm { font-size: 0.58rem; }
+  .font-size-btn.md { font-size: 0.72rem; }
+  .font-size-btn.lg { font-size: 0.88rem; }
+
+  /* Font scale application */
+  body.fs-small  { font-size: 13px; }
+  body.fs-medium { font-size: 15px; }
+  body.fs-large  { font-size: 17px; }
+
   /* ══════════════════════════════════════════
      API Config Bar
      ══════════════════════════════════════════ */
@@ -1089,6 +1122,11 @@
     <div class="live-dot">LIVE</div>
   </div>
   <nav style="display:flex;align-items:center;gap:0.5rem;">
+    <div class="font-size-ctrl" title="字體大小">
+      <button class="font-size-btn sm" onclick="setFontSize('small')" id="fsSmall">A</button>
+      <button class="font-size-btn md active" onclick="setFontSize('medium')" id="fsMedium">A</button>
+      <button class="font-size-btn lg" onclick="setFontSize('large')" id="fsLarge">A</button>
+    </div>
     <a href="/chart.html" target="_blank" class="nav-link">📊 K線圖</a>
   </nav>
 </header>
@@ -2138,8 +2176,6 @@ async function generateBrief(market) {
   tsEl.textContent = `◆ ${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} · Groq AI 生成`;
   el.innerHTML = `<div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:55%"></div></div>`;
 
-  // Filter articles by market category + take top 8
-  // Use all articles — AI will summarize for the specific market context
   const articles = allArticles.slice(0, 6);
   const headlines = articles.map(a => a.title).filter(Boolean).join('\n');
 
@@ -2149,21 +2185,24 @@ async function generateBrief(market) {
   };
 
   if (!articles.length) {
-    el.innerHTML = `<div class="brief-text">${fallbacks[market]}<br><small style="color:var(--muted);font-size:0.68rem;margin-top:0.4rem;display:block">${'⚠ 請先載入財經新聞'}</small></div>`;
+    el.dataset.loading = '0';
+    el.innerHTML = `<div class="brief-text">${fallbacks[market]}<br><small style="color:var(--muted);font-size:0.68rem;margin-top:0.4rem;display:block">⚠ 請先載入財經新聞</small></div>`;
     return;
   }
 
   try {
-    const prompt = `你是專業財經分析師。根據以下今日財經新聞，從【${label}市場】角度，用繁體中文撰寫 80-100 字每日簡報，涵蓋：今日趨勢、主要驅動因素、需注意風險。直接輸出，無需標題。
+    const prompt = `你是專業財經分析師。請使用繁體中文（Traditional Chinese）回答，嚴禁簡體中文。根據以下今日財經新聞，從【${label}市場】角度，撰寫 80-100 字每日簡報，涵蓋：今日趨勢、主要驅動因素、需注意風險。直接輸出，無需標題。
 
 ${headlines || '（今日暫無相關新聞）'}`;
     const text = await Promise.race([
       callGroq(prompt),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 15000))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000))
     ]);
     el.innerHTML = `<div class="brief-text">${text || fallbacks[market]}</div>`;
   } catch {
     el.innerHTML = `<div class="brief-text">${fallbacks[market]}</div>`;
+  } finally {
+    el.dataset.loading = '0';
   }
 }
 
@@ -2393,40 +2432,59 @@ function renderFuturesChart(sortKey) {
   });
 
   const sorted = [...futuresData].sort((a, b) => Math.abs(b[sortKey]) - Math.abs(a[sortKey]));
-  const maxVal = Math.max(...sorted.map(d => Math.abs(d[sortKey])));
+  const maxVal = Math.max(0.0001, ...sorted.map(d => Math.abs(d[sortKey])));
   const container = document.getElementById('futuresChart');
   container.innerHTML = '';
+
+  // 圖例說明
+  const legend = document.createElement('div');
+  legend.style.cssText = 'display:flex;align-items:center;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.6rem;padding:0 0.2rem;';
+  legend.innerHTML = `
+    <span style="color:#16a34a;">◀ 跌</span>
+    <span style="letter-spacing:0.06em;">零軸</span>
+    <span style="color:#dc2626;">漲 ▶</span>`;
+  container.appendChild(legend);
 
   const cats = ['波動率','美股指數','亞股指數','能源','金屬','農產品','外匯','債券','加密貨幣'];
   for (const cat of cats) {
     const items = sorted.filter(d => d.cat === cat);
     if (!items.length) continue;
+
     const section = document.createElement('div');
-    section.style.cssText = 'margin-bottom:1.5rem;';
-    section.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.5rem;padding-bottom:0.3rem;border-bottom:1px solid var(--border);">${cat}</div>`;
+    section.style.cssText = 'margin-bottom:1.4rem;';
+    section.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.45rem;padding-bottom:0.3rem;border-bottom:1px solid var(--border);">${cat}</div>`;
+
     for (const item of items) {
       const val = item[sortKey];
-      const pct = maxVal ? Math.abs(val) / maxVal * 100 : 0;
+      const pct = maxVal ? Math.abs(val) / maxVal * 48 : 0; // 最大 48%（半邊）
       const isUp = val >= 0;
       const color = isUp ? '#dc2626' : '#16a34a';
-      const barColor = isUp ? '#fde8dc' : '#d4edda';
       const label = (val >= 0 ? '+' : '') + (val * 100).toFixed(2) + '%';
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;';
-      // Determine source tag
+
       const stooqSyms = ['%5E','EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCNH','10USY','30USY','BTCUSD','ETHUSD'];
       const isST = stooqSyms.some(s => item.symbol.includes(s));
       const srcTag = isST
-        ? `<span style="font-size:0.5rem;padding:0 3px;border:1px solid #aaa;border-radius:2px;color:var(--muted);margin-right:3px;">ST</span>`
-        : `<span style="font-size:0.5rem;padding:0 3px;border:1px solid #1a6bc8;border-radius:2px;color:#1a6bc8;margin-right:3px;">FM</span>`;
+        ? `<span style="font-size:0.45rem;padding:0 2px;border:1px solid #aaa;border-radius:2px;color:var(--muted);margin-right:2px;">ST</span>`
+        : `<span style="font-size:0.45rem;padding:0 2px;border:1px solid #1a6bc8;border-radius:2px;color:#1a6bc8;margin-right:2px;">FM</span>`;
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:5.5rem 1fr 3.8rem;align-items:center;gap:0.4rem;margin-bottom:0.3rem;';
+      row.title = `${item.name}  ${label}  現價：${item.price.toLocaleString('en',{maximumFractionDigits:3})}`;
+
+      // 雙向 bar：左半=跌（右對齊）| 右半=漲（左對齊）
+      const leftPct  = isUp ? 0 : pct;
+      const rightPct = isUp ? pct : 0;
+      const leftBar  = leftPct  ? `<div style="height:12px;width:${leftPct.toFixed(1)}%;background:#bbf7d0;border-radius:3px 0 0 3px;margin-left:auto;"></div>` : '';
+      const rightBar = rightPct ? `<div style="height:12px;width:${rightPct.toFixed(1)}%;background:#fecaca;border-radius:0 3px 3px 0;"></div>` : '';
+
       row.innerHTML = `
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--text);width:6rem;flex-shrink:0;display:flex;align-items:center;">${srcTag}${item.name}</div>
-        <div style="flex:1;height:14px;background:#f5f3ee;border-radius:3px;overflow:hidden;">
-          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;transition:width 0.4s ease;"></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.64rem;color:var(--text);display:flex;align-items:center;overflow:hidden;white-space:nowrap;">${srcTag}${item.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1px 1fr;height:12px;background:#f5f3ee;border-radius:3px;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:flex-end;">${leftBar}</div>
+          <div style="background:var(--border-dark);width:1px;height:100%;"></div>
+          <div style="display:flex;align-items:center;">${rightBar}</div>
         </div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:${color};font-weight:700;width:4.5rem;text-align:right;">${label}</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);width:5rem;text-align:right;">${item.price.toLocaleString('en',{maximumFractionDigits:3})}</div>
-      `;
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:${color};font-weight:700;text-align:right;white-space:nowrap;">${label}</div>`;
       section.appendChild(row);
     }
     container.appendChild(section);
@@ -4368,9 +4426,24 @@ async function loadSignalBacktest() {
   }
 }
 
+// ── 字體大小控制 ──
+function setFontSize(size) {
+  document.body.classList.remove('fs-small', 'fs-medium', 'fs-large');
+  document.body.classList.add(`fs-${size}`);
+  document.querySelectorAll('.font-size-btn').forEach(b => b.classList.remove('active'));
+  const ids = { small: 'fsSmall', medium: 'fsMedium', large: 'fsLarge' };
+  document.getElementById(ids[size])?.classList.add('active');
+  localStorage.setItem('alphascope_fontsize', size);
+}
+function loadSavedFontSize() {
+  const saved = localStorage.getItem('alphascope_fontsize') || 'medium';
+  setFontSize(saved);
+}
+
 // ── Init ──
 renderTrending();
 loadSavedKeys();
+loadSavedFontSize();
 loadFearGreed();
 loadCryptoFearGreed();
 loadVix();
