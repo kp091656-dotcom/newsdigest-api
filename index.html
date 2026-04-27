@@ -1,4 +1,12 @@
-'<span class="badge-hot">🔥 熱門</span>\';'<span class="badge-hot">🔥 熱門</span>\';\n      '<span class="badge-critical">⚡ 重大</span>\';\n      <style>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaScope — AI 財經市場情報</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
   /* ══════════════════════════════════════════
      Design Tokens
      ══════════════════════════════════════════ */
@@ -1731,8 +1739,8 @@ function createCard(article, idx) {
       <span class="card-time">${timeAgo(article.publishedAt)}</span>
       ${(() => {
         const s = article.popularityScore || 0;
-        if (s >= 95) return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.58rem;background:#fef2f2;color:#c81a1a;border:1px solid #fca5a5;border-radius:3px;padding:0.1rem 0.4rem;font-weight:600;">⚡ 重大</span>';
-        if (s >= 80) return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.58rem;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:3px;padding:0.1rem 0.4rem;font-weight:600;">🔥 熱門</span>';
+        if (s >= 95) return '<span class="badge-critical">⚡ 重大</span>';
+        if (s >= 80) return '<span class="badge-hot">🔥 熱門</span>';
         return '';
       })()}
       <span class="pop-score">${article.popularityScore > 0 ? article.popularityScore.toFixed(0) + ' 分' : '—'}</span>
