@@ -1,761 +1,644 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>台指期 K 棒日線圖</title>
-<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaScope — K 線圖</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f0f0f;
-    --surface: #1a1a1a;
-    --border: #2a2a2a;
-    --accent: #c8521a;
-    --accent2: #1a6bc8;
-    --text: #e8e6e0;
-    --muted: #5a5850;
-    --up: #26a69a;
-    --down: #ef5350;
+    --bg: #f0f0f5;
+    --surface: #ffffff;
+    --border: #e2e2ec;
+    --border-dark: #c4c4d4;
+    --accent: #6366f1;
+    --accent2: #0ea5e9;
+    --text: #16161a;
+    --muted: #6e6e7e;
+    --header-bg: #0c0c18;
+    --up: #dc2626;
+    --down: #16a34a;
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
   }
-
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   body {
     background: var(--bg);
+    background-image: radial-gradient(circle at 1px 1px, rgba(99,102,241,0.05) 1px, transparent 0);
+    background-size: 28px 28px;
     color: var(--text);
     font-family: 'Noto Sans TC', sans-serif;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
   }
 
   header {
+    background: var(--header-bg);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06), 0 4px 24px rgba(0,0,0,0.35);
+    border-bottom: 1px solid rgba(99,102,241,0.3);
+  }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    letter-spacing: 0.03em;
+  }
+  .logo span { color: #818cf8; }
+  .logo-badge {
+    background: rgba(99,102,241,0.25);
+    border: 1px solid rgba(99,102,241,0.45);
+    color: #a5b4fc;
+    font-size: 0.48rem;
+    padding: 0.12rem 0.36rem;
+    border-radius: 3px;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+  }
+  .back-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.55);
+    text-decoration: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 0.28rem 0.75rem;
+    border-radius: var(--r-sm);
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .back-btn:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); }
+
+  .search-bar {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-    height: 56px;
+    padding: 0.75rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow-sm);
+  }
+  .search-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .search-input {
+    border: 1px solid var(--border-dark);
+    border-radius: var(--r-sm);
+    padding: 0.38rem 0.75rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    background: #fff;
+    color: var(--text);
+    outline: none;
+    width: 140px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+  .search-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--r-sm);
+    padding: 0.38rem 1rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    cursor: pointer;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(99,102,241,0.3);
+    transition: background 0.15s, transform 0.1s;
+  }
+  .search-btn:hover { background: #4f46e5; transform: translateY(-1px); }
+  .search-btn:active { transform: translateY(0); }
+
+  /* 快速代碼按鈕 */
+  .quick-chips {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+  }
+  .chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    padding: 0.22rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-dark);
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .chip:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* 主內容 */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 1.2rem;
+    padding: 1.2rem 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .chart-panel {
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+  }
+  .chart-header {
+    padding: 0.85rem 1.1rem 0.7rem;
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
-
-  .logo {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.1rem;
-    font-weight: 900;
+  .chart-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
     color: var(--text);
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
-
-  .logo span { color: var(--accent); }
-
-  .controls {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .symbol-btn {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.7rem;
-    padding: 0.3rem 0.8rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    transition: all 0.15s;
-    letter-spacing: 0.05em;
-  }
-
-  .symbol-btn:hover, .symbol-btn.active {
-    border-color: var(--accent);
+  .stock-badge {
+    background: rgba(99,102,241,0.1);
     color: var(--accent);
-    background: rgba(200,82,26,0.1);
+    font-size: 0.6rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    border: 1px solid rgba(99,102,241,0.2);
   }
-
-  .range-btn {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.65rem;
-    padding: 0.25rem 0.6rem;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .range-btn:hover, .range-btn.active {
-    border-color: var(--accent2);
-    color: var(--accent2);
-    background: rgba(26,107,200,0.1);
-  }
-
-  .main {
-    padding: 1.5rem 2rem;
-  }
-
-  .chart-header {
-    display: flex;
-    align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .symbol-name {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.5rem;
-    font-weight: 700;
-  }
-
-  .price-info {
-    display: flex;
-    gap: 1.5rem;
-    align-items: baseline;
-  }
-
-  #currentPrice {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 1.8rem;
-    font-weight: 500;
-  }
-
-  #priceChange {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.9rem;
-  }
-
-  .ohlcv-bar {
-    display: flex;
-    gap: 2rem;
-    margin-bottom: 1rem;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-  }
-
-  .ohlcv-bar span { color: var(--text); }
-
-  #chartContainer {
-    width: 100%;
-    height: calc(100vh - 220px);
-    min-height: 400px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .loading-overlay {
-    position: absolute;
-    inset: 0;
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 1rem;
-    z-index: 10;
-  }
-
-  .spinner {
-    width: 32px; height: 32px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .loading-text {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-
-  .status-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 0.75rem;
+  .interval-btns { display: flex; gap: 0.25rem; }
+  .interval-btn {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.6rem;
+    padding: 0.22rem 0.55rem;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
     color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .interval-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .interval-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  #tvContainer {
+    height: 520px;
+    width: 100%;
+  }
+  #tvContainer iframe { width: 100%; height: 100%; border: none; }
+
+  /* 右側面板 */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .info-card {
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .info-card-header {
+    padding: 0.65rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    background: var(--bg);
+  }
+  .info-card-body { padding: 0.75rem 0.9rem; }
+
+  /* 股價資訊 */
+  .price-big {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+  .price-chg {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+  }
+  .price-chg.up { color: var(--up); }
+  .price-chg.down { color: var(--down); }
+  .price-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+  }
+  .meta-item {
+    background: var(--bg);
+    border-radius: var(--r-sm);
+    padding: 0.4rem 0.5rem;
+  }
+  .meta-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.5rem; color: var(--muted); margin-bottom: 2px; }
+  .meta-val   { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; font-weight: 600; color: var(--text); }
+
+  /* 歷史走勢（Supabase bar） */
+  #histBars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 60px;
+    padding: 0.5rem 0.9rem 0;
+  }
+  #histDates {
+    display: flex;
+    gap: 2px;
+    padding: 2px 0.9rem 0.5rem;
   }
 
-  .up { color: var(--up); }
-  .down { color: var(--down); }
+  /* 估值資訊 */
+  .val-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.4rem;
+  }
+  .val-item {
+    text-align: center;
+    background: var(--bg);
+    border-radius: var(--r-sm);
+    padding: 0.45rem 0.3rem;
+  }
+  .val-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.48rem; color: var(--muted); }
+  .val-num   { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; font-weight: 700; color: var(--text); margin-top: 2px; }
+
+  .loading-msg {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    padding: 1rem;
+    text-align: center;
+  }
+  .error-msg {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--up);
+    padding: 0.75rem 0.9rem;
+  }
+
+  /* No data */
+  .no-data {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 1.5rem;
+    opacity: 0.7;
+  }
+
+  @media (max-width: 900px) {
+    .main-layout { grid-template-columns: 1fr; padding: 0.8rem 1rem; }
+    #tvContainer { height: 380px; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">NewsDigest<span>.</span>AI <span style="font-size:0.65rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-left:0.5rem;">期貨K線</span></div>
-  <div class="controls">
-    <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
-      <!-- 搜尋框 -->
-      <div style="display:flex;gap:0.3rem;align-items:center;">
-        <input id="searchInput" type="text" placeholder="輸入代碼 e.g. 2330"
-          style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;padding:0.3rem 0.6rem;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);width:140px;outline:none;"
-          onkeydown="if(event.key==='Enter') searchStock()"
-        />
-        <button class="symbol-btn" onclick="searchStock()" style="padding:0.3rem 0.6rem;">搜尋</button>
-      </div>
-      <!-- 快捷按鈕 -->
-      <div style="display:flex;gap:0.3rem;border-left:1px solid var(--border);padding-left:0.6rem;">
-        <!-- 台股 -->
-        <button class="symbol-btn" onclick="loadChart('TAIEX','加權指數','tw')">加權指數</button>
-        <button class="symbol-btn active" onclick="loadChart('TX','台指期','futures')">台指期</button>
-        <button class="symbol-btn" onclick="loadChart('2330','台積電','tw')">台積電</button>
-        <button class="symbol-btn" onclick="loadChart('2454','聯發科','tw')">聯發科</button>
-        <button class="symbol-btn" onclick="loadChart('0050','元大台50','tw')">元大台50</button>
-      </div>
-      <!-- 美股 -->
-      <div style="display:flex;gap:0.3rem;border-left:1px solid var(--border);padding-left:0.6rem;">
-        <button class="symbol-btn" onclick="loadChart('^GSPC','S&P500','us')">S&P500</button>
-        <button class="symbol-btn" onclick="loadChart('^IXIC','那斯達克','us')">那斯達克</button>
-        <button class="symbol-btn" onclick="loadChart('^DJI','道瓊','us')">道瓊</button>
-        <button class="symbol-btn" onclick="loadChart('^VIX','VIX波動率','us')">VIX</button>
-        <button class="symbol-btn" onclick="loadChart('AAPL','蘋果','us')">蘋果</button>
-        <button class="symbol-btn" onclick="loadChart('NVDA','輝達','us')">輝達</button>
-        <button class="symbol-btn" onclick="loadChart('TSM','台積電ADR','us')">台積電ADR</button>
-      </div>
-    </div>
-    <div style="display:flex;gap:0.3rem;margin-left:1rem;">
-      <button class="range-btn" onclick="setRange(90)">3M</button>
-      <button class="range-btn" onclick="setRange(180)">6M</button>
-      <button class="range-btn active" onclick="setRange(365)">1Y</button>
-      <button class="range-btn" onclick="setRange(730)">2Y</button>
-      <button class="range-btn" onclick="setRange(1825)">5Y</button>
-    </div>
-    <div style="display:flex;gap:0.3rem;margin-left:1rem;border-left:1px solid var(--border);padding-left:1rem;">
-      <button class="range-btn active" id="btnMA" onclick="toggleMA()">均線</button>
-      <button class="range-btn" id="btnBB" onclick="toggleBB()">布林</button>
-      <button class="range-btn" id="btnRSI" onclick="toggleRSI()">RSI</button>
-      <button class="range-btn" id="btnMACD" onclick="toggleMACD()">MACD</button>
-    </div>
-  </div>
+  <a href="/" class="logo">Alpha<span>Scope</span> <span class="logo-badge">BETA</span></a>
+  <a href="/" class="back-btn">← 返回主頁</a>
 </header>
 
-<div class="main">
-  <div class="chart-header">
-    <div class="symbol-name" id="symbolName">台指期 TX</div>
-    <div class="price-info">
-      <div id="currentPrice" style="color:var(--text);">—</div>
-      <div id="priceChange">—</div>
+<div class="search-bar">
+  <span class="search-label">股票代碼</span>
+  <input type="text" class="search-input" id="stockInput" placeholder="例：2330、AAPL" maxlength="10"
+    onkeydown="if(event.key==='Enter') loadChart()">
+  <button class="search-btn" onclick="loadChart()">查詢 ↵</button>
+  <div class="quick-chips" id="quickChips">
+    <span class="chip" onclick="quickLoad('2330','台積電','TW')">2330 台積電</span>
+    <span class="chip" onclick="quickLoad('2454','聯發科','TW')">2454 聯發科</span>
+    <span class="chip" onclick="quickLoad('2317','鴻海','TW')">2317 鴻海</span>
+    <span class="chip" onclick="quickLoad('2303','聯電','TW')">2303 聯電</span>
+    <span class="chip" onclick="quickLoad('2412','中華電','TW')">2412 中華電</span>
+    <span class="chip" onclick="quickLoad('AAPL','Apple','US')">AAPL 蘋果</span>
+    <span class="chip" onclick="quickLoad('NVDA','NVIDIA','US')">NVDA 輝達</span>
+    <span class="chip" onclick="quickLoad('TSLA','Tesla','US')">TSLA 特斯拉</span>
+    <span class="chip" onclick="quickLoad('MSFT','微軟','US')">MSFT 微軟</span>
+  </div>
+</div>
+
+<div class="main-layout">
+
+  <!-- 左：TradingView K 線圖 -->
+  <div class="chart-panel">
+    <div class="chart-header">
+      <div class="chart-title">
+        <span id="chartStockName">— 請輸入股票代碼 —</span>
+        <span class="stock-badge" id="chartStockId" style="display:none;"></span>
+      </div>
+      <div class="interval-btns">
+        <button class="interval-btn active" onclick="setInterval('D')">日</button>
+        <button class="interval-btn" onclick="setInterval('W')">週</button>
+        <button class="interval-btn" onclick="setInterval('M')">月</button>
+      </div>
+    </div>
+    <div id="tvContainer">
+      <div class="no-data" style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;">
+        <div style="font-size:2rem;opacity:0.3;">📊</div>
+        <div>請輸入股票代碼或點選快速選單</div>
+      </div>
     </div>
   </div>
 
-  <div class="ohlcv-bar">
-    <div>開 <span id="ohlcO">—</span></div>
-    <div>高 <span id="ohlcH" class="up">—</span></div>
-    <div>低 <span id="ohlcL" class="down">—</span></div>
-    <div>收 <span id="ohlcC">—</span></div>
-    <div>量 <span id="ohlcV">—</span></div>
-  </div>
+  <!-- 右：資訊面板 -->
+  <div class="side-panel">
 
-  <div id="chartContainer">
-    <div class="loading-overlay" id="loadingOverlay">
-      <div class="spinner"></div>
-      <div class="loading-text" id="loadingText">載入台指期歷史資料…</div>
+    <!-- 即時股價 -->
+    <div class="info-card" id="priceCard">
+      <div class="info-card-header">📈 即時行情</div>
+      <div class="info-card-body" id="priceBody">
+        <div class="no-data">查詢股票後顯示</div>
+      </div>
     </div>
-  </div>
-  <div id="rsiContainer" style="display:none;width:100%;height:120px;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:0.5rem;position:relative;">
-    <div style="position:absolute;top:4px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);z-index:1;">RSI(14)</div>
-  </div>
-  <div id="macdContainer" style="display:none;width:100%;height:120px;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:0.5rem;position:relative;">
-    <div style="position:absolute;top:4px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);z-index:1;">MACD(12,26,9)</div>
-  </div>
 
-  <div class="status-bar">
-    <div id="dataInfo">資料來源：FinMind · 台灣期交所 / 美股盤後資料</div>
-    <div id="lastUpdate"></div>
+    <!-- 歷史走勢（Supabase，台股專用） -->
+    <div class="info-card" id="histCard" style="display:none;">
+      <div class="info-card-header">📅 近期走勢（Supabase）</div>
+      <div id="histBars"></div>
+      <div id="histDates"></div>
+    </div>
+
+    <!-- 估值資訊（Supabase） -->
+    <div class="info-card" id="valCard" style="display:none;">
+      <div class="info-card-header">🔢 估值資訊</div>
+      <div class="info-card-body" id="valBody"></div>
+    </div>
+
+    <!-- 說明 -->
+    <div class="info-card">
+      <div class="info-card-header">ℹ️ 說明</div>
+      <div class="info-card-body" style="font-size:0.6rem;color:var(--muted);line-height:1.7;font-family:'IBM Plex Mono',monospace;">
+        <div>• 台股代碼直接輸入數字（如 2330）</div>
+        <div>• 美股輸入英文代碼（如 AAPL）</div>
+        <div>• K 線由 TradingView 提供</div>
+        <div>• 歷史走勢、估值為台股專屬</div>
+        <div style="margin-top:0.5rem;opacity:0.65;">⚠️ 資料僅供參考，不構成投資建議</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
-const API_BASE = 'https://newsdigest-api.vercel.app/api/news?endpoint=finmind';
+  const SUPABASE_URL  = 'https://fdxedcwtmlurumfjmlys.supabase.co';
+  const SUPABASE_ANON = 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
 
-let chart, candleSeries, volumeSeries, vixSeries;
-let rsiChart, rsiSeries;
-let macdChart, macdLineSeries, macdSignalSeries, macdHistSeries;
-let ma5, ma20, ma60, ma120, ma240;
-let bbUpper, bbMiddle, bbLower;
-let showMA = true, showBB = false, showRSI = false, showMACD = false;
-let currentSymbol = 'TX';
-let currentDays = 365;
-let allData = [];
-let vixMode = false;
+  let currentStockId   = '';
+  let currentStockName = '';
+  let currentMarket    = 'TW';
+  let currentInterval  = 'D';
 
-// ── Indicator calculations ──
-function calcMA(data, period) {
-  return data.map((d, i) => {
-    if (i < period - 1) return null;
-    const avg = data.slice(i - period + 1, i + 1).reduce((s, v) => s + v.close, 0) / period;
-    return { time: d.time, value: avg };
-  }).filter(Boolean);
-}
-
-function calcBB(data, period = 20, mult = 2) {
-  const upper = [], middle = [], lower = [];
-  for (let i = period - 1; i < data.length; i++) {
-    const slice = data.slice(i - period + 1, i + 1);
-    const avg = slice.reduce((s, v) => s + v.close, 0) / period;
-    const std = Math.sqrt(slice.reduce((s, v) => s + Math.pow(v.close - avg, 2), 0) / period);
-    upper.push({ time: data[i].time, value: avg + mult * std });
-    middle.push({ time: data[i].time, value: avg });
-    lower.push({ time: data[i].time, value: avg - mult * std });
-  }
-  return { upper, middle, lower };
-}
-
-function calcRSI(data, period = 14) {
-  const result = [];
-  for (let i = period; i < data.length; i++) {
-    let gains = 0, losses = 0;
-    for (let j = i - period + 1; j <= i; j++) {
-      const chg = data[j].close - data[j-1].close;
-      if (chg > 0) gains += chg; else losses -= chg;
-    }
-    const rs = gains / (losses || 0.001);
-    result.push({ time: data[i].time, value: 100 - 100 / (1 + rs) });
-  }
-  return result;
-}
-
-function calcMACD(data, fast = 12, slow = 26, signal = 9) {
-  const ema = (arr, n) => {
-    const k = 2 / (n + 1);
-    const result = [arr[n-1].close];
-    for (let i = n; i < arr.length; i++) result.push(arr[i].close * k + result[result.length-1] * (1-k));
-    return result;
-  };
-  const fastEMA = ema(data, fast);
-  const slowEMA = ema(data, slow);
-  const offset = slow - fast;
-  const macdLine = fastEMA.slice(offset).map((v, i) => v - slowEMA[i]);
-  const signalLine = ema(macdLine.map((v,i) => ({close:v})), signal);
-  const sigOffset = signal - 1;
-  return data.slice(slow + signal - 2).map((d, i) => ({
-    time: d.time,
-    macd: macdLine[i + sigOffset],
-    signal: signalLine[i],
-    hist: macdLine[i + sigOffset] - signalLine[i],
-  }));
-}
-
-function toggleMA() {
-  showMA = !showMA;
-  document.getElementById('btnMA').classList.toggle('active', showMA);
-  [ma5, ma20, ma60, ma120, ma240].forEach(s => s?.applyOptions({ visible: showMA }));
-}
-
-function toggleBB() {
-  showBB = !showBB;
-  document.getElementById('btnBB').classList.toggle('active', showBB);
-  [bbUpper, bbMiddle, bbLower].forEach(s => s?.applyOptions({ visible: showBB }));
-}
-
-function toggleRSI() {
-  showRSI = !showRSI;
-  document.getElementById('btnRSI').classList.toggle('active', showRSI);
-  document.getElementById('rsiContainer').style.display = showRSI ? 'block' : 'none';
-  if (showRSI && allData.length) updateIndicators(allData.filter(d => d.time >= getStartDate(currentDays)));
-}
-
-function toggleMACD() {
-  showMACD = !showMACD;
-  document.getElementById('btnMACD').classList.toggle('active', showMACD);
-  document.getElementById('macdContainer').style.display = showMACD ? 'block' : 'none';
-  if (showMACD && allData.length) updateIndicators(allData.filter(d => d.time >= getStartDate(currentDays)));
-}
-
-function initChart() {
-  const container = document.getElementById('chartContainer');
-
-  chart = LightweightCharts.createChart(container, {
-    layout: {
-      background: { color: '#0f0f0f' },
-      textColor: '#5a5850',
-    },
-    grid: {
-      vertLines: { color: '#1a1a1a' },
-      horzLines: { color: '#1a1a1a' },
-    },
-    crosshair: {
-      vertLine: { color: '#3a3a3a', width: 1, style: 2 },
-      horzLine: { color: '#3a3a3a', width: 1, style: 2 },
-    },
-    rightPriceScale: {
-      borderColor: '#2a2a2a',
-      textColor: '#5a5850',
-    },
-    timeScale: {
-      borderColor: '#2a2a2a',
-      textColor: '#5a5850',
-      timeVisible: true,
-    },
-    width: container.clientWidth,
-    height: container.clientHeight,
-  });
-
-  // Candlestick series
-  candleSeries = chart.addCandlestickSeries({
-    upColor: '#26a69a',
-    downColor: '#ef5350',
-    borderUpColor: '#26a69a',
-    borderDownColor: '#ef5350',
-    wickUpColor: '#26a69a',
-    wickDownColor: '#ef5350',
-  });
-
-  // Volume series (histogram)
-  volumeSeries = chart.addHistogramSeries({
-    priceFormat: { type: 'volume' },
-    priceScaleId: 'volume',
-    color: '#26a69a',
-  });
-  chart.priceScale('volume').applyOptions({
-    scaleMargins: { top: 0.8, bottom: 0 },
-  });
-
-  // Crosshair move → update OHLCV display
-  chart.subscribeCrosshairMove(param => {
-    if (!param.time || !param.seriesData) return;
-    const d = param.seriesData.get(candleSeries);
-    if (!d) return;
-    document.getElementById('ohlcO').textContent = d.open?.toLocaleString() ?? '—';
-    document.getElementById('ohlcH').textContent = d.high?.toLocaleString() ?? '—';
-    document.getElementById('ohlcL').textContent = d.low?.toLocaleString() ?? '—';
-    document.getElementById('ohlcC').textContent = d.close?.toLocaleString() ?? '—';
-    const vd = param.seriesData.get(volumeSeries);
-    document.getElementById('ohlcV').textContent = vd?.value ? Math.round(vd.value).toLocaleString() : '—';
-  });
-
-  // Moving averages
-  ma5   = chart.addLineSeries({ color: '#f97316', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-  ma20  = chart.addLineSeries({ color: '#3b82f6', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-  ma60  = chart.addLineSeries({ color: '#a855f7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-  ma120 = chart.addLineSeries({ color: '#ec4899', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-  ma240 = chart.addLineSeries({ color: '#84cc16', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-
-  // Bollinger Bands
-  bbUpper  = chart.addLineSeries({ color: 'rgba(251,191,36,0.6)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, visible: false });
-  bbMiddle = chart.addLineSeries({ color: 'rgba(251,191,36,0.9)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, visible: false });
-  bbLower  = chart.addLineSeries({ color: 'rgba(251,191,36,0.6)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, visible: false });
-
-  // VIX line series (hidden by default)
-  vixSeries = chart.addLineSeries({
-    color: '#f97316',
-    lineWidth: 2,
-    priceScaleId: 'right',
-    visible: false,
-  });
-
-  // Resize observer
-  new ResizeObserver(() => {
-    chart.applyOptions({
-      width: container.clientWidth,
-      height: container.clientHeight,
+  async function sbFetch(table, params) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
     });
-  }).observe(container);
+    if (!r.ok) throw new Error(`Supabase ${r.status}`);
+    return r.json();
+  }
 
-  // RSI sub-chart
-  const rsiContainer = document.getElementById('rsiContainer');
-  rsiChart = LightweightCharts.createChart(rsiContainer, {
-    layout: { background: { color: '#0f0f0f' }, textColor: '#5a5850' },
-    grid: { vertLines: { color: '#1a1a1a' }, horzLines: { color: '#1a1a1a' } },
-    rightPriceScale: { borderColor: '#2a2a2a', scaleMargins: { top: 0.1, bottom: 0.1 } },
-    timeScale: { borderColor: '#2a2a2a', visible: false },
-    crosshair: { vertLine: { color: '#3a3a3a' }, horzLine: { color: '#3a3a3a' } },
-    width: rsiContainer.clientWidth, height: 120,
-  });
-  rsiSeries = rsiChart.addLineSeries({ color: '#f97316', lineWidth: 2, priceScaleId: 'right' });
-  // Overbought/oversold lines
-  rsiChart.addLineSeries({ color: 'rgba(239,83,80,0.4)', lineWidth: 1, lineStyle: 2, priceScaleId: 'right', lastValueVisible: false }).setData([]);
+  function setInterval(iv) {
+    currentInterval = iv;
+    document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    if (currentStockId) renderTVChart();
+  }
 
-  // MACD sub-chart
-  const macdContainer = document.getElementById('macdContainer');
-  macdChart = LightweightCharts.createChart(macdContainer, {
-    layout: { background: { color: '#0f0f0f' }, textColor: '#5a5850' },
-    grid: { vertLines: { color: '#1a1a1a' }, horzLines: { color: '#1a1a1a' } },
-    rightPriceScale: { borderColor: '#2a2a2a' },
-    timeScale: { borderColor: '#2a2a2a', visible: false },
-    crosshair: { vertLine: { color: '#3a3a3a' }, horzLine: { color: '#3a3a3a' } },
-    width: macdContainer.clientWidth, height: 120,
-  });
-  macdLineSeries   = macdChart.addLineSeries({ color: '#3b82f6', lineWidth: 2 });
-  macdSignalSeries = macdChart.addLineSeries({ color: '#f97316', lineWidth: 1 });
-  macdHistSeries   = macdChart.addHistogramSeries({ color: '#26a69a', priceScaleId: 'right' });
+  function quickLoad(id, name, market) {
+    document.getElementById('stockInput').value = id;
+    currentStockId   = id;
+    currentStockName = name;
+    currentMarket    = market;
+    loadChart();
+  }
 
-  new ResizeObserver(() => {
-    rsiChart.applyOptions({ width: rsiContainer.clientWidth });
-    macdChart.applyOptions({ width: macdContainer.clientWidth });
-  }).observe(rsiContainer);
-}
+  function loadChart() {
+    const raw = document.getElementById('stockInput').value.trim().toUpperCase();
+    if (!raw) return;
 
-function getStartDate(days) {
-  const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  return d.toISOString().slice(0, 10);
-}
+    // 判斷市場
+    const isTW = /^\d{4,5}$/.test(raw);
+    currentMarket    = isTW ? 'TW' : 'US';
+    currentStockId   = raw;
+    currentStockName = raw;
 
-function searchStock() {
-  const val = document.getElementById('searchInput').value.trim();
-  const valU = val.toUpperCase();
-  if (!val) return;
-  const isFutures = ['TX','MTX','TE','TF','ZEF','ZFF','GDF','XIF','EXF','SPF','NQF','DOF'].includes(valU);
-  // US stocks: start with ^ or contain letters only (non-numeric)
-  const isUS = val.startsWith('^') || /^[A-Z]{1,5}$/.test(valU) && !['TX','MTX','TAIEX'].includes(valU);
-  const type = isFutures ? 'futures' : isUS ? 'us' : 'tw';
-  const nameMap = {
-    'TAIEX':'加權指數','2330':'台積電','2317':'鴻海','2454':'聯發科','2308':'台達電',
-    '0050':'元大台50','006208':'富邦台50',
-    '^GSPC':'S&P500','^IXIC':'那斯達克','^DJI':'道瓊','^VIX':'VIX波動率',
-    'AAPL':'蘋果','NVDA':'輝達','MSFT':'微軟','GOOGL':'Alphabet','AMZN':'亞馬遜','TSM':'台積電ADR',
-  };
-  loadChart(val, nameMap[valU] || val, type);
-}
+    document.getElementById('chartStockName').textContent = raw;
+    const badge = document.getElementById('chartStockId');
+    badge.textContent = isTW ? 'TWSE' : 'NASDAQ/NYSE';
+    badge.style.display = 'inline';
 
-let currentType = 'futures';
+    renderTVChart();
 
-async function loadChart(symbol, name, type = 'futures') {
-  // Reset VIX mode
-  vixMode = false;
-  // Normalize type
-  if (type === 'stock') type = 'tw';
-  currentType = type;
-  if (vixSeries) vixSeries.applyOptions({ visible: false });
-  document.querySelectorAll('.symbol-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.trim() === (name || symbol));
-  });
-  currentSymbol = symbol;
-  document.getElementById('symbolName').textContent = name || symbol;
-
-  document.getElementById('loadingOverlay').style.display = 'flex';
-  document.getElementById('loadingText').textContent = `載入 ${symbol} 歷史資料…`;
-
-  try {
-    const start = getStartDate(Math.max(currentDays, 365));
-
-    // Choose dataset by type
-    let url, processData;
-    if (type === 'tw') {
-      url = `${API_BASE}&dataset=TaiwanStockPrice&symbol=${symbol}&start=${start}`;
-      processData = (json) => json.data
-        .filter(d => (d.open || d.Open) > 0)
-        .map(d => ({ 
-          time: d.date, 
-          open: d.open || d.Open, 
-          high: d.max || d.Max || d.high, 
-          low: d.min || d.Min || d.low, 
-          close: d.close || d.Close, 
-          volume: d.Trading_Volume || d.volume || 0 
-        }))
-        .sort((a, b) => a.time.localeCompare(b.time));
-    } else if (type === 'us') {
-      url = `${API_BASE}&dataset=USStockPrice&symbol=${symbol}&start=${start}`;
-      processData = (json) => json.data
-        .filter(d => d.Close > 0)
-        .map(d => ({
-          time: d.date,
-          open: d.Open, high: d.High, low: d.Low, close: d.Close,
-          volume: d.Volume || 0,
-        }))
-        .sort((a, b) => a.time.localeCompare(b.time));
-    } else if (type === 'index') {
-      url = `${API_BASE}&dataset=TaiwanStockWeightedIndex&symbol=${symbol}&start=${start}`;
-      processData = (json) => json.data
-        .filter(d => d.price > 0)
-        .map(d => ({ time: d.date, open: d.price, high: d.price, low: d.price, close: d.price, volume: d.volume || 0 }))
-        .sort((a, b) => a.time.localeCompare(b.time));
+    if (isTW) {
+      loadSupabaseData(raw);
     } else {
-      // futures (default)
-      url = `${API_BASE}&symbol=${symbol}&start=${start}`;
-      processData = (json) => {
-        const byDate = {};
-        for (const d of json.data) {
-          if (d.trading_session !== 'position') continue;
-          if (!d.open || d.open === 0) continue;
-          const cd = d.contract_date.toString();
-          if (!byDate[d.date] || cd < byDate[d.date].contract_date) byDate[d.date] = d;
-        }
-        return Object.values(byDate)
-          .map(d => ({ time: d.date, open: d.open, high: d.max, low: d.min, close: d.close, volume: d.volume }))
-          .sort((a, b) => a.time.localeCompare(b.time));
-      };
+      loadUSPrice(raw);
+      document.getElementById('histCard').style.display = 'none';
+      document.getElementById('valCard').style.display  = 'none';
+    }
+  }
+
+  function renderTVChart() {
+    const isTW = currentMarket === 'TW';
+    // TradingView symbol format
+    const sym = isTW
+      ? `TWSE:${currentStockId}`
+      : currentStockId;
+
+    const ivMap = { D: 'D', W: 'W', M: 'M' };
+
+    const container = document.getElementById('tvContainer');
+    container.innerHTML = '';
+
+    // Use TradingView Advanced Chart Widget (free, no API key)
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tradingview-widget-container';
+    wrapper.style.height = '100%';
+    wrapper.style.width  = '100%';
+
+    const div = document.createElement('div');
+    div.id = 'tradingview_chart';
+    div.style.height = '100%';
+    wrapper.appendChild(div);
+
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/tv.js';
+    script.async = true;
+    script.onload = () => {
+      if (typeof TradingView === 'undefined') {
+        container.innerHTML = `<div class="no-data" style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;">
+          <div style="font-size:1.5rem;opacity:0.4;">⚠️</div>
+          <div>TradingView 載入失敗，請重新整理</div>
+        </div>`;
+        return;
+      }
+      new TradingView.widget({
+        autosize: true,
+        symbol: sym,
+        interval: ivMap[currentInterval],
+        timezone: 'Asia/Taipei',
+        theme: 'light',
+        style: '1',
+        locale: 'zh_TW',
+        toolbar_bg: '#f8f8fc',
+        enable_publishing: false,
+        hide_side_toolbar: false,
+        allow_symbol_change: true,
+        container_id: 'tradingview_chart',
+        studies: ['RSI@tv-basicstudies', 'MACD@tv-basicstudies'],
+        show_popup_button: true,
+      });
+    };
+    wrapper.appendChild(script);
+    container.appendChild(wrapper);
+  }
+
+  async function loadSupabaseData(id) {
+    // 股價歷史
+    try {
+      const rows = await sbFetch('stock_daily_twse',
+        `stock_id=eq.${id}&order=date.desc&limit=60&select=date,close,chg_pct,volume`);
+
+      if (rows && rows.length > 0) {
+        // 更新名稱
+        const nameRow = rows[0];
+        document.getElementById('chartStockName').textContent = `${id}`;
+
+        // 即時行情卡
+        const latest = rows[0];
+        const prev   = rows[1];
+        const chgPct = (latest.chg_pct || 0) * 100;
+        const chgAbs = prev ? (latest.close - prev.close).toFixed(2) : '—';
+        const isUp   = chgPct >= 0;
+
+        document.getElementById('priceBody').innerHTML = `
+          <div class="price-big">${latest.close?.toLocaleString('zh-TW', {minimumFractionDigits:2}) ?? '—'}</div>
+          <div class="price-chg ${isUp ? 'up' : 'down'}">
+            ${isUp ? '▲' : '▼'} ${Math.abs(chgAbs)} (${isUp ? '+':''}${chgPct.toFixed(2)}%)
+          </div>
+          <div class="price-meta">
+            <div class="meta-item"><div class="meta-label">日期</div><div class="meta-val">${latest.date}</div></div>
+            <div class="meta-item"><div class="meta-label">成交量(千)</div><div class="meta-val">${latest.volume ? (latest.volume/1000).toFixed(0) : '—'}</div></div>
+            <div class="meta-item"><div class="meta-label">資料來源</div><div class="meta-val">Supabase</div></div>
+            <div class="meta-item"><div class="meta-label">筆數</div><div class="meta-val">${rows.length} 日</div></div>
+          </div>`;
+
+        // 走勢 bar
+        const data    = rows.slice().reverse();
+        const closes  = data.map(d => d.close);
+        const minC    = Math.min(...closes);
+        const maxC    = Math.max(...closes);
+        const rangeC  = maxC - minC || minC * 0.01 || 1;
+        const BAR_H   = 52;
+        const BAR_W   = Math.max(3, Math.min(10, Math.floor(240 / data.length)));
+        const GAP     = 2;
+
+        document.getElementById('histBars').style.cssText = `display:flex;align-items:flex-end;gap:${GAP}px;height:${BAR_H}px;padding:0.5rem 0.9rem 0;`;
+        document.getElementById('histBars').innerHTML = data.map((d, i) => {
+          const hPx  = Math.max(3, ((d.close - minC) / rangeC * 0.8 + 0.15) * BAR_H).toFixed(1);
+          const isP  = (d.chg_pct || 0) >= 0;
+          const col  = isP ? '#dc2626' : '#16a34a';
+          const isLast = i === data.length - 1;
+          return `<div style="flex-shrink:0;width:${BAR_W}px;display:flex;flex-direction:column;justify-content:flex-end;height:${BAR_H}px;"
+            title="${d.date}  ${d.close}  ${isP?'+':''}${((d.chg_pct||0)*100).toFixed(2)}%">
+            <div style="height:${hPx}px;background:${col};border-radius:2px 2px 0 0;opacity:${isLast?1:0.65};${isLast?`outline:1.5px solid ${col};outline-offset:-1px;`:''}"></div>
+          </div>`;
+        }).join('');
+
+        document.getElementById('histDates').innerHTML = `<div style="display:flex;gap:${GAP}px;">` +
+          data.map((d, i) => `<div style="flex-shrink:0;width:${BAR_W}px;font-family:'IBM Plex Mono',monospace;font-size:0.38rem;color:var(--muted);text-align:center;overflow:hidden;">${i % 10 === 0 ? d.date.slice(5) : ''}</div>`).join('') + '</div>';
+
+        document.getElementById('histCard').style.display = 'block';
+      } else {
+        document.getElementById('histCard').style.display = 'none';
+        document.getElementById('priceBody').innerHTML = '<div class="no-data">無資料（此股票可能不在追蹤清單中）</div>';
+      }
+    } catch(e) {
+      document.getElementById('priceBody').innerHTML = `<div class="error-msg">載入失敗：${e.message}</div>`;
     }
 
-    const res = await fetch(url);
-    const json = await res.json();
-    if (!json.data?.length) throw new Error('無資料，請確認代碼正確');
-    allData = processData(json);
-
-    renderRange();
-    document.getElementById('dataInfo').textContent = `資料來源：FinMind · 台灣期交所 / 美股 · ${allData.length} 個交易日`;
-    document.getElementById('lastUpdate').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
-
-  } catch(e) {
-    document.getElementById('loadingText').textContent = '載入失敗：' + e.message;
-    return;
-  }
-}
-
-function renderRange() {
-  const cutoff = getStartDate(currentDays);
-  const filtered = allData.filter(d => d.time >= cutoff);
-  if (!filtered.length) return;
-
-  const candles = filtered.map(d => ({ time: d.time, open: d.open, high: d.high, low: d.low, close: d.close }));
-  const volumes = filtered.map(d => ({
-    time: d.time,
-    value: d.volume,
-    color: d.close >= d.open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
-  }));
-
-  candleSeries.setData(candles);
-  volumeSeries.setData(volumes);
-  chart.timeScale().fitContent();
-
-  // Update price display with last bar
-  const last = filtered[filtered.length - 1];
-  const prev = filtered[filtered.length - 2];
-  const chg = last.close - (prev?.close ?? last.open);
-  const chgPct = prev ? (chg / prev.close * 100) : 0;
-  const isUp = chg >= 0;
-
-  document.getElementById('currentPrice').textContent = last.close.toLocaleString();
-  document.getElementById('currentPrice').style.color = isUp ? '#26a69a' : '#ef5350';
-  document.getElementById('priceChange').textContent = `${isUp?'+':''}${chg.toFixed(0)} (${isUp?'+':''}${chgPct.toFixed(2)}%)`;
-  document.getElementById('priceChange').className = isUp ? 'up' : 'down';
-
-  document.getElementById('ohlcO').textContent = last.open.toLocaleString();
-  document.getElementById('ohlcH').textContent = last.high.toLocaleString();
-  document.getElementById('ohlcL').textContent = last.low.toLocaleString();
-  document.getElementById('ohlcC').textContent = last.close.toLocaleString();
-
-  document.getElementById('loadingOverlay').style.display = 'none';
-
-  // Update indicators
-  updateIndicators(filtered);
-}
-
-function updateIndicators(data) {
-  if (!data.length) return;
-
-  // MA
-  ma5.setData(calcMA(data, 5));
-  ma20.setData(calcMA(data, 20));
-  ma60.setData(calcMA(data, 60));
-  ma120.setData(calcMA(data, 120));
-  ma240.setData(calcMA(data, 240));
-
-  // Bollinger Bands
-  if (showBB) {
-    const bb = calcBB(data);
-    bbUpper.setData(bb.upper);
-    bbMiddle.setData(bb.middle);
-    bbLower.setData(bb.lower);
-  }
-
-  // RSI
-  if (showRSI && rsiSeries) {
-    const rsiData = calcRSI(data);
-    rsiSeries.setData(rsiData);
-    // Add overbought/oversold reference lines to RSI data
-    const firstTime = rsiData[0]?.time;
-    const lastTime = rsiData[rsiData.length-1]?.time;
-    if (firstTime && lastTime) {
-      rsiChart.series?.[1]?.setData([
-        { time: firstTime, value: 70 },
-        { time: lastTime, value: 70 },
-      ]);
+    // 估值
+    try {
+      const valRows = await sbFetch('stock_valuation_daily',
+        `stock_id=eq.${id}&order=date.desc&limit=1&select=*`);
+      if (valRows && valRows.length > 0) {
+        const v = valRows[0];
+        document.getElementById('valBody').innerHTML = `
+          <div class="val-grid">
+            <div class="val-item"><div class="val-label">本益比 PER</div><div class="val-num">${v.pe_ratio ?? '—'}</div></div>
+            <div class="val-item"><div class="val-label">殖利率 %</div><div class="val-num">${v.dividend_yield ? (v.dividend_yield).toFixed(2)+'%' : '—'}</div></div>
+            <div class="val-item"><div class="val-label">股價淨值 PBR</div><div class="val-num">${v.pb_ratio ?? '—'}</div></div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.48rem;color:var(--muted);margin-top:0.5rem;">資料日期：${v.date ?? '—'}</div>`;
+        document.getElementById('valCard').style.display = 'block';
+      } else {
+        document.getElementById('valCard').style.display = 'none';
+      }
+    } catch(e) {
+      document.getElementById('valCard').style.display = 'none';
     }
-    rsiChart.timeScale().fitContent();
   }
 
-  // MACD
-  if (showMACD && macdLineSeries) {
-    const macdData = calcMACD(data);
-    macdLineSeries.setData(macdData.map(d => ({ time: d.time, value: d.macd })));
-    macdSignalSeries.setData(macdData.map(d => ({ time: d.time, value: d.signal })));
-    macdHistSeries.setData(macdData.map(d => ({
-      time: d.time, value: d.hist,
-      color: d.hist >= 0 ? 'rgba(38,166,154,0.6)' : 'rgba(239,83,80,0.6)',
-    })));
-    macdChart.timeScale().fitContent();
+  async function loadUSPrice(sym) {
+    document.getElementById('priceBody').innerHTML = '<div class="loading-msg">載入中…</div>';
+    try {
+      const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? '/api/news' : 'https://alphascope-fin.vercel.app/api/news';
+      const r = await fetch(`${API}?endpoint=vix`); // 借用 vix 端點格式
+      // 改用 Yahoo Finance（透過 Vercel proxy 不存在，改提示用戶）
+      document.getElementById('priceBody').innerHTML = `
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);line-height:1.7;">
+          <div style="margin-bottom:0.5rem;">美股即時報價可至以下平台查看：</div>
+          <a href="https://finance.yahoo.com/quote/${sym}" target="_blank" style="color:var(--accent2);display:block;margin-bottom:0.25rem;">→ Yahoo Finance</a>
+          <a href="https://www.tradingview.com/chart/?symbol=${sym}" target="_blank" style="color:var(--accent2);display:block;margin-bottom:0.25rem;">→ TradingView</a>
+          <a href="https://www.google.com/finance/quote/${sym}:NASDAQ" target="_blank" style="color:var(--accent2);display:block;">→ Google Finance</a>
+        </div>`;
+    } catch {
+      document.getElementById('priceBody').innerHTML = '<div class="no-data">無法取得即時報價</div>';
+    }
   }
-}
 
-function setRange(days) {
-  currentDays = days;
-  document.querySelectorAll('.range-btn').forEach(b => {
-    const map = {'3M':90,'6M':180,'1Y':365,'2Y':730,'5Y':1825};
-    b.classList.toggle('active', map[b.textContent] === days);
+  // 預設載入台積電
+  window.addEventListener('load', () => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    const name = params.get('name');
+    if (id) {
+      document.getElementById('stockInput').value = id;
+      currentStockName = name || id;
+      loadChart();
+    }
   });
-  if (allData.length) renderRange();
-  else loadChart(currentSymbol);
-}
-
-async function loadVix() {
-  vixMode = true;
-  document.querySelectorAll('.symbol-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.includes('VIX'));
-  });
-  document.getElementById('symbolName').textContent = '台股波動率指數 (TAIWAN VIX)';
-  document.getElementById('loadingOverlay').style.display = 'flex';
-  document.getElementById('loadingText').textContent = '載入台股 VIX 歷史資料…';
-
-  try {
-    const res = await fetch(`${API_BASE.replace('finmind','twvix')}`);
-    const json = await res.json();
-    if (!json?.length) throw new Error('無資料');
-
-    // Parse VIX data - field names from TAIFEX OpenAPI
-    const vixData = json
-      .filter(d => d.VIX && parseFloat(d.VIX) > 0)
-      .map(d => ({
-        time: d.Date?.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') || d.date,
-        value: parseFloat(d.VIX),
-      }))
-      .sort((a, b) => a.time.localeCompare(b.time));
-
-    if (!vixData.length) throw new Error('無有效資料');
-
-    // Switch chart to line mode
-    candleSeries.setData([]);
-    volumeSeries.setData([]);
-    vixSeries.applyOptions({ visible: true });
-    vixSeries.setData(vixData);
-    chart.timeScale().fitContent();
-
-    const last = vixData[vixData.length - 1];
-    const prev = vixData[vixData.length - 2];
-    const chg = last.value - (prev?.value ?? last.value);
-    const chgPct = prev ? (chg / prev.value * 100) : 0;
-    const isUp = chg >= 0;
-
-    document.getElementById('currentPrice').textContent = last.value.toFixed(2);
-    document.getElementById('currentPrice').style.color = isUp ? '#ef5350' : '#26a69a'; // VIX up = bad
-    document.getElementById('priceChange').textContent = `${isUp?'+':''}${chg.toFixed(2)} (${isUp?'+':''}${chgPct.toFixed(2)}%)`;
-    document.getElementById('priceChange').className = isUp ? 'down' : 'up';
-    document.getElementById('ohlcO').textContent = '—';
-    document.getElementById('ohlcH').textContent = '—';
-    document.getElementById('ohlcL').textContent = '—';
-    document.getElementById('ohlcC').textContent = last.value.toFixed(2);
-    document.getElementById('ohlcV').textContent = '—';
-    document.getElementById('dataInfo').textContent = `資料來源：台灣期貨交易所 OpenAPI · ${vixData.length} 個交易日`;
-    document.getElementById('loadingOverlay').style.display = 'none';
-  } catch(e) {
-    document.getElementById('loadingText').textContent = '載入失敗：' + e.message;
-  }
-}
-
-// Init
-initChart();
-loadChart('TX', '台指期 TX');
 </script>
 </body>
 </html>
