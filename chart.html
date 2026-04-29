@@ -126,17 +126,17 @@
   .search-btn:hover { background: #4f46e5; transform: translateY(-1px); }
   .search-btn:active { transform: translateY(0); }
 
-  /* 快速代碼按鈕 */
-  .quick-chips {
+  /* 分類 tabs */
+  .cat-tabs {
     display: flex;
-    align-items: center;
-    gap: 0.3rem;
+    gap: 0.25rem;
     flex-wrap: wrap;
+    margin-bottom: 0.5rem;
   }
-  .chip {
+  .cat-tab {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.6rem;
-    padding: 0.22rem 0.55rem;
+    font-size: 0.58rem;
+    padding: 0.2rem 0.65rem;
     border-radius: 999px;
     border: 1px solid var(--border-dark);
     background: var(--bg);
@@ -145,7 +145,11 @@
     transition: all 0.15s;
     white-space: nowrap;
   }
-  .chip:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .cat-tab:hover  { border-color: var(--accent); color: var(--accent); }
+  .cat-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .chip-group { display: none; flex-wrap: wrap; gap: 0.3rem; }
+  .chip-group.active { display: flex; }
 
   /* 主內容 */
   .main-layout {
@@ -331,20 +335,105 @@
 </header>
 
 <div class="search-bar">
-  <span class="search-label">股票代碼</span>
-  <input type="text" class="search-input" id="stockInput" placeholder="例：2330、AAPL" maxlength="10"
+  <span class="search-label">代碼</span>
+  <input type="text" class="search-input" id="stockInput" placeholder="例：2330、AAPL、TXFR1" maxlength="12"
     onkeydown="if(event.key==='Enter') loadChart()">
   <button class="search-btn" onclick="loadChart()">查詢 ↵</button>
-  <div class="quick-chips" id="quickChips">
-    <span class="chip" onclick="quickLoad('2330','台積電','TW')">2330 台積電</span>
-    <span class="chip" onclick="quickLoad('2454','聯發科','TW')">2454 聯發科</span>
-    <span class="chip" onclick="quickLoad('2317','鴻海','TW')">2317 鴻海</span>
-    <span class="chip" onclick="quickLoad('2303','聯電','TW')">2303 聯電</span>
-    <span class="chip" onclick="quickLoad('2412','中華電','TW')">2412 中華電</span>
-    <span class="chip" onclick="quickLoad('AAPL','Apple','US')">AAPL 蘋果</span>
-    <span class="chip" onclick="quickLoad('NVDA','NVIDIA','US')">NVDA 輝達</span>
-    <span class="chip" onclick="quickLoad('TSLA','Tesla','US')">TSLA 特斯拉</span>
-    <span class="chip" onclick="quickLoad('MSFT','微軟','US')">MSFT 微軟</span>
+
+  <div style="display:flex;flex-direction:column;gap:0.4rem;flex:1;min-width:0;">
+    <!-- 分類 tabs -->
+    <div class="cat-tabs">
+      <button class="cat-tab active" onclick="switchCat('tw')">🇹🇼 台股</button>
+      <button class="cat-tab" onclick="switchCat('idx')">📊 指數</button>
+      <button class="cat-tab" onclick="switchCat('fut')">⚡ 期貨</button>
+      <button class="cat-tab" onclick="switchCat('us')">🇺🇸 美股</button>
+      <button class="cat-tab" onclick="switchCat('etf')">💼 商品ETF</button>
+      <button class="cat-tab" onclick="switchCat('fx')">💱 外匯</button>
+    </div>
+
+    <!-- 台股個股 -->
+    <div class="chip-group active" id="cat-tw">
+      <span class="chip" onclick="quickLoad('2330','台積電','TWSE')">2330 台積電</span>
+      <span class="chip" onclick="quickLoad('2454','聯發科','TWSE')">2454 聯發科</span>
+      <span class="chip" onclick="quickLoad('2317','鴻海','TWSE')">2317 鴻海</span>
+      <span class="chip" onclick="quickLoad('2303','聯電','TWSE')">2303 聯電</span>
+      <span class="chip" onclick="quickLoad('2881','富邦金','TWSE')">2881 富邦金</span>
+      <span class="chip" onclick="quickLoad('2882','國泰金','TWSE')">2882 國泰金</span>
+      <span class="chip" onclick="quickLoad('2412','中華電','TWSE')">2412 中華電</span>
+      <span class="chip" onclick="quickLoad('3008','大立光','TWSE')">3008 大立光</span>
+      <span class="chip" onclick="quickLoad('2308','台達電','TWSE')">2308 台達電</span>
+      <span class="chip" onclick="quickLoad('2382','廣達','TWSE')">2382 廣達</span>
+    </div>
+
+    <!-- 指數 -->
+    <div class="chip-group" id="cat-idx">
+      <span class="chip" onclick="quickLoad('TAIEX','台灣加權指數','IDX')">加權指數 TAIEX</span>
+      <span class="chip" onclick="quickLoad('TWSE:IX0001','台灣電子指數','IDX')">電子指數</span>
+      <span class="chip" onclick="quickLoad('TWSE:IX0010','台灣半導體指數','IDX')">半導體</span>
+      <span class="chip" onclick="quickLoad('SPX','S&P500','IDX')">S&P 500</span>
+      <span class="chip" onclick="quickLoad('IXIC','那斯達克','IDX')">那斯達克</span>
+      <span class="chip" onclick="quickLoad('DJI','道瓊','IDX')">道瓊</span>
+      <span class="chip" onclick="quickLoad('NI225','日經225','IDX')">日經 225</span>
+      <span class="chip" onclick="quickLoad('HSI','香港恆生','IDX')">恆生指數</span>
+      <span class="chip" onclick="quickLoad('DAX','德國DAX','IDX')">德國 DAX</span>
+      <span class="chip" onclick="quickLoad('VIX','VIX 恐慌指數','IDX')">VIX 恐慌</span>
+      <span class="chip" onclick="quickLoad('SOX','費城半導體','IDX')">費城半導體 SOX</span>
+    </div>
+
+    <!-- 期貨 -->
+    <div class="chip-group" id="cat-fut">
+      <span class="chip" onclick="quickLoad('TXFR1','台指期近月','FUT')">台指期 TXFR1</span>
+      <span class="chip" onclick="quickLoad('TXFR2','台指期次月','FUT')">台指期 次月</span>
+      <span class="chip" onclick="quickLoad('ESFR1','S&P500期貨','FUT')">ES S&P500期</span>
+      <span class="chip" onclick="quickLoad('NQFR1','那斯達克期貨','FUT')">NQ 那斯達克期</span>
+      <span class="chip" onclick="quickLoad('YMER1','道瓊期貨','FUT')">YM 道瓊期</span>
+      <span class="chip" onclick="quickLoad('CLR1!','WTI原油期貨','FUT')">CL WTI原油</span>
+      <span class="chip" onclick="quickLoad('GCR1!','黃金期貨','FUT')">GC 黃金</span>
+      <span class="chip" onclick="quickLoad('SIR1!','白銀期貨','FUT')">SI 白銀</span>
+      <span class="chip" onclick="quickLoad('NGR1!','天然氣期貨','FUT')">NG 天然氣</span>
+      <span class="chip" onclick="quickLoad('BTCUSDT','比特幣','FUT')">BTC 比特幣</span>
+      <span class="chip" onclick="quickLoad('ETHUSDT','以太幣','FUT')">ETH 以太幣</span>
+    </div>
+
+    <!-- 美股 -->
+    <div class="chip-group" id="cat-us">
+      <span class="chip" onclick="quickLoad('AAPL','Apple','US')">AAPL 蘋果</span>
+      <span class="chip" onclick="quickLoad('NVDA','NVIDIA','US')">NVDA 輝達</span>
+      <span class="chip" onclick="quickLoad('MSFT','微軟','US')">MSFT 微軟</span>
+      <span class="chip" onclick="quickLoad('TSLA','Tesla','US')">TSLA 特斯拉</span>
+      <span class="chip" onclick="quickLoad('META','Meta','US')">META</span>
+      <span class="chip" onclick="quickLoad('GOOGL','Google','US')">GOOGL</span>
+      <span class="chip" onclick="quickLoad('AMZN','Amazon','US')">AMZN</span>
+      <span class="chip" onclick="quickLoad('AMD','AMD','US')">AMD</span>
+      <span class="chip" onclick="quickLoad('TSM','台積電ADR','US')">TSM ADR</span>
+      <span class="chip" onclick="quickLoad('ASML','ASML','US')">ASML</span>
+    </div>
+
+    <!-- 商品 ETF -->
+    <div class="chip-group" id="cat-etf">
+      <span class="chip" onclick="quickLoad('GLD','黃金ETF','ETF')">GLD 黃金</span>
+      <span class="chip" onclick="quickLoad('SLV','白銀ETF','ETF')">SLV 白銀</span>
+      <span class="chip" onclick="quickLoad('USO','原油ETF','ETF')">USO 原油</span>
+      <span class="chip" onclick="quickLoad('UNG','天然氣ETF','ETF')">UNG 天然氣</span>
+      <span class="chip" onclick="quickLoad('COPX','銅礦ETF','ETF')">COPX 銅礦</span>
+      <span class="chip" onclick="quickLoad('TLT','20年美債ETF','ETF')">TLT 長債</span>
+      <span class="chip" onclick="quickLoad('IEF','10年美債ETF','ETF')">IEF 中債</span>
+      <span class="chip" onclick="quickLoad('IBIT','比特幣ETF','ETF')">IBIT 比特幣</span>
+      <span class="chip" onclick="quickLoad('0050','元大台灣50','TWSE')">0050 台灣50</span>
+      <span class="chip" onclick="quickLoad('00878','國泰永續高股息','TWSE')">00878 永續高息</span>
+    </div>
+
+    <!-- 外匯 -->
+    <div class="chip-group" id="cat-fx">
+      <span class="chip" onclick="quickLoad('EURUSD','歐元/美元','FX')">EUR/USD</span>
+      <span class="chip" onclick="quickLoad('USDJPY','美元/日圓','FX')">USD/JPY</span>
+      <span class="chip" onclick="quickLoad('GBPUSD','英鎊/美元','FX')">GBP/USD</span>
+      <span class="chip" onclick="quickLoad('AUDUSD','澳幣/美元','FX')">AUD/USD</span>
+      <span class="chip" onclick="quickLoad('USDCAD','美元/加幣','FX')">USD/CAD</span>
+      <span class="chip" onclick="quickLoad('USDCNH','美元/人民幣','FX')">USD/CNH</span>
+      <span class="chip" onclick="quickLoad('USDTWD','美元/台幣','FX')">USD/TWD</span>
+      <span class="chip" onclick="quickLoad('DXY','美元指數','FX')">DXY 美元指數</span>
+    </div>
   </div>
 </div>
 
@@ -398,11 +487,13 @@
     <!-- 說明 -->
     <div class="info-card">
       <div class="info-card-header">ℹ️ 說明</div>
-      <div class="info-card-body" style="font-size:0.6rem;color:var(--muted);line-height:1.7;font-family:'IBM Plex Mono',monospace;">
-        <div>• 台股代碼直接輸入數字（如 2330）</div>
-        <div>• 美股輸入英文代碼（如 AAPL）</div>
-        <div>• K 線由 TradingView 提供</div>
-        <div>• 歷史走勢、估值為台股專屬</div>
+      <div class="info-card-body" style="font-size:0.6rem;color:var(--muted);line-height:1.8;font-family:'IBM Plex Mono',monospace;">
+        <div>• 台股：輸入 4~5 位數字（2330、0050）</div>
+        <div>• 美股：英文代碼（AAPL、NVDA）</div>
+        <div>• 指數：SPX、IXIC、TAIEX、VIX…</div>
+        <div>• 期貨：TXFR1、CLR1!、GCR1!…</div>
+        <div>• 外匯：EURUSD、USDJPY…</div>
+        <div>• K 線圖由 TradingView 提供</div>
         <div style="margin-top:0.5rem;opacity:0.65;">⚠️ 資料僅供參考，不構成投資建議</div>
       </div>
     </div>
@@ -419,19 +510,36 @@
   let currentMarket    = 'TW';
   let currentInterval  = 'D';
 
-  async function sbFetch(table, params) {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
-      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
-    });
-    if (!r.ok) throw new Error(`Supabase ${r.status}`);
-    return r.json();
-  }
+  // TradingView symbol mapping（各市場格式不同）
+  const TV_SYMBOL_MAP = {
+    // 台灣加權指數
+    'TAIEX':       'TWSE:TAIEX',
+    'TWSE:IX0001': 'TWSE:IX0001',
+    'TWSE:IX0010': 'TWSE:IX0010',
+    // 全球指數
+    'SPX':   'SP:SPX',  'IXIC': 'NASDAQ:IXIC', 'DJI':   'DJ:DJI',
+    'NI225': 'TVC:NI225','HSI':  'TVC:HSI',     'DAX':   'XETR:DAX',
+    'VIX':   'TVC:VIX', 'SOX':  'PHLX:SOX',
+    // 美元指數
+    'DXY':   'TVC:DXY',
+    // 期貨（CME/TAIFEX）
+    'TXFR1': 'TAIFEX:TXFR1', 'TXFR2': 'TAIFEX:TXFR2',
+    'ESFR1': 'CME_MINI:ESR1!', 'NQFR1': 'CME_MINI:NQR1!', 'YMER1': 'CBOT_MINI:YMR1!',
+    'CLR1!': 'NYMEX:CLR1!',   'GCR1!': 'COMEX:GCR1!',
+    'SIR1!': 'COMEX:SIR1!',   'NGR1!': 'NYMEX:NGR1!',
+    // 加密貨幣
+    'BTCUSDT': 'BINANCE:BTCUSDT', 'ETHUSDT': 'BINANCE:ETHUSDT',
+    // 外匯
+    'EURUSD': 'FX:EURUSD', 'USDJPY': 'FX:USDJPY', 'GBPUSD': 'FX:GBPUSD',
+    'AUDUSD': 'FX:AUDUSD', 'USDCAD': 'FX:USDCAD', 'USDCNH': 'FX:USDCNH',
+    'USDTWD': 'FX:USDTWD',
+  };
 
-  function setInterval(iv) {
-    currentInterval = iv;
-    document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+  function switchCat(cat) {
+    document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');
-    if (currentStockId) renderTVChart();
+    document.querySelectorAll('.chip-group').forEach(g => g.classList.remove('active'));
+    document.getElementById('cat-' + cat).classList.add('active');
   }
 
   function quickLoad(id, name, market) {
@@ -442,49 +550,69 @@
     loadChart();
   }
 
+  // badge 文字對照
+  const MARKET_BADGE = {
+    TWSE: 'TWSE', TW: 'TWSE', US: 'NASDAQ/NYSE', IDX: '指數',
+    FUT: '期貨', ETF: 'ETF', FX: '外匯', FX_IDX: '外匯指數',
+  };
+
   function loadChart() {
     const raw = document.getElementById('stockInput').value.trim().toUpperCase();
     if (!raw) return;
 
     // 判斷市場
-    const isTW = /^\d{4,5}$/.test(raw);
-    currentMarket    = isTW ? 'TW' : 'US';
+    let market = currentMarket || 'US';
+    if (/^\d{4,5}$/.test(raw))                        market = 'TWSE'; // 台股代碼
+    else if (/^(EURUSD|USDJPY|GBPUSD|AUDUSD|USDCAD|USDCNH|USDTWD|DXY)$/.test(raw)) market = 'FX';
+    else if (/^(TXFR|ESFR|NQFR|YMER|CLR|GCR|SIR|NGR)/.test(raw)) market = 'FUT';
+    else if (/^(TAIEX|SPX|IXIC|DJI|NI225|HSI|DAX|VIX|SOX)$/.test(raw)) market = 'IDX';
+    else if (/^(BTC|ETH)USDT$/.test(raw))             market = 'FUT';
+
+    currentMarket    = market;
     currentStockId   = raw;
     currentStockName = raw;
 
-    document.getElementById('chartStockName').textContent = raw;
+    document.getElementById('chartStockName').textContent = currentStockName !== raw ? currentStockName : raw;
     const badge = document.getElementById('chartStockId');
-    badge.textContent = isTW ? 'TWSE' : 'NASDAQ/NYSE';
+    badge.textContent  = MARKET_BADGE[market] || market;
     badge.style.display = 'inline';
 
     renderTVChart();
 
-    if (isTW) {
+    // Supabase 資料只有台股個股
+    if (market === 'TWSE' || market === 'TW') {
       loadSupabaseData(raw);
     } else {
-      loadUSPrice(raw);
       document.getElementById('histCard').style.display = 'none';
       document.getElementById('valCard').style.display  = 'none';
+      document.getElementById('priceBody').innerHTML =
+        `<div class="no-data" style="font-size:0.62rem;color:var(--muted);">即時報價請直接看 TradingView 圖表</div>`;
     }
   }
 
-  function renderTVChart() {
-    const isTW = currentMarket === 'TW';
-    // TradingView symbol format
-    const sym = isTW
-      ? `TWSE:${currentStockId}`
-      : currentStockId;
+  function getTVSymbol(id, market) {
+    // 優先查 mapping table
+    if (TV_SYMBOL_MAP[id]) return TV_SYMBOL_MAP[id];
+    // 台股
+    if (market === 'TWSE' || market === 'TW' || /^\d{4,5}$/.test(id)) return `TWSE:${id}`;
+    // 外匯
+    if (market === 'FX') return `FX:${id}`;
+    // 期貨
+    if (market === 'FUT') return id;
+    // ETF / 美股
+    return id;
+  }
 
+  function renderTVChart() {
+    const sym = getTVSymbol(currentStockId, currentMarket);
     const ivMap = { D: 'D', W: 'W', M: 'M' };
 
     const container = document.getElementById('tvContainer');
     container.innerHTML = '';
 
-    // Use TradingView Advanced Chart Widget (free, no API key)
     const wrapper = document.createElement('div');
     wrapper.className = 'tradingview-widget-container';
-    wrapper.style.height = '100%';
-    wrapper.style.width  = '100%';
+    wrapper.style.cssText = 'height:100%;width:100%;';
 
     const div = document.createElement('div');
     div.id = 'tradingview_chart';
@@ -497,9 +625,7 @@
     script.onload = () => {
       if (typeof TradingView === 'undefined') {
         container.innerHTML = `<div class="no-data" style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;">
-          <div style="font-size:1.5rem;opacity:0.4;">⚠️</div>
-          <div>TradingView 載入失敗，請重新整理</div>
-        </div>`;
+          <div style="font-size:1.5rem;opacity:0.4;">⚠️</div><div>TradingView 載入失敗，請重新整理</div></div>`;
         return;
       }
       new TradingView.widget({
@@ -523,7 +649,20 @@
     container.appendChild(wrapper);
   }
 
-  async function loadSupabaseData(id) {
+  async function sbFetch(table, params) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
+    });
+    if (!r.ok) throw new Error(`Supabase ${r.status}`);
+    return r.json();
+  }
+
+  function setInterval(iv) {
+    currentInterval = iv;
+    document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    if (currentStockId) renderTVChart();
+  }
     // 股價歷史
     try {
       const rows = await sbFetch('stock_daily_twse',
