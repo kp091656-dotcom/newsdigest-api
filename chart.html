@@ -533,8 +533,8 @@
 
   // TradingView symbol mapping（各市場格式不同）
   const TV_SYMBOL_MAP = {
-    // 台灣加權指數（免費可用）
-    'TAIEX':       'TWSE:TAIEX',
+    // 台灣加權指數（TVC 資料源免費可用）
+    'TAIEX':       'TVC:TAIEX',
     'TWSE:IX0001': 'TWSE:IX0001',
     'TWSE:IX0010': 'TWSE:IX0010',
     // 全球指數（TVC 免費可用）
@@ -543,9 +543,9 @@
     'VIX':   'TVC:VIX',  'SOX':  'NASDAQ:SOX',
     // 美元指數
     'DXY':   'TVC:DXY',
-    // 台指期（TAIFEX 是正確交易所代碼，1! = 連續近月合約）
-    'TXFR1': 'TAIFEX:TX1!',    // 台指期近月
-    'TXFR2': 'TAIFEX:TX2!',    // 台指期次月
+    // 台指期（正確格式：TAIFEX:TXF1! 非 TX1!）
+    'TXFR1': 'TAIFEX:TXF1!',   // 台指期近月連續
+    'TXFR2': 'TAIFEX:TXF2!',   // 台指期次月
     // 美股期貨連續合約（1! 格式）
     'ESFR1': 'CME_MINI:ES1!',
     'NQFR1': 'CME_MINI:NQ1!',
