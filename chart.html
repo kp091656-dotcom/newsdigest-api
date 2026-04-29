@@ -358,12 +358,12 @@
   <div style="display:flex;flex-direction:column;gap:0.4rem;flex:1;min-width:0;">
     <!-- 分類 tabs -->
     <div class="cat-tabs">
-      <button class="cat-tab active" onclick="switchCat('tw')">🇹🇼 台股</button>
-      <button class="cat-tab" onclick="switchCat('idx')">📊 指數</button>
-      <button class="cat-tab" onclick="switchCat('fut')">⚡ 期貨</button>
-      <button class="cat-tab" onclick="switchCat('us')">🇺🇸 美股</button>
-      <button class="cat-tab" onclick="switchCat('etf')">💼 商品ETF</button>
-      <button class="cat-tab" onclick="switchCat('fx')">💱 外匯</button>
+      <button class="cat-tab active" onclick="switchCat('tw',this)">🇹🇼 台股</button>
+      <button class="cat-tab" onclick="switchCat('idx',this)">📊 指數</button>
+      <button class="cat-tab" onclick="switchCat('fut',this)">⚡ 期貨</button>
+      <button class="cat-tab" onclick="switchCat('us',this)">🇺🇸 美股</button>
+      <button class="cat-tab" onclick="switchCat('etf',this)">💼 商品ETF</button>
+      <button class="cat-tab" onclick="switchCat('fx',this)">💱 外匯</button>
     </div>
 
     <!-- 台股個股 -->
@@ -550,9 +550,9 @@
     'USDTWD': 'FX:USDTWD',
   };
 
-  function switchCat(cat) {
+  function switchCat(cat, el) {
     document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    el.classList.add('active');
     document.querySelectorAll('.chip-group').forEach(g => g.classList.remove('active'));
     document.getElementById('cat-' + cat).classList.add('active');
   }
@@ -751,6 +751,90 @@
           <div class="val-grid">
             <div class="val-item"><div class="val-label">本益比 PER</div><div class="val-num">${v.pe_ratio ?? '—'}</div></div>
             <div class="val-item"><div class="val-label">殖利率 %</div><div class="val-num">${v.dividend_yield ? (v.dividend_yield).toFixed(2)+'%' : '—'}</div></div>
+            <div class="val-item"><div class="val-label">股價淨值 PBR</div><div class="val-num">${v.pb_ratio ?? '—'}</div></div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.48rem;color:var(--muted);margin-top:0.5rem;">資料日期：${v.date ?? '—'}</div>`;
+        document.getElementById('valCard').style.display = 'block';
+      } else {
+        document.getElementById('valCard').style.display = 'none';
+      }
+    } catch(e) {
+      document.getElementById('valCard').style.display = 'none';
+    }
+  }
+
+  async function loadSupabaseData(id) {
+    document.getElementById('priceBody').innerHTML = '<div class="loading-msg">載入中…</div>';
+    try {
+      const rows = await sbFetch('stock_daily_twse',
+        `stock_id=eq.${id}&order=date.desc&limit=60&select=date,close,chg_pct,volume`);
+
+      if (rows && rows.length > 0) {
+        const latest = rows[0];
+        const prev   = rows[1];
+        const chgPct = (latest.chg_pct || 0) * 100;
+        const chgAbs = prev ? (latest.close - prev.close).toFixed(2) : '—';
+        const isUp   = chgPct >= 0;
+
+        document.getElementById('priceBody').innerHTML = `
+          <div class="price-big">${latest.close?.toLocaleString('zh-TW', {minimumFractionDigits:2}) ?? '—'}</div>
+          <div class="price-chg ${isUp ? 'up' : 'down'}">
+            ${isUp ? '▲' : '▼'} ${Math.abs(chgAbs)} (${isUp ? '+':''}${chgPct.toFixed(2)}%)
+          </div>
+          <div class="price-meta">
+            <div class="meta-item"><div class="meta-label">日期</div><div class="meta-val">${latest.date}</div></div>
+            <div class="meta-item"><div class="meta-label">成交量(千)</div><div class="meta-val">${latest.volume ? (latest.volume/1000).toFixed(0) : '—'}</div></div>
+            <div class="meta-item"><div class="meta-label">資料來源</div><div class="meta-val">Supabase</div></div>
+            <div class="meta-item"><div class="meta-label">筆數</div><div class="meta-val">${rows.length} 日</div></div>
+          </div>`;
+
+        // 走勢 bar
+        const data   = rows.slice().reverse();
+        const closes = data.map(d => d.close);
+        const minC   = Math.min(...closes);
+        const maxC   = Math.max(...closes);
+        const rangeC = maxC - minC || minC * 0.01 || 1;
+        const BAR_H  = 52;
+        const BAR_W  = Math.max(3, Math.min(10, Math.floor(240 / data.length)));
+        const GAP    = 2;
+
+        document.getElementById('histBars').style.cssText =
+          `display:flex;align-items:flex-end;gap:${GAP}px;height:${BAR_H}px;padding:0.5rem 0.9rem 0;`;
+        document.getElementById('histBars').innerHTML = data.map((d, i) => {
+          const hPx  = Math.max(3, ((d.close - minC) / rangeC * 0.8 + 0.15) * BAR_H).toFixed(1);
+          const isP  = (d.chg_pct || 0) >= 0;
+          const col  = isP ? '#dc2626' : '#16a34a';
+          const isLast = i === data.length - 1;
+          return `<div style="flex-shrink:0;width:${BAR_W}px;display:flex;flex-direction:column;justify-content:flex-end;height:${BAR_H}px;"
+            title="${d.date}  ${d.close}  ${isP?'+':''}${((d.chg_pct||0)*100).toFixed(2)}%">
+            <div style="height:${hPx}px;background:${col};border-radius:2px 2px 0 0;opacity:${isLast?1:0.65};${isLast?`outline:1.5px solid ${col};outline-offset:-1px;`:''}"></div>
+          </div>`;
+        }).join('');
+
+        document.getElementById('histDates').innerHTML = `<div style="display:flex;gap:${GAP}px;">` +
+          data.map((d, i) => `<div style="flex-shrink:0;width:${BAR_W}px;font-family:'IBM Plex Mono',monospace;font-size:0.38rem;color:var(--muted);text-align:center;overflow:hidden;">${i % 10 === 0 ? d.date.slice(5) : ''}</div>`).join('') + '</div>';
+
+        document.getElementById('histCard').style.display = 'block';
+      } else {
+        document.getElementById('histCard').style.display = 'none';
+        document.getElementById('priceBody').innerHTML =
+          '<div class="no-data">無資料（此股票可能不在追蹤清單中）</div>';
+      }
+    } catch(e) {
+      document.getElementById('priceBody').innerHTML =
+        `<div class="error-msg">載入失敗：${e.message}</div>`;
+    }
+
+    // 估值
+    try {
+      const valRows = await sbFetch('stock_valuation_daily',
+        `stock_id=eq.${id}&order=date.desc&limit=1&select=*`);
+      if (valRows && valRows.length > 0) {
+        const v = valRows[0];
+        document.getElementById('valBody').innerHTML = `
+          <div class="val-grid">
+            <div class="val-item"><div class="val-label">本益比 PER</div><div class="val-num">${v.pe_ratio ?? '—'}</div></div>
+            <div class="val-item"><div class="val-label">殖利率 %</div><div class="val-num">${v.dividend_yield ? v.dividend_yield.toFixed(2)+'%' : '—'}</div></div>
             <div class="val-item"><div class="val-label">股價淨值 PBR</div><div class="val-num">${v.pb_ratio ?? '—'}</div></div>
           </div>
           <div style="font-family:'IBM Plex Mono',monospace;font-size:0.48rem;color:var(--muted);margin-top:0.5rem;">資料日期：${v.date ?? '—'}</div>`;
