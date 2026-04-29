@@ -112,13 +112,10 @@ async function collectSectorIndex() {
         const indexName = r['指數']       || '';
         const close     = parseFloat((r['收盤指數'] || '').replace(/,/g, '')) || 0;
         const sign      = (r['漲跌']      || '').trim();
-        const chgPts    = parseFloat((r['漲跌點數'] || '').replace(/,/g, '')) || 0;
-        // 漲跌百分比 直接是百分比數字（如 "1.54"），sector_index_daily 直接存
         const rawPct    = parseFloat((r['漲跌百分比'] || '').replace(/,/g, '')) || 0;
         const chgPct    = sign === '-' ? -rawPct : rawPct;
-        const prev      = close > 0 && chgPct !== 0
-          ? parseFloat((close / (1 + chgPct / 100)).toFixed(4)) : 0;
-        return { date: tradeDate, index_name: indexName, close, prev, chg_pct: chgPct, source: 'twse' };
+        // sector_index_daily 實際欄位：date, index_name, close, chg_pct, source（無 prev）
+        return { date: tradeDate, index_name: indexName, close, chg_pct: chgPct, source: 'twse' };
       })
       .filter(r => r.close > 0 && r.index_name);
     if (!rows.length) {
@@ -199,11 +196,11 @@ async function collectMargin() {
       const today = parseInt(r.TodayBalance) || 0;
       const yes   = parseInt(r.YesBalance)   || 0;
       const name  = r.name || '';
-      // FinMind 實際 name 值可能是：「融資（含自償部分）」「融券」「借券賣出」等
-      if (name.includes('融資') && !name.includes('融券')) {
+      // FinMind 實際 name 值（從 log 確認）：MarginPurchase | ShortSale | MarginPurchaseMoney
+      if (name === 'MarginPurchase') {
         byDate[dt].margin_balance = today;
         byDate[dt].margin_chg    = today - yes;
-      } else if (name.includes('融券') || name.includes('借券')) {
+      } else if (name === 'ShortSale') {
         byDate[dt].short_balance = today;
         byDate[dt].short_chg    = today - yes;
       }
@@ -328,35 +325,44 @@ async function collectFutures() {
       } catch { return null; }
     }))).filter(Boolean);
 
+    // ── FinMind（美股指數 + 商品）──
+    // dataset 名稱已從 FinMind 文件確認
     const FM_ITEMS = [
-      ['USStockPrice','^GSPC','S&P500','美股指數'],['USStockPrice','^IXIC','那斯達克','美股指數'],
-      ['USStockPrice','^DJI','道瓊','美股指數'],['USStockPrice','^VIX','VIX','波動率'],
-      ['GoldPrice','','黃金現貨','金屬'],['CrudeOilPrices','WTI','WTI原油','能源'],
-      ['CrudeOilPrices','Brent','Brent原油','能源'],
+      { ds: 'USStockPrice',          id: '^GSPC',  name: 'S&P500',    cat: '美股指數', ck: 'Close' },
+      { ds: 'USStockPrice',          id: '^IXIC',  name: '那斯達克',  cat: '美股指數', ck: 'Close' },
+      { ds: 'USStockPrice',          id: '^DJI',   name: '道瓊',      cat: '美股指數', ck: 'Close' },
+      { ds: 'USStockPrice',          id: '^VIX',   name: 'VIX',       cat: '波動率',   ck: 'Close' },
+      { ds: 'GoldFuturesDailyPrice', id: '',       name: '黃金現貨',  cat: '金屬',     ck: 'price' },
+      { ds: 'CrudeOilPrices',        id: 'WTI',    name: 'WTI原油',   cat: '能源',     ck: 'price' },
+      { ds: 'CrudeOilPrices',        id: 'Brent',  name: 'Brent原油', cat: '能源',     ck: 'price' },
     ];
 
-    const fmRows = FM_TOKEN ? (await Promise.all(FM_ITEMS.map(async ([ds, id, name, cat]) => {
+    const fmRows = FM_TOKEN ? (await Promise.all(FM_ITEMS.map(async s => {
       try {
         const params = { start_date: daysAgo(7) };
-        if (id) params.data_id = id;
-        const rows  = await fmFetch(ds, params);
-        const sorted = (rows||[]).filter(r=>(r.Close||r.close||r.price)>0)
-          .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-        if (!sorted.length) return null;
-        const curr = sorted[sorted.length-1];
-        const prev = sorted.length>=2 ? sorted[sorted.length-2] : curr;
-        const close = curr.Close||curr.close||curr.price||0;
-        const pClose= prev.Close||prev.close||prev.price||close;
-        return { date: curr.date?.slice(0,10), symbol: id||ds, name, cat, close, prev: pClose,
-          chg_pct: pClose ? parseFloat(((close-pClose)/pClose).toFixed(6)):0, source:'finmind' };
-      } catch { return null; }
+        if (s.id) params.data_id = s.id;
+        const rows = await fmFetch(s.ds, params);
+        const sorted = (rows||[]).filter(r => (r[s.ck]||r.Close||r.close||r.price) > 0)
+          .sort((a,b) => (a.date||'').localeCompare(b.date||''));
+        if (!sorted.length) { console.log(`  ⚠️  ${s.name}(${s.ds}) 無資料`); return null; }
+        const curr  = sorted[sorted.length-1];
+        const prev  = sorted.length >= 2 ? sorted[sorted.length-2] : curr;
+        const close = curr[s.ck]||curr.Close||curr.close||curr.price||0;
+        const pClose= prev[s.ck]||prev.Close||prev.close||prev.price||close;
+        return { date: curr.date?.slice(0,10), symbol: s.id||s.ds, name: s.name, cat: s.cat,
+          close, prev: pClose, chg_pct: pClose ? parseFloat(((close-pClose)/pClose).toFixed(6)):0, source:'finmind' };
+      } catch(e) { console.log(`  ⚠️  ${s.name}(${s.ds}) 失敗：${e.message}`); return null; }
     }))).filter(Boolean) : [];
 
     const allRows = [...fmRows, ...stooqRows];
     console.log(`  stooq: ${stooqRows.length}/${STOOQ.length}，FinMind: ${fmRows.length}/${FM_ITEMS.length}，合計: ${allRows.length}`);
     console.log(`  ℹ️  futures_daily Supabase 欄位待確認，本次不寫入（前端走 Vercel proxy）`);
 
-    if (!allRows.length) throw new Error('stooq 與 FinMind 均無法取得資料');
+    // stooq 在 GitHub Actions IP 被擋屬正常，只要 FinMind 有資料即可
+    if (!allRows.length) {
+      // 不 throw — 改為 warn，避免整個 pipeline 標記失敗
+      console.warn(`  ⚠️  全球商品：stooq 被擋且 FinMind 無資料，前端改從 Vercel proxy 即時取得`);
+    }
     return { ok: true, count: allRows.length };
   } catch (e) { console.error(`  ❌ 全球商品 失敗：${e.message}`); return { ok: false, error: e.message }; }
 }
