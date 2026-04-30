@@ -2,10 +2,11 @@ name: Daily Market Data Collector
 
 on:
   schedule:
-    # UTC 08:00 = 台灣 16:00（TWSE 收盤後 ~2小時，資料已更新）
-    - cron: '0 8 * * 1-5'
-    # UTC 09:00 = 台灣 17:00（FinMind 資料延遲，稍晚跑）
-    - cron: '0 9 * * 1-5'
+    # 台灣時間 06:00 = UTC 前一天 22:00
+    # TWSE OpenAPI 於 05:30 更新，06:00 執行確保資料已就緒
+    - cron: '0 22 * * 0-4'   # UTC 週日~週四 22:00 = 台灣週一~週五 06:00（TWSE）
+    # 台灣時間 06:30 = UTC 前一天 22:30（FinMind 稍晚）
+    - cron: '30 22 * * 0-4'  # UTC 週日~週四 22:30 = 台灣週一~週五 06:30（FinMind）
   workflow_dispatch:
     inputs:
       mode:
@@ -34,14 +35,14 @@ jobs:
 
       # 決定 COLLECT_MODE：
       # - 手動觸發 → 用 inputs.mode
-      # - cron 08:00 → twse
-      # - cron 09:00 → finmind
+      # - cron :00 → twse
+      # - cron :30 → finmind
       - name: Set COLLECT_MODE
         id: mode
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-          elif [ "$(date -u +%H)" = "08" ]; then
+          elif [ "$(date -u +%M)" = "00" ]; then
             echo "mode=twse" >> $GITHUB_OUTPUT
           else
             echo "mode=finmind" >> $GITHUB_OUTPUT
@@ -49,7 +50,6 @@ jobs:
 
       - name: Run collect_market_data.js
         env:
-          # ✅ 從 GitHub Secrets 注入 — 必須在 repo Settings > Secrets > Actions 設定
           FINMIND_TOKEN:        ${{ secrets.FINMIND_TOKEN }}
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
