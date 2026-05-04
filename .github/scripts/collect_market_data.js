@@ -140,9 +140,20 @@ async function collectValuation() {
       .filter(r => r.Code && /^\d{4,5}$/.test(r.Code))
       .map(r => ({
         date: tradeDate, stock_id: r.Code,
-        pe_ratio: parseFloat(r.PEratio) || null,
-        pb_ratio: parseFloat(r.PBratio) || null,
-        dividend_yield: parseFloat(r.DividendYield) || null,
+        name: r.Name || null,
+        pe_ratio: (() => {
+          const v = parseFloat(r.PEratio);
+          // 過濾無效值：NaN、負數、極端值（>200 通常為微利股失真）
+          return (!isNaN(v) && v > 0 && v <= 200) ? v : null;
+        })(),
+        pb_ratio: (() => {
+          const v = parseFloat(r.PBratio);
+          return (!isNaN(v) && v > 0) ? v : null;
+        })(),
+        dividend_yield: (() => {
+          const v = parseFloat(r.DividendYield);
+          return (!isNaN(v) && v >= 0) ? v : null;
+        })(),
       })).filter(r => r.pb_ratio != null || r.pe_ratio != null);
     await sbUpsert('stock_valuation_daily', rows, 'date,stock_id');
     return { ok: true, count: rows.length };
