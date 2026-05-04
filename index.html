@@ -3428,7 +3428,8 @@ async function loadHeatmap() {
       }
 
       // 估值欄位（CLAUDE.md: stock_valuation_daily 欄位為 pe_ratio, pb_ratio, dividend_yield）
-      const per = v ? parseFloat(v.pe_ratio) || 0 : 0;
+      // pe_ratio > 200 視為失真（虧損/微利股），前端過濾
+      const per = v ? (() => { const p = parseFloat(v.pe_ratio); return (p > 0 && p <= 200) ? p : 0; })() : 0;
       const pbr = v ? parseFloat(v.pb_ratio) || 0 : 0;
       const dy  = v ? parseFloat(v.dividend_yield) || 0 : 0;
 
@@ -4634,7 +4635,7 @@ async function loadValuationSignal() {
     let cheap = 0, ok = 0, exp = 0;
     let sumPER = 0, cntPER = 0, sumDY = 0, cntDY = 0, highDYCnt = 0;
     vals.forEach(v => {
-      const per = parseFloat(v.pe_ratio) || 0;
+      const per = (() => { const p = parseFloat(v.pe_ratio); return (p > 0 && p <= 200) ? p : 0; })();
       const dy  = parseFloat(v.dividend_yield) || 0;
       if (per > 0) {
         sumPER += per; cntPER++;
