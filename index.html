@@ -1480,7 +1480,91 @@
       </div><!-- end 欄③ -->
     </div><!-- end 三欄 grid -->
 
-    <!-- 免責聲明 -->
+    <!-- 第三列：估值警示 + β 分布（新增）-->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+
+      <!-- 估值警示卡 -->
+      <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;">📊 熱圖估值分布</div>
+        <div id="ms_valLoading" style="font-size:0.72rem;color:var(--muted);">計算中…</div>
+        <div id="ms_valContent" style="display:none;">
+          <!-- 估值統計 -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-bottom:0.8rem;">
+            <div style="background:var(--bg);border-radius:8px;padding:0.5rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.48rem;color:var(--muted);margin-bottom:3px;">偏便宜</div>
+              <div id="ms_valCheap" style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:#16a34a;">—</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.45rem;color:var(--muted);">支</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:0.5rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.48rem;color:var(--muted);margin-bottom:3px;">合理</div>
+              <div id="ms_valOk" style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:var(--muted);">—</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.45rem;color:var(--muted);">支</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:0.5rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.48rem;color:var(--muted);margin-bottom:3px;">偏貴/高估</div>
+              <div id="ms_valExp" style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:#dc2626;">—</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.45rem;color:var(--muted);">支</div>
+            </div>
+          </div>
+          <!-- 平均 PER / 殖利率 -->
+          <div style="display:flex;flex-direction:column;gap:0.25rem;margin-bottom:0.6rem;">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);">平均本益比</span>
+              <span id="ms_avgPER" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;font-weight:600;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);">平均殖利率</span>
+              <span id="ms_avgDY" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;font-weight:600;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);">高息股（≥5%）</span>
+              <span id="ms_highDYCount" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;font-weight:600;color:#f59e0b;">—</span>
+            </div>
+          </div>
+          <!-- 市場估值情境 -->
+          <div id="ms_valSignal" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;padding:0.35rem 0.6rem;border-radius:6px;text-align:center;font-weight:600;"></div>
+        </div>
+      </div>
+
+      <!-- β 值分布卡 -->
+      <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;">📐 CAPM β 值分析</div>
+        <div id="ms_betaLoading" style="font-size:0.72rem;color:var(--muted);">計算中…</div>
+        <div id="ms_betaContent" style="display:none;">
+          <!-- β 統計 -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-bottom:0.8rem;">
+            <div style="background:var(--bg);border-radius:8px;padding:0.5rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.46rem;color:var(--muted);margin-bottom:3px;">低波動 β&lt;0.8</div>
+              <div id="ms_betaLow" style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:#0ea5e9;">—</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.45rem;color:var(--muted);">支</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:0.5rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.46rem;color:var(--muted);margin-bottom:3px;">市場 0.8~1.2</div>
+              <div id="ms_betaMid" style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:var(--muted);">—</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.45rem;color:var(--muted);">支</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:0.5rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.46rem;color:var(--muted);margin-bottom:3px;">高波動 β&gt;1.2</div>
+              <div id="ms_betaHigh" style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:#f97316;">—</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.45rem;color:var(--muted);">支</div>
+            </div>
+          </div>
+          <!-- 平均 β + 解讀 -->
+          <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);">市場平均 β</span>
+            <span id="ms_avgBeta" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;font-weight:600;">—</span>
+          </div>
+          <!-- 高 β Top5 -->
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);margin-bottom:0.3rem;">高波動 Top 5</div>
+          <div id="ms_betaTop5" style="display:flex;flex-direction:column;gap:0.2rem;margin-bottom:0.6rem;"></div>
+          <!-- β 情境解讀 -->
+          <div id="ms_betaSignal" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;padding:0.35rem 0.6rem;border-radius:6px;text-align:center;font-weight:600;"></div>
+        </div>
+      </div>
+
+    </div><!-- end 估值+β grid -->
+
+        <!-- 免責聲明 -->
     <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);line-height:1.6;padding:0 0.2rem;">
       ⚠️ 盤後資料，僅供參考，不構成投資建議
     </div>
@@ -3343,16 +3427,34 @@ async function loadHeatmap() {
         if (pbr > 0 && shares > 0) mcap = pbr * shares * close / 100000;
       }
 
+      // 估值欄位（CLAUDE.md: stock_valuation_daily 欄位為 pe_ratio, pb_ratio, dividend_yield）
+      const per = v ? parseFloat(v.pe_ratio) || 0 : 0;
+      const pbr = v ? parseFloat(v.pb_ratio) || 0 : 0;
+      const dy  = v ? parseFloat(v.dividend_yield) || 0 : 0;
+
+      // 本益比警示：以台股歷史均值 15~20 倍為基準
+      let valLabel = '', valColor = 'var(--muted)';
+      if (per > 0) {
+        if      (per < 10)  { valLabel = '偏便宜'; valColor = '#16a34a'; }
+        else if (per < 15)  { valLabel = '合理偏低'; valColor = '#0ea5e9'; }
+        else if (per < 20)  { valLabel = '合理';   valColor = 'var(--muted)'; }
+        else if (per < 30)  { valLabel = '偏貴';   valColor = '#f97316'; }
+        else                { valLabel = '高估';   valColor = '#dc2626'; }
+      }
+      // 高殖利率標記（>5% 視為高息）
+      const highDY = dy >= 5;
+
       data.push({
-        id:     s.id,
-        name:   s.name,
-        sector: s.sector,
-        price:  close,
-        prev:   parseFloat(t.prev) || 0,
+        id:       s.id,
+        name:     s.name,
+        sector:   s.sector,
+        price:    close,
+        prev:     parseFloat(t.prev) || 0,
         chgPct,
         mcap,
-        date:   latestDate,
-        volume: parseFloat(t.volume) || 0,
+        date:     latestDate,
+        volume:   parseFloat(t.volume) || 0,
+        per, pbr, dy, valLabel, valColor, highDY,
       });
     }
 
@@ -3732,6 +3834,9 @@ function renderTreemap(data, skipFilterRebuild) {
             <span>收盤</span><span style="color:#f5f3ee;text-align:right;">${priceStr}</span>
             <span>前日</span><span style="color:#f5f3ee;text-align:right;">${prevStr}</span>
             <span>市值</span><span style="color:#f5f3ee;text-align:right;">${mcapStr}</span>
+            ${r.per > 0 ? `<span>本益比</span><span style="color:${r.valColor};text-align:right;font-weight:600;">${r.per.toFixed(1)}x ${r.valLabel}</span>` : ''}
+            ${r.dy  > 0 ? `<span>殖利率</span><span style="color:${r.highDY?'#f59e0b':'#f5f3ee'};text-align:right;">${r.dy.toFixed(2)}%${r.highDY?' 🔶':''}</span>` : ''}
+            ${r.pbr > 0 ? `<span>PBR</span><span style="color:#f5f3ee;text-align:right;">${r.pbr.toFixed(2)}x</span>` : ''}
           </div>
           <div style="font-size:0.85rem;font-weight:700;color:${pct>=0?'#dc2626':'#16a34a'};border-top:1px solid #30302e;padding-top:5px;">${sign}${pct.toFixed(2)}%</div>`;
         tooltip.style.display = 'block';
@@ -4218,6 +4323,18 @@ async function loadMktSignals() {
     document.getElementById('ms_marginLoading').style.display = 'block';
   }
 
+  // ── ④ VIX 複合調整（從側欄讀取已載入的 VIX 值）──
+  const vixPriceEl = document.getElementById('vixPrice');
+  const vixVal = vixPriceEl ? parseFloat(vixPriceEl.textContent) : NaN;
+  let vixAdj = 0, vixNote = '';
+  if (!isNaN(vixVal) && vixVal > 0) {
+    if      (vixVal >= 35) { vixAdj = -2; vixNote = `VIX ${vixVal.toFixed(1)} 恐慌`; }
+    else if (vixVal >= 25) { vixAdj = -1; vixNote = `VIX ${vixVal.toFixed(1)} 高波動`; }
+    else if (vixVal <= 15) { vixAdj =  1; vixNote = `VIX ${vixVal.toFixed(1)} 低波動`; }
+    else                   { vixNote = `VIX ${vixVal.toFixed(1)}`; }
+    score += vixAdj;
+  }
+
   // ── 計算綜合多空得分 ──
   const totalScore = Math.round(score * 10) / 10;
   const scoreEl = document.getElementById('mktSignalScore');
@@ -4226,11 +4343,14 @@ async function loadMktSignals() {
   const descEl  = document.getElementById('mktSignalDesc');
   scoreEl.textContent = (totalScore >= 0 ? '+' : '') + totalScore;
   let signalColor, signalTitle, signalDesc;
-  if      (totalScore >= 4)  { signalColor='var(--accent)';  signalTitle='明顯偏多'; signalDesc='多數指標偏多，注意過熱風險'; }
-  else if (totalScore >= 2)  { signalColor='var(--accent)';  signalTitle='略偏多頭'; signalDesc='多空指標略偏多方'; }
+  if      (totalScore >= 5)  { signalColor='var(--accent)';  signalTitle='強力多頭'; signalDesc='多指標共振偏多，動能強勁'; }
+  else if (totalScore >= 3)  { signalColor='var(--accent)';  signalTitle='明顯偏多'; signalDesc='多數指標偏多，注意過熱風險'; }
+  else if (totalScore >= 1)  { signalColor='var(--accent2)'; signalTitle='略偏多頭'; signalDesc='多空指標略偏多方'; }
   else if (totalScore >= -1) { signalColor='var(--muted)';   signalTitle='中性觀望'; signalDesc='多空訊號分歧，方向待確認'; }
   else if (totalScore >= -3) { signalColor='#16a34a'; signalTitle='略偏空頭'; signalDesc='多數指標偏空，留意下行風險'; }
-  else                       { signalColor='var(--accent3)'; signalTitle='明顯偏空'; signalDesc='空方訊號強烈，謹慎為宜'; }
+  else                       { signalColor='#dc2626'; signalTitle='明顯偏空'; signalDesc='空方訊號強烈，謹慎為宜'; }
+  // 加入 VIX 附註
+  if (vixNote) signalDesc += `｜${vixNote}`;
   dotEl.style.background   = signalColor;
   titleEl.textContent       = signalTitle;
   titleEl.style.color       = signalColor;
@@ -4240,6 +4360,8 @@ async function loadMktSignals() {
   // 載入完當日資料後，非同步補充 Supabase 歷史資料
   loadInstitutionalHistory();
   loadSignalBacktest();
+  loadValuationSignal();   // ② 估值分布
+  loadBetaSignal();        // ③ CAPM β 值
 }
 
 // ── 台指選擇權：P/C Ratio + 三大法人 + Max Pain ──
@@ -4480,6 +4602,179 @@ async function loadInstitutionalHistory() {
 }
 
 // ════════ 多空訊號回測（Supabase）════════
+
+
+// ════════ ② 估值分布警示 ════════
+async function loadValuationSignal() {
+  const loading = document.getElementById('ms_valLoading');
+  const content = document.getElementById('ms_valContent');
+  try {
+    // 取熱圖 155 支股票的最新估值（分兩批）
+    const HM_IDS = typeof HM_STOCK_LIST !== "undefined" ? HM_STOCK_LIST.map(s => s.id) : [];
+    if (!HM_IDS.length) { loading.textContent = '熱圖尚未載入'; return; }
+    const half = Math.ceil(HM_IDS.length / 2);
+    const [r1, r2] = await Promise.all([
+      sbFetch('stock_valuation_daily',
+        `stock_id=in.(${HM_IDS.slice(0, half).join(',')})&order=date.desc&limit=${half * 2}&select=*`),
+      sbFetch('stock_valuation_daily',
+        `stock_id=in.(${HM_IDS.slice(half).join(',')})&order=date.desc&limit=${half * 2}&select=*`),
+    ]);
+    const rows = [...(r1 || []), ...(r2 || [])];
+
+    // 每支取最新一筆 pe_ratio > 0
+    const valMap = {};
+    rows.forEach(r => {
+      const per = parseFloat(r.pe_ratio);
+      if (!valMap[r.stock_id] && per > 0) valMap[r.stock_id] = r;
+    });
+    const vals = Object.values(valMap);
+    if (!vals.length) { loading.textContent = '估值資料暫無'; return; }
+
+    // 分類統計
+    let cheap = 0, ok = 0, exp = 0;
+    let sumPER = 0, cntPER = 0, sumDY = 0, cntDY = 0, highDYCnt = 0;
+    vals.forEach(v => {
+      const per = parseFloat(v.pe_ratio) || 0;
+      const dy  = parseFloat(v.dividend_yield) || 0;
+      if (per > 0) {
+        sumPER += per; cntPER++;
+        if      (per < 15) cheap++;
+        else if (per < 20) ok++;
+        else               exp++;
+      }
+      if (dy > 0) { sumDY += dy; cntDY++; }
+      if (dy >= 5) highDYCnt++;
+    });
+    const avgPER = cntPER ? sumPER / cntPER : 0;
+    const avgDY  = cntDY  ? sumDY  / cntDY  : 0;
+
+    document.getElementById('ms_valCheap').textContent = cheap;
+    document.getElementById('ms_valOk').textContent    = ok;
+    document.getElementById('ms_valExp').textContent   = exp;
+    document.getElementById('ms_avgPER').textContent   = avgPER ? avgPER.toFixed(1) + 'x' : '—';
+    document.getElementById('ms_avgDY').textContent    = avgDY  ? avgDY.toFixed(2)  + '%' : '—';
+    document.getElementById('ms_highDYCount').textContent = highDYCnt + ' 支';
+
+    // 市場估值情境
+    const sigEl = document.getElementById('ms_valSignal');
+    let sigText, sigBg, sigColor;
+    if (avgPER > 0 && avgPER < 13)      { sigText='整體市場偏便宜，具長線價值';  sigBg='rgba(22,163,74,0.12)';  sigColor='#16a34a'; }
+    else if (avgPER > 0 && avgPER < 18) { sigText='整體市場估值合理';            sigBg='rgba(99,102,241,0.1)';  sigColor='var(--accent)'; }
+    else if (avgPER > 0 && avgPER < 25) { sigText='整體市場略微偏貴，注意風險'; sigBg='rgba(249,115,22,0.12)'; sigColor='#f97316'; }
+    else if (avgPER > 0)                { sigText='整體市場高估，謹慎追高';      sigBg='rgba(220,38,38,0.12)';  sigColor='#dc2626'; }
+    else                                { sigText='估值資料不足';                sigBg='transparent';           sigColor='var(--muted)'; }
+    sigEl.textContent         = sigText;
+    sigEl.style.background    = sigBg;
+    sigEl.style.color         = sigColor;
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch(e) {
+    loading.textContent = '估值資料載入失敗';
+    console.warn('loadValuationSignal error:', e);
+  }
+}
+
+// ════════ ③ CAPM β 值計算 ════════
+async function loadBetaSignal() {
+  const loading = document.getElementById('ms_betaLoading');
+  const content = document.getElementById('ms_betaContent');
+  try {
+    // 取 TAIEX 近 62 日（多 2 天 buffer）
+    const HM_IDS = typeof HM_STOCK_LIST !== "undefined" ? HM_STOCK_LIST.map(s => s.id) : [];
+    if (!HM_IDS.length) { loading.textContent = '熱圖尚未載入'; return; }
+
+    // 取 0050 作為市場代理（流動性高、追蹤加權指數）
+    const mktRows = await sbFetch('stock_daily_twse',
+      'stock_id=eq.0050&order=date.desc&limit=62&select=date,chg_pct');
+    if (!mktRows || mktRows.length < 10) { loading.textContent = '市場資料不足'; return; }
+
+    const mktDates = mktRows.map(r => r.date);
+    const mktMap   = {};
+    mktRows.forEach(r => { mktMap[r.date] = parseFloat(r.chg_pct) * 100; }); // 轉 %
+
+    // 取熱圖股票近 62 日收盤漲跌（分兩批）
+    const half = Math.ceil(HM_IDS.length / 2);
+    const [s1, s2] = await Promise.all([
+      sbFetch('stock_daily_twse',
+        `stock_id=in.(${HM_IDS.slice(0, half).join(',')})&order=date.desc&limit=${half * 62}&select=stock_id,date,chg_pct`),
+      sbFetch('stock_daily_twse',
+        `stock_id=in.(${HM_IDS.slice(half).join(',')})&order=date.desc&limit=${half * 62}&select=stock_id,date,chg_pct`),
+    ]);
+    const stockRows = [...(s1 || []), ...(s2 || [])];
+
+    // 按股票分組
+    const stockMap = {};
+    stockRows.forEach(r => {
+      if (!stockMap[r.stock_id]) stockMap[r.stock_id] = {};
+      stockMap[r.stock_id][r.date] = parseFloat(r.chg_pct) * 100;
+    });
+
+    // 計算每支股票的 β（用共同有資料的交易日）
+    const betas = [];
+    for (const id of HM_IDS) {
+      const sm = stockMap[id];
+      if (!sm) continue;
+      const pairs = mktDates.filter(d => sm[d] != null && mktMap[d] != null)
+                            .map(d => ({ m: mktMap[d], s: sm[d] }));
+      if (pairs.length < 10) continue;
+
+      const n   = pairs.length;
+      const mMean = pairs.reduce((a, p) => a + p.m, 0) / n;
+      const sMean = pairs.reduce((a, p) => a + p.s, 0) / n;
+      const cov   = pairs.reduce((a, p) => a + (p.m - mMean) * (p.s - sMean), 0) / (n - 1);
+      const varM  = pairs.reduce((a, p) => a + (p.m - mMean) ** 2, 0) / (n - 1);
+      if (varM === 0) continue;
+      const beta  = cov / varM;
+      if (isFinite(beta) && Math.abs(beta) < 5) {
+        const info = typeof HM_STOCK_LIST !== 'undefined' ? HM_STOCK_LIST.find(s => s.id === id) : null;
+        betas.push({ id, name: info?.name || id, beta: Math.round(beta * 100) / 100 });
+      }
+    }
+
+    if (!betas.length) { loading.textContent = 'β 值資料不足'; return; }
+
+    const lowB  = betas.filter(b => b.beta < 0.8).length;
+    const midB  = betas.filter(b => b.beta >= 0.8 && b.beta <= 1.2).length;
+    const highB = betas.filter(b => b.beta > 1.2).length;
+    const avgBeta = betas.reduce((a, b) => a + b.beta, 0) / betas.length;
+
+    document.getElementById('ms_betaLow').textContent  = lowB;
+    document.getElementById('ms_betaMid').textContent  = midB;
+    document.getElementById('ms_betaHigh').textContent = highB;
+    document.getElementById('ms_avgBeta').textContent  = avgBeta.toFixed(2);
+
+    // Top 5 高 β
+    const top5 = [...betas].sort((a, b) => b.beta - a.beta).slice(0, 5);
+    document.getElementById('ms_betaTop5').innerHTML = top5.map(b => {
+      const color = b.beta > 1.5 ? '#dc2626' : b.beta > 1.2 ? '#f97316' : 'var(--muted)';
+      const barW  = Math.min(100, (b.beta / 2.5) * 100);
+      return `<div style="display:flex;align-items:center;gap:5px;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.56rem;color:var(--muted);width:52px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${b.name}</span>
+        <div style="flex:1;height:5px;background:var(--bg);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;"></div>
+        </div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:${color};font-weight:600;width:36px;text-align:right;">β${b.beta.toFixed(2)}</span>
+      </div>`;
+    }).join('');
+
+    // β 情境解讀
+    const sigEl = document.getElementById('ms_betaSignal');
+    let sigText, sigBg, sigColor;
+    if (avgBeta > 1.3)      { sigText='市場整體高波動，進攻型持股多'; sigBg='rgba(249,115,22,0.12)'; sigColor='#f97316'; }
+    else if (avgBeta > 0.9) { sigText='市場波動接近平均水準';        sigBg='rgba(99,102,241,0.1)';  sigColor='var(--accent)'; }
+    else                    { sigText='市場整體偏防禦，低波動持股多'; sigBg='rgba(14,165,233,0.1)';  sigColor='#0ea5e9'; }
+    sigEl.textContent      = sigText;
+    sigEl.style.background = sigBg;
+    sigEl.style.color      = sigColor;
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch(e) {
+    loading.textContent = 'β 值計算失敗';
+    console.warn('loadBetaSignal error:', e);
+  }
+}
 
 async function loadSignalBacktest() {
   const section = document.getElementById('ms_backtestSection');
