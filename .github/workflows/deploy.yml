@@ -1,0 +1,72 @@
+name: PWA 版本號自動更新
+
+# 觸發時機：
+# 1. 推送 index.html / service-worker.js / manifest.json 時自動跑
+# 2. 每日市場收集完成後自動跑（確保每日資料更新也能讓 SW 失效）
+# 3. 手動觸發
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'service-worker.js'
+      - 'manifest.json'
+      - 'chart.html'
+      - 'api/**'
+  workflow_run:
+    workflows: ["Daily Market Data Collector"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  bump-sw-version:
+    runs-on: ubuntu-latest
+    # workflow_run 觸發時只在成功時執行
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    permissions:
+      contents: write   # 需要 push 回 repo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 使用 PAT 或預設 GITHUB_TOKEN（需開啟 workflow write 權限）
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 產生時間戳版本號
+        id: ver
+        run: |
+          # 格式：YYYYMMDD-HHmmss（台灣時間 UTC+8）
+          VERSION=$(TZ='Asia/Taipei' date '+%Y%m%d-%H%M%S')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "🔖 新版本號：${VERSION}"
+
+      - name: 更新 service-worker.js 版本號
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          # 把佔位符 __SW_VERSION__ 換成時間戳
+          sed -i "s/__SW_VERSION__/${VERSION}/g" service-worker.js
+          echo "✅ service-worker.js 版本號已更新為 ${VERSION}"
+          # 確認結果
+          grep "CACHE_NAME\|STATIC_CACHE" service-worker.js
+
+      - name: 確認檔案有變更
+        id: check
+        run: |
+          git diff --quiet service-worker.js && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit & Push
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add service-worker.js
+          git commit -m "chore: bump SW version to ${{ steps.ver.outputs.version }} [skip ci]"
+          git push
+          echo "✅ 版本號已 commit 並推送"
+
+      - name: 無需更新
+        if: steps.check.outputs.changed == 'false'
+        run: echo "ℹ️  service-worker.js 未變更，跳過 commit"
