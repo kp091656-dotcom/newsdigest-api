@@ -1844,8 +1844,24 @@
       </div>
     </div>
 
-    <!-- 法人籌碼（個股暫無，說明） -->
+    <!-- AI 個股研究（Owner 限定）-->
     <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:0.6rem;">◆ AI 個股快速研究</div>
+      <button id="modalAiBtn" onclick="requireOwner(()=>runStockAI())"
+        style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;font-weight:700;
+               padding:0.5rem;border-radius:8px;border:none;
+               background:linear-gradient(135deg,var(--accent),#0ea5e9);
+               color:#fff;cursor:pointer;letter-spacing:0.05em;">
+        ✦ 生成機構風格個股分析
+      </button>
+      <div id="modalAiResult" style="display:none;margin-top:0.8rem;
+        padding:0.8rem;border-radius:8px;background:var(--bg);
+        box-shadow:0 0 0 1px var(--border);font-size:0.72rem;line-height:1.75;
+        color:var(--text);font-family:'Noto Sans TC',sans-serif;white-space:pre-line;"></div>
+    </div>
+
+    <!-- 快速連結 -->
+    <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);">
       <div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:0.3rem;">快速連結</div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
         <a id="modalTVLink2" href="#" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;padding:0.25rem 0.65rem;border-radius:6px;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);color:var(--muted);text-decoration:none;">📈 TradingView</a>
@@ -2141,7 +2157,7 @@ async function translateArticles() {
   const lines = targets.map((a, j) =>
     `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,60).replace(/[|]/g,' ')}`
   ).join('\n');
-  const prompt = `你是財經翻譯專員。翻譯成繁體中文，格式不變，每行「編號. 標題 ||| 描述」，不要加說明。\n\n${lines}`;
+  const prompt = `你是財經翻譯專員，精通金融術語。將以下英文財經新聞翻譯成繁體中文，保持專業語感：股票代號維持英文、公司名稱用台灣常用譯名、數據單位保留原文。格式不變，每行「編號. 標題 ||| 描述」，不加任何說明或前言。\n\n${lines}`;
 
   try {
     const raw = await callGroq(prompt, 1200, 0.3);
@@ -2230,7 +2246,11 @@ async function toggleReadMode(btn) {
   readLoading.textContent = '⏳ Groq AI 生成中…';
 
   try {
-    const prompt = `你是財經記者。根據以下新聞標題和描述，用繁體中文撰寫一段完整的新聞摘要（150-200字），包含：事件背景、主要影響、市場反應。語氣專業客觀。
+    const prompt = `你是資深財經記者，擅長從機構研究角度解讀市場新聞。根據以下新聞，用繁體中文撰寫深度摘要（150-200字），結構如下：
+第一段：事件背景與核心數據（發生了什麼、關鍵數字）
+第二段：市場影響與催化劑分析（對哪些產業/資產類別有影響、為什麼）
+第三段：風險與後續觀察重點（需關注什麼、共識預期可能哪裡有誤）
+語氣專業客觀，避免模糊用詞。
 
 標題：${title}
 描述：${desc}`;
@@ -2406,7 +2426,11 @@ async function doSummarize(id, title, desc) {
   `;
 
   try {
-    const prompt = `你是專業財經新聞編輯。根據以下新聞，用繁體中文寫 2-3 句精簡摘要，點出關鍵數據與市場影響。直接輸出摘要，無需標籤或前綴。
+    const prompt = `根據以下財經新聞，用繁體中文輸出結構化分析，格式如下（每項一行，不加標題符號）：
+【催化劑】點出觸發事件或關鍵數據（20字內）
+【市場影響】對股市/產業/匯率的直接影響（25字內）
+【風險提示】需注意的下行風險或不確定因素（20字內）
+直接輸出三行，不加任何前言或說明。
 
 標題：${title}
 內容：${desc || '（無詳細內容）'}`;
@@ -2461,7 +2485,10 @@ async function generateBrief(market) {
   }
 
   try {
-    const prompt = `你是專業財經分析師。請使用繁體中文（Traditional Chinese）回答，嚴禁簡體中文。根據以下今日財經新聞，從【${label}市場】角度，撰寫 80-100 字每日簡報，涵蓋：今日趨勢、主要驅動因素、需注意風險。直接輸出，無需標題。
+    // 參考 equity-research morning-note 框架：宏觀 → 催化劑 → 動能 → 風險
+    const prompt = `你是機構股票研究部門的早報分析師。根據以下今日財經新聞，用繁體中文撰寫【${label}市場】早報（100-120字），結構如下：
+①宏觀背景（利率/匯率/政策是順風還是逆風）②主要催化劑（今日最重要的驅動事件）③市場動能（哪個族群/板塊最強或最弱）④關鍵風險（需警惕的尾部風險）
+語氣精準專業，數據具體，避免空話。直接輸出段落，不加編號標題。
 
 ${headlines || '（今日暫無相關新聞）'}`;
     const text = await Promise.race([
@@ -2991,7 +3018,12 @@ async function sentAnalyzeGroq(posts, onStatus) {
       return `${j}. [${src}] ${p.title}${body}\n   互動→ ${engStr}`;
     }).join('\n');
 
-    const prompt = `財經情緒分析，判斷每篇bull/bear/neutral，英文標題翻繁中。bull=看多利多，bear=看空利空，neutral=中性。confidence：high=明確，mid=普通，low=模糊。輸出純JSON不要其他文字：[{"idx":0,"sentiment":"bull","reason":"8字內繁中","title_zh":"繁中標題","confidence":"high"}]
+    // 情緒分析 prompt：參考 equity-research 的催化劑分類框架
+    const prompt = `你是財經情緒分析師。分析以下每篇社群貼文的市場情緒。
+判斷標準：bull=明確利多催化劑（財報超預期/Fed降息/政策利好/突破技術面），bear=明確利空（盈警/衰退數據/地緣風險/流動性收緊），neutral=資訊/討論型無明確方向。
+confidence：high=訊號清晰，mid=需觀察，low=訊息模糊。
+reason：點出核心催化劑，8字內繁中（例：「Fed鴿派超預期」「台積電下修展望」）。
+輸出純JSON不要其他文字：[{"idx":0,"sentiment":"bull","reason":"8字內繁中","title_zh":"繁中標題","confidence":"high"}]
 貼文：
 ${postLines}`;
 
@@ -3030,7 +3062,9 @@ ${postLines}`;
 async function sentGenerateSummary(posts) {
   const bull=posts.filter(p=>p.sentiment==='bull').length, bear=posts.filter(p=>p.sentiment==='bear').length, neu=posts.filter(p=>p.sentiment==='neutral').length;
   const topPosts = posts.slice(0,8).map(p=>`[${p.source.toUpperCase()}${p.sentiment==='bull'?'↑':p.sentiment==='bear'?'↓':''}] ${p.title_zh||p.title}`).join('；');
-  const prompt = `你是專業財經分析師。根據以下社群討論資料，用繁體中文寫一段150字左右的市場情緒分析報告（段落形式，不要列點）。
+  // 參考 wealth-management client-report 框架：情緒分布→分歧點→主題→風險提示
+  const prompt = `你是機構資產管理部門的情緒研究員。根據以下社群討論數據，用繁體中文撰寫市場情緒快報（150字，段落形式）。
+結構：①情緒分布與整體傾向（多空比例意義）②各來源分歧點（PTT vs Reddit 看法差異）③市場主要關注議題（catalysts）④尾部風險提示（where might consensus be wrong）。數據具體，語氣專業。
 
 數據：PTT ${posts.filter(p=>p.source==='ptt').length}篇（多${posts.filter(p=>p.source==='ptt'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='ptt'&&p.sentiment==='bear').length}）、WSB ${posts.filter(p=>p.source==='wsb').length}篇（多${posts.filter(p=>p.source==='wsb'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='wsb'&&p.sentiment==='bear').length}）、r/investing ${posts.filter(p=>p.source==='inv').length}篇（多${posts.filter(p=>p.source==='inv'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='inv'&&p.sentiment==='bear').length}）
 熱門討論：${topPosts}
@@ -4629,6 +4663,75 @@ async function openStockModal(stock) {
 function closeStockModal() {
   document.getElementById('stockModal').classList.remove('open');
   document.body.classList.remove('modal-open');
+  // 重置 AI 結果
+  const aiResult = document.getElementById('modalAiResult');
+  if (aiResult) { aiResult.style.display = 'none'; aiResult.textContent = ''; }
+  const aiBtn = document.getElementById('modalAiBtn');
+  if (aiBtn) aiBtn.disabled = false;
+}
+
+// ── AI 個股快速研究（機構研究框架）──
+async function runStockAI() {
+  const btn      = document.getElementById('modalAiBtn');
+  const resultEl = document.getElementById('modalAiResult');
+  if (!btn || !resultEl) return;
+
+  // 取得當前個股資訊（從 modal 標題讀取）
+  const nameEl = document.getElementById('modalStockName');
+  const metaEl = document.getElementById('modalStockMeta');
+  const statsEl= document.getElementById('modalTodayStats');
+  if (!nameEl) return;
+
+  const stockTitle = nameEl.textContent.trim();  // e.g. "2330 台積電"
+  const stockMeta  = metaEl?.textContent.trim() || '';
+  // 從 stats 抓數字
+  const statsText  = statsEl?.innerText?.replace(/\n/g,' ') || '';
+
+  // 取估值資料（已在 data 陣列裡，透過 heatmapData 找）
+  const stockId = stockTitle.split(' ')[0];
+  const hmData  = heatmapData || [];
+  const stockData = hmData.find(r => r.id === stockId) || {};
+  const valInfo = stockData.per > 0
+    ? `本益比 ${stockData.per.toFixed(1)}x（${stockData.valLabel}）、殖利率 ${stockData.dy?.toFixed(2)||'N/A'}%、PBR ${stockData.pbr?.toFixed(2)||'N/A'}x`
+    : '估值資料暫無';
+
+  // 取近期走勢資訊（從 modal bars 的 title 屬性）
+  const bars = document.querySelectorAll('#modalBars [title]');
+  const recentDays = Array.from(bars).slice(-5).map(b => b.title).join('、') || '走勢資料暫無';
+
+  btn.disabled = true;
+  btn.textContent = '⏳ 分析中…';
+  resultEl.style.display = 'none';
+
+  // 機構研究框架 prompt（參考 equity-research LSEG SKILL.md）
+  const prompt = `你是台灣股市資深研究員，擅長從機構研究角度分析個股。請用繁體中文對以下股票進行快速研究分析（200-250字），嚴格按照此框架：
+
+【基本資料】${stockTitle}｜${stockMeta}
+【今日行情】${statsText}
+【估值指標】${valInfo}
+【近5日走勢】${recentDays}
+
+請依序輸出以下五段（每段一行，加粗標題）：
+**催化劑 Catalyst**：該股近期最可能的驅動事件或題材
+**基本面 Fundamentals**：本益比合理性、獲利成長性評估
+**價格動能 Momentum**：近期走勢強弱、與大盤相對表現
+**風險因子 Risk**：需警惕的下行風險（地緣/產業/公司層面）
+**投資論點 Thesis**：共識預期是否有誤判空間（where might consensus be wrong）
+
+語氣專業、數據具體、避免空話。結尾加一行免責聲明：⚠ 本分析為 AI 生成，僅供參考，不構成投資建議。`;
+
+  try {
+    const text = await callGroq(prompt, 900, 0.65);
+    resultEl.textContent = text;
+    resultEl.style.display = 'block';
+    btn.textContent = '✦ 重新生成';
+    btn.disabled = false;
+  } catch(e) {
+    resultEl.textContent = `分析失敗：${e.message}`;
+    resultEl.style.display = 'block';
+    btn.textContent = '✦ 生成機構風格個股分析';
+    btn.disabled = false;
+  }
 }
 
 // ESC 關閉 modal
