@@ -2157,21 +2157,27 @@ async function translateArticles() {
   const lines = targets.map((a, j) =>
     `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,60).replace(/[|]/g,' ')}`
   ).join('\n');
-  const prompt = `你是財經翻譯專員，精通金融術語。將以下英文財經新聞翻譯成繁體中文，保持專業語感：股票代號維持英文、公司名稱用台灣常用譯名、數據單位保留原文。格式不變，每行「編號. 標題 ||| 描述」，不加任何說明或前言。\n\n${lines}`;
+  // 翻譯 prompt：不在 prompt 裡提「標題」「描述」等字眼，避免 AI 誤輸出格式說明
+  const prompt = `將以下財經新聞翻譯為繁體中文，規則：①股票代號（如NVDA、TSMC）維持英文 ②公司名稱用台灣常用譯名 ③數字與單位保留原文 ④每行輸出格式完全照原始格式：「編號. 翻譯後內容 ||| 翻譯後描述」⑤不輸出任何說明、前言或額外文字，只輸出翻譯結果。\n\n${lines}`;
 
   try {
     const raw = await callGroq(prompt, 1200, 0.3);
-    raw.trim().split('\n').filter(l => l.match(/^\d+\./)).forEach(line => {
-      const nm = line.match(/^(\d+)\.\s*/);
-      if (!nm) return;
-      const idx = parseInt(nm[1]) - 1;
-      const rest = line.replace(/^\d+\.\s*/, '');
-      const parts = rest.split('|||');
-      const art = targets[idx];
-      if (!art) return;
-      if (parts[0]?.trim()) art.title       = parts[0].trim();
-      if (parts[1]?.trim()) art.description = parts[1].trim();
-    });
+    raw.trim().split('\n')
+      .filter(l => l.match(/^\d+\./) && l.includes('|||'))  // 必須含 ||| 才是有效翻譯行
+      .forEach(line => {
+        const nm = line.match(/^(\d+)\.\s*/);
+        if (!nm) return;
+        const idx = parseInt(nm[1]) - 1;
+        const rest = line.replace(/^\d+\.\s*/, '');
+        const parts = rest.split('|||');
+        const art = targets[idx];
+        if (!art) return;
+        const t = parts[0]?.trim();
+        const d = parts[1]?.trim();
+        // 防禦：過濾掉 AI 誤輸出的格式說明文字（純漢字「標題」「描述」等）
+        if (t && t !== '標題' && t !== '描述' && t.length > 2) art.title = t;
+        if (d && d !== '標題' && d !== '描述' && d.length > 2) art.description = d;
+      });
   } catch(e) {
     console.warn('Groq 翻譯失敗:', e.message);
   }
