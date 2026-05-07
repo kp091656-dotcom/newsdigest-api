@@ -3517,7 +3517,7 @@ async function loadHeatmap() {
     // valuation lookup（每支取最新有 pbr 的一筆）
     const valMap = {};
     valRows.forEach(r => {
-      if (!valMap[r.stock_id] && parseFloat(r.pbr) > 0) // listed_shares 欄位不存在，只檢查 pbr
+      if (!valMap[r.stock_id] && parseFloat(r.pb_ratio) > 0) // listed_shares 欄位不存在，只檢查 pb_ratio
         valMap[r.stock_id] = r;
     });
 
