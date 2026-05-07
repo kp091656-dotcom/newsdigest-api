@@ -4459,12 +4459,12 @@ async function loadMktSignals() {
   const descEl  = document.getElementById('mktSignalDesc');
   scoreEl.textContent = (totalScore >= 0 ? '+' : '') + totalScore;
   let signalColor, signalTitle, signalDesc;
-  if      (totalScore >= 5)  { signalColor='var(--accent)';  signalTitle='強力多頭'; signalDesc='多指標共振偏多，動能強勁'; }
-  else if (totalScore >= 3)  { signalColor='var(--accent)';  signalTitle='明顯偏多'; signalDesc='多數指標偏多，注意過熱風險'; }
-  else if (totalScore >= 1)  { signalColor='var(--accent2)'; signalTitle='略偏多頭'; signalDesc='多空指標略偏多方'; }
+  if      (totalScore >= 5)  { signalColor='var(--up)';    signalTitle='強力多頭'; signalDesc='多指標共振偏多，動能強勁'; }
+  else if (totalScore >= 3)  { signalColor='var(--up)';    signalTitle='明顯偏多'; signalDesc='多數指標偏多，注意過熱風險'; }
+  else if (totalScore >= 1)  { signalColor='#f97316';      signalTitle='略偏多頭'; signalDesc='多空指標略偏多方'; }
   else if (totalScore >= -1) { signalColor='var(--muted)';   signalTitle='中性觀望'; signalDesc='多空訊號分歧，方向待確認'; }
-  else if (totalScore >= -3) { signalColor='#16a34a'; signalTitle='略偏空頭'; signalDesc='多數指標偏空，留意下行風險'; }
-  else                       { signalColor='#dc2626'; signalTitle='明顯偏空'; signalDesc='空方訊號強烈，謹慎為宜'; }
+  else if (totalScore >= -3) { signalColor='var(--down)';  signalTitle='略偏空頭'; signalDesc='多數指標偏空，留意下行風險'; }
+  else                       { signalColor='#15803d';      signalTitle='明顯偏空'; signalDesc='空方訊號強烈，謹慎為宜'; }
   // 加入 VIX 附註
   if (vixNote) signalDesc += `｜${vixNote}`;
   dotEl.style.background   = signalColor;
@@ -4969,7 +4969,7 @@ async function loadSignalBacktest() {
     // 同時抓選擇權和台指（用個股加權）
     const [optRows, stockRows] = await Promise.all([
       sbFetch('options_daily', 'order=date.desc&limit=30&select=date,pc_ratio_oi,foreign_opt_net'),
-      sbFetch('stock_daily',   'stock_id=eq.0050&order=date.desc&limit=31&select=date,close,chg_pct'),
+      sbFetch('stock_daily_twse', 'stock_id=eq.0050&order=date.desc&limit=31&select=date,close,chg_pct'),
     ]);
 
     if (!optRows?.length || optRows.length < 5) {
