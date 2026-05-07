@@ -535,7 +535,7 @@
   // TradingView symbol mapping（各市場格式不同）
   const TV_SYMBOL_MAP = {
     // 台灣加權指數（TVC 資料源免費可用）
-    'TAIEX':       'TVC:TAIEX',
+    'TAIEX':       'TWSE:TAIEX',
     'TWSE:IX0001': 'TWSE:IX0001',
     'TWSE:IX0010': 'TWSE:IX0010',
     // 全球指數（TVC 免費可用）
@@ -710,7 +710,7 @@
         show_popup_button: true,
       });
 
-      setTimeout(() => _addTVFallbackBar(container, tvUrl), 4000);
+      _addTVFallbackBar(container, tvUrl);
     });
   }
 
@@ -731,7 +731,7 @@
       bar.style.transition = 'opacity 1.2s';
       bar.style.opacity = '0';
       setTimeout(() => bar.remove(), 1200);
-    }, 15000);
+    }, 30000);
   }
 
   // 攔截 TradingView widget 的 postMessage
