@@ -2153,31 +2153,35 @@ async function translateArticles() {
 
   setStatus(`Groq 翻譯中（熱門 ${targets.length} 篇）…`, 'loading');
 
-  // 一次性全部合併成一個 prompt
-  const lines = targets.map((a, j) =>
-    `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,60).replace(/[|]/g,' ')}`
-  ).join('\n');
-  // 翻譯 prompt：不在 prompt 裡提「標題」「描述」等字眼，避免 AI 誤輸出格式說明
-  const prompt = `將以下財經新聞翻譯為繁體中文，規則：①股票代號（如NVDA、TSMC）維持英文 ②公司名稱用台灣常用譯名 ③數字與單位保留原文 ④每行輸出格式完全照原始格式：「編號. 翻譯後內容 ||| 翻譯後描述」⑤不輸出任何說明、前言或額外文字，只輸出翻譯結果。\n\n${lines}`;
-
-  try {
-    const raw = await callGroq(prompt, 1200, 0.3);
+  // 分批翻譯（每批 6 篇），避免 max_tokens 截斷
+  const BATCH = 6;
+  async function translateBatch(batch, offset) {
+    const lines = batch.map((a, j) =>
+      `${offset+j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,150).replace(/[|]/g,' ')}`
+    ).join('\n');
+    const prompt = `將以下財經新聞翻譯為繁體中文，規則：①股票代號（如NVDA、TSMC）維持英文 ②公司名稱用台灣常用譯名 ③數字與單位保留原文 ④每行輸出格式完全照原始格式：「編號. 翻譯後內容 ||| 翻譯後描述」⑤不輸出任何說明、前言或額外文字，只輸出翻譯結果。\n\n${lines}`;
+    const raw = await callGroq(prompt, 1400, 0.3);
     raw.trim().split('\n')
-      .filter(l => l.match(/^\d+\./) && l.includes('|||'))  // 必須含 ||| 才是有效翻譯行
+      .filter(l => l.match(/^\d+\./) && l.includes('|||'))
       .forEach(line => {
         const nm = line.match(/^(\d+)\.\s*/);
         if (!nm) return;
-        const idx = parseInt(nm[1]) - 1;
+        const idx = parseInt(nm[1]) - 1 - offset;
         const rest = line.replace(/^\d+\.\s*/, '');
         const parts = rest.split('|||');
-        const art = targets[idx];
+        const art = batch[idx];
         if (!art) return;
         const t = parts[0]?.trim();
         const d = parts[1]?.trim();
-        // 防禦：過濾掉 AI 誤輸出的格式說明文字（純漢字「標題」「描述」等）
         if (t && t !== '標題' && t !== '描述' && t.length > 2) art.title = t;
         if (d && d !== '標題' && d !== '描述' && d.length > 2) art.description = d;
       });
+  }
+
+  try {
+    for (let i = 0; i < targets.length; i += BATCH) {
+      await translateBatch(targets.slice(i, i + BATCH), i);
+    }
   } catch(e) {
     console.warn('Groq 翻譯失敗:', e.message);
   }
