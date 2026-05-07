@@ -2083,9 +2083,9 @@ async function fetchMarketaux() {
       for (const a of data.data) {
         if (!a.description || a.description.trim().length < 30) continue;
 
-        // India blacklist
-        const indiaCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
-        if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata/i.test(indiaCheck)) continue;
+        // 地區黑名單（印度、捷克、菲律賓、非洲）
+        const regionCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
+        if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata|czech|prague|koruna|brno|czechia|philippines|philippine|manila|peso|pse index|bangko sentral|safaricom|nairobi|kenya|nigeria|lagos|johannesburg|south africa|ghana|ethiopia|tanzania|rwanda|african stock|jse |nse nigeria|east africa|west africa|sub-saharan/i.test(regionCheck)) continue;
 
         // 過濾：必須是財經相關
         const isBiz = /stock|market|trade|economy|finance|invest|bank|rate|inflation|gdp|earnings|crypto|bitcoin|tech|ai|chip|energy|oil|gold|bond|fund|fed|nasdaq|s&p|trump|tariff|sanction|china|taiwan|ukraine|russia|war|election|policy|microsoft|apple|google|amazon|nvidia|tesla|meta|revenue|profit|quarter|fiscal|merger|acquisition|ipo|valuation|shares|equity|debt|yield|currency|dollar|euro|yen|interest|central bank|monetary|budget|deficit|surplus|export|import|supply chain|semiconductor|electric|battery|cloud|software|hardware|startup|venture|billion|trillion|million/i.test((a.title||'') + ' ' + (a.description||''));
