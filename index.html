@@ -2476,8 +2476,22 @@ async function generateBrief(market) {
   tsEl.textContent = `◆ ${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} · Groq AI 生成`;
   el.innerHTML = `<div class="skeleton"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line" style="width:55%"></div></div>`;
 
-  const articles = allArticles.slice(0, 6);
-  const headlines = articles.map(a => a.title).filter(Boolean).join('\n');
+  // 按市場篩選相關文章
+  const twKeywords = /台灣|台股|台積電|聯發科|鴻海|台幣|TWD|TSMC|加權|上市|外資買超|三大法人/i;
+  const usKeywords = /Fed|聯準會|S&P|納斯達克|Nasdaq|道瓊|美股|美債|美元|利率|升息|降息|科技股|AI|輝達|蘋果|Google|微軟|Meta|亞馬遜|特斯拉|NVIDIA|Apple|Microsoft/i;
+  const marketFilter = isUS ? usKeywords : twKeywords;
+
+  // 先取相關文章，不足再補其他文章湊滿8篇
+  const relevant = allArticles.filter(a => marketFilter.test((a.title||'') + ' ' + (a.description||'')));
+  const others   = allArticles.filter(a => !marketFilter.test((a.title||'') + ' ' + (a.description||'')));
+  const articles = [...relevant, ...others].slice(0, 8);
+
+  // 標題 + 摘要（description 已截至300字）
+  const headlines = articles.map((a, i) => {
+    const title = a.title || '';
+    const desc  = (a.description || '').trim();
+    return desc ? `${i+1}. ${title}\n   摘要：${desc}` : `${i+1}. ${title}`;
+  }).filter(Boolean).join('\n\n');
 
   const fallbacks = {
     us: '今日美股科技股強勢領漲，AI 相關標的持續受到市場關注，聯準會政策走向備受矚目，投資人聚焦企業財報與總經數據。',
@@ -2492,16 +2506,18 @@ async function generateBrief(market) {
 
   try {
     // 參考 equity-research morning-note 框架：宏觀 → 催化劑 → 動能 → 風險
-    const prompt = `你是機構股票研究部門的早報分析師。根據以下今日財經新聞，用繁體中文撰寫【${label}市場】早報（100-120字），結構如下：
+    const prompt = `你是機構股票研究部門的早報分析師。根據以下今日財經新聞（含標題與內文摘要），用繁體中文撰寫【${label}市場】早報（100-120字），結構如下：
 ①宏觀背景（利率/匯率/政策是順風還是逆風）②主要催化劑（今日最重要的驅動事件）③市場動能（哪個族群/板塊最強或最弱）④關鍵風險（需警惕的尾部風險）
-語氣精準專業，數據具體，避免空話。直接輸出段落，不加編號標題。
+【嚴格限制】只能引用以下新聞中明確出現的事實與數字，絕對不可自行補充或捏造任何具體數字（包括指數點位、匯率、股價、漲跌幅等）。若新聞未提及某項數據，請用「持續關注」「走勢分歧」等定性描述代替。直接輸出段落，不加編號標題。
 
+以下為今日相關新聞（標題 + 摘要）：
 ${headlines || '（今日暫無相關新聞）'}`;
     const text = await Promise.race([
-      callGroq(prompt),
+      callGroq(prompt, 400, 0.3),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000))
     ]);
-    el.innerHTML = `<div class="brief-text">${text || fallbacks[market]}</div>`;
+    const disclaimer = '<div style="font-size:0.55rem;color:var(--muted);margin-top:0.5rem;opacity:0.75;">⚠ 內容僅基於載入之新聞標題摘要，具體數字請自行查證</div>';
+    el.innerHTML = `<div class="brief-text">${text || fallbacks[market]}</div>${disclaimer}`;
   } catch {
     el.innerHTML = `<div class="brief-text">${fallbacks[market]}</div>`;
   } finally {
