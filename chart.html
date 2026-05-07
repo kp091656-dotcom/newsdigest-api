@@ -463,9 +463,7 @@
         <a id="tvDirectLink" href="#" target="_blank" style="display:none;font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--accent2);text-decoration:none;border:1px solid var(--accent2);padding:0.15rem 0.45rem;border-radius:4px;white-space:nowrap;" title="在 TradingView 網站直接開啟（不受 Widget 限制）">↗ TV 開啟</a>
       </div>
       <div style="display:flex;align-items:center;gap:0.5rem;">
-        <div id="twseNotice" style="display:none;font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:#d97706;background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:0.2rem 0.5rem;">
-          ⚠ 需登入 TradingView 帳號（免費）才能查看
-        </div>
+
         <div class="interval-btns">
           <button class="interval-btn active" onclick="setInterval('D',this)">日</button>
           <button class="interval-btn" onclick="setInterval('W',this)">週</button>
@@ -514,7 +512,7 @@
         <div>• 指數：SPX、IXIC、TAIEX、VIX…</div>
         <div>• 期貨：TXFR1、CLR1!、GCR1!…</div>
         <div>• 外匯：EURUSD、USDJPY…</div>
-        <div>• K 線圖由 TradingView 提供</div>
+        <div>• K 線圖直接嵌入 TradingView 完整網站</div>
         <div style="margin-top:0.5rem;opacity:0.65;">⚠️ 資料僅供參考，不構成投資建議</div>
       </div>
     </div>
@@ -672,48 +670,28 @@
 
   function renderTVChart() {
     const sym = getTVSymbol(currentStockId, currentMarket);
-    const tvUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}`;
+    // 直接嵌入 TradingView 網站（完整功能，免登入限制）
     const ivMap = { D: 'D', W: 'W', M: 'M' };
+    const interval = ivMap[currentInterval] || 'D';
+    const tvUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}&interval=${interval}`;
 
     const container = document.getElementById('tvContainer');
     container.style.position = 'relative';
-    container.innerHTML = '<div id="tradingview_chart" style="height:100%;"></div>';
 
     // 更新直連按鈕
     const tvLink = document.getElementById('tvDirectLink');
     if (tvLink) { tvLink.href = tvUrl; tvLink.style.display = 'inline'; }
 
-    // 儲存當前 sym 供 postMessage 攔截用
     window._currentTVSym = sym;
     window._currentTVUrl = tvUrl;
 
-    loadTVScript(() => {
-      if (typeof TradingView === 'undefined') {
-        container.innerHTML = `<div class="no-data" style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;">
-          <div style="font-size:1.5rem;opacity:0.4;">⚠️</div><div>TradingView 載入失敗，請重新整理</div></div>`;
-        return;
-      }
-      new TradingView.widget({
-        autosize: true,
-        symbol: sym,
-        interval: ivMap[currentInterval],
-        timezone: 'Asia/Taipei',
-        theme: 'light',
-        style: '1',
-        locale: 'zh_TW',
-        toolbar_bg: '#f8f8fc',
-        enable_publishing: false,
-        hide_side_toolbar: false,
-        allow_symbol_change: true,
-        container_id: 'tradingview_chart',
-        studies: ['RSI@tv-basicstudies', 'MACD@tv-basicstudies'],
-        show_popup_button: true,
-      });
-
-      // 4秒後加一個浮動提示條（非侵入式，不擋圖表）
-      // 當 TV 顯示錯誤彈窗時，用戶可點此跳轉
-      setTimeout(() => _addTVFallbackBar(container, tvUrl), 4000);
-    });
+    // iframe 嵌入 TradingView 完整網站
+    container.innerHTML = `<iframe
+      src="${tvUrl}"
+      style="width:100%;height:100%;border:none;border-radius:0 0 8px 8px;"
+      allow="fullscreen"
+      referrerpolicy="no-referrer-when-downgrade"
+    ></iframe>`;
   }
 
   function _addTVFallbackBar(container, tvUrl) {
