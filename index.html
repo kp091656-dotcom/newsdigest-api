@@ -3069,15 +3069,15 @@ async function sentGenerateSummary(posts) {
   const bull=posts.filter(p=>p.sentiment==='bull').length, bear=posts.filter(p=>p.sentiment==='bear').length, neu=posts.filter(p=>p.sentiment==='neutral').length;
   const topPosts = posts.slice(0,8).map(p=>`[${p.source.toUpperCase()}${p.sentiment==='bull'?'↑':p.sentiment==='bear'?'↓':''}] ${p.title_zh||p.title}`).join('；');
   // 參考 wealth-management client-report 框架：情緒分布→分歧點→主題→風險提示
-  const prompt = `你是機構資產管理部門的情緒研究員。根據以下社群討論數據，用繁體中文撰寫市場情緒快報（150字，段落形式）。
-結構：①情緒分布與整體傾向（多空比例意義）②各來源分歧點（PTT vs Reddit 看法差異）③市場主要關注議題（catalysts）④尾部風險提示（where might consensus be wrong）。數據具體，語氣專業。
+  const prompt = `你是機構資產管理部門的情緒研究員。根據以下社群討論數據，用繁體中文撰寫市場情緒快報（300字以內，段落形式）。
+結構：①情緒分布與整體傾向（多空比例意義）②各來源分歧點（PTT vs Reddit 看法差異）③市場主要關注議題（catalysts）④尾部風險提示（where might consensus be wrong）。數據具體，語氣專業，每個段落完整收尾。
 
 數據：PTT ${posts.filter(p=>p.source==='ptt').length}篇（多${posts.filter(p=>p.source==='ptt'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='ptt'&&p.sentiment==='bear').length}）、WSB ${posts.filter(p=>p.source==='wsb').length}篇（多${posts.filter(p=>p.source==='wsb'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='wsb'&&p.sentiment==='bear').length}）、r/investing ${posts.filter(p=>p.source==='inv').length}篇（多${posts.filter(p=>p.source==='inv'&&p.sentiment==='bull').length}/空${posts.filter(p=>p.source==='inv'&&p.sentiment==='bear').length}）
 熱門討論：${topPosts}
 
 請分析：1)整體情緒傾向 2)各來源差異 3)主要關注議題 4)短期市場風險提示`;
   try {
-    return await callGroq(prompt, 400, 0.5);
+    return await callGroq(prompt, 900, 0.5);
   } catch(e) { return null; }
 }
 
