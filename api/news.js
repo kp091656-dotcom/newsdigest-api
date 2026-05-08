@@ -450,6 +450,24 @@ export default async function handler(req, res) {
       const data = await r.json();
       console.log('[Groq] Response status:', r.status, 'hasError:', !!data.error);
       if (data.error) {
+        const is429 = r.status === 429 || data.error?.code === 'rate_limit_exceeded';
+        if (is429) {
+          // 解析 retry-after 秒數，加 2 秒緩衝
+          const retryMatch = data.error.message?.match(/try again in ([\d.]+)s/i);
+          const retrySec  = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) + 2 : 12;
+          console.warn(`[Groq] 429 rate limit — waiting ${retrySec}s then retry`);
+          await new Promise(r => setTimeout(r, retrySec * 1000));
+          // 重試一次
+          const r2   = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` }, body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'system', content: `你是資深股票研究分析師，專精台灣與全球金融市場。\n語言規則：務必使用繁體中文，嚴禁使用簡體中文。` }, { role: 'user', content: prompt }], max_tokens: maxTokens, temperature }) });
+          const d2   = await r2.json();
+          if (d2.error) {
+            console.error('[Groq] Retry also failed:', JSON.stringify(d2.error));
+            return res.status(429).json({ error: d2.error.message, retryAfter: retrySec });
+          }
+          const text2 = d2.choices?.[0]?.message?.content || '';
+          console.log('[Groq] Retry success, output length:', text2.length);
+          return res.status(200).json({ text: text2 });
+        }
         console.error('[Groq] API Error:', JSON.stringify(data.error));
         return res.status(500).json({ error: data.error.message, details: data.error });
       }
