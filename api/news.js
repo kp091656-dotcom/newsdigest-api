@@ -772,12 +772,17 @@ export default async function handler(req, res) {
       return d.data || [];
     };
 
-    // 嘗試最近 7 個交易日（避免連假超過 3 天）
+    // 嘗試最近 4 個交易日（控制總時間在 Vercel 10s 上限內）
     let optData = [], instData = [];
-    for (let i = 0; i <= 7; i++) {
+    const overallDeadline = Date.now() + 8000; // 整體最多 8 秒
+    for (let i = 0; i <= 4; i++) {
+      if (Date.now() > overallDeadline) break; // 整體超時保護
       const date = getTradeDate(i);
       const ctrl = new AbortController();
-      setTimeout(() => ctrl.abort(), 8000);
+      const remaining = overallDeadline - Date.now();
+      const perReqTimeout = Math.min(5000, remaining - 500); // 每次最多 5 秒，保留 500ms 緩衝
+      if (perReqTimeout <= 0) break;
+      setTimeout(() => ctrl.abort(), perReqTimeout);
       try {
         const [opt, inst] = await Promise.all([
           fetch(`${BASE}?dataset=TaiwanOptionDaily&data_id=TXO&start_date=${date}&end_date=${date}`, { signal: ctrl.signal }).then(r => r.json()),
