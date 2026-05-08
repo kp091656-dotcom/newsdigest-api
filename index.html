@@ -4577,10 +4577,71 @@ async function loadOptions() {
 
     document.getElementById('optTs').textContent = `資料日期：${data.date || '—'}`;
   } catch(e) {
-    const is504 = e.message.includes('504') || e.message.includes('timeout');
-    const msg   = is504 ? '選擇權資料暫時無法取得（伺服器逾時），請稍後重新整理' : `選擇權資料載入失敗：${e.message}`;
-    document.getElementById('optLoading').textContent = msg;
-    console.warn('loadOptions error:', e.message);
+    console.warn('loadOptions FinMind 失敗，嘗試 Supabase fallback:', e.message);
+    // ── Fallback：直接從 Supabase options_daily 取最新一筆 ──
+    try {
+      const rows = await sbFetch('options_daily', 'order=date.desc&limit=1&select=date,pc_ratio_oi,pc_ratio_vol,foreign_opt_net');
+      const row  = rows?.[0];
+      if (!row) throw new Error('Supabase 也無資料');
+
+      // 用 Supabase 資料組成最小可顯示結構
+      const fallbackData = {
+        date:      row.date,
+        pcRatio:   { oi: row.pc_ratio_oi, volume: row.pc_ratio_vol, callOI: null, putOI: null },
+        institution: { '外資': row.foreign_opt_net, '自營商': null, '投信': null },
+        maxPain:   null,
+        _source:   'supabase',
+      };
+
+      document.getElementById('optLoading').style.display = 'none';
+      document.getElementById('optContent').style.display = 'block';
+
+      const pcOI  = fallbackData.pcRatio.oi;
+      const pcVal = document.getElementById('pcRatioVal');
+      const pcLbl = document.getElementById('pcRatioLabel');
+      pcVal.textContent = pcOI != null ? Number(pcOI).toFixed(2) : '—';
+      let pcColor = 'var(--muted)', pcText = '中性';
+      if (pcOI != null) {
+        if      (pcOI < 0.7)  { pcColor = 'var(--accent2)'; pcText = '偏多頭'; }
+        else if (pcOI < 1.0)  { pcColor = 'var(--accent2)'; pcText = '略偏多'; }
+        else if (pcOI < 1.3)  { pcColor = 'var(--muted)';   pcText = '中性';   }
+        else if (pcOI < 1.7)  { pcColor = '#e07020';        pcText = '略偏空'; }
+        else                  { pcColor = '#16a34a';         pcText = '偏空頭'; }
+      }
+      pcVal.style.color = pcColor;
+      pcLbl.textContent = pcText;
+      pcLbl.style.color = pcColor;
+      document.getElementById('pcCallOI').textContent = '—';
+      document.getElementById('pcPutOI').textContent  = '—';
+
+      const inst = fallbackData.institution;
+      const instEl = document.getElementById('instRows');
+      instEl.innerHTML = ['外資','自營商','投信'].map(name => {
+        const val = inst[name];
+        if (val == null) return '';
+        const pos  = val >= 0;
+        const color = pos ? '#dc2626' : '#16a34a';
+        const sign  = pos ? '+' : '';
+        const barW  = Math.min(100, Math.abs(val) / 5000 * 100);
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);width:36px;flex-shrink:0;">${name}</span>
+          <div style="flex:1;height:8px;background:var(--surface);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;"></div>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:${color};font-weight:600;width:52px;text-align:right;">${sign}${Number(val).toLocaleString()}</span>
+        </div>`;
+      }).join('');
+
+      document.getElementById('maxPainVal').textContent = '—';
+      document.getElementById('maxPainNote').textContent = '（FinMind 逾時，Max Pain 暫無）';
+      document.getElementById('optTs').textContent = `資料日期：${row.date}（Supabase）`;
+
+    } catch(e2) {
+      const is504 = e.message.includes('504') || e.message.includes('timeout');
+      const msg   = is504 ? '選擇權資料暫時無法取得（伺服器逾時），請稍後重新整理' : `選擇權資料載入失敗：${e.message}`;
+      document.getElementById('optLoading').textContent = msg;
+      console.warn('loadOptions fallback 也失敗:', e2.message);
+    }
   }
 }
 
@@ -4614,6 +4675,29 @@ async function openStockModal(stock) {
   document.getElementById('modalTVLink2').href     = `https://tw.tradingview.com/chart/?symbol=TWSE:${stock.id}`;
   document.getElementById('modalGoodInfoLink').href = `https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID=${stock.id}`;
   document.getElementById('modalAnueLink').href    = `https://www.cnyes.com/twstock/${stock.id}`;
+
+  // AI 結果：嘗試從 sessionStorage 還原（同一股票），否則清空
+  const aiResult = document.getElementById('modalAiResult');
+  const aiBtn    = document.getElementById('modalAiBtn');
+  if (aiResult) {
+    const cached = sessionStorage.getItem(`aiResearch_${stock.id}`);
+    if (cached) {
+      try {
+        const obj = JSON.parse(cached);
+        aiResult.innerHTML = obj.html;
+        aiResult.style.display = 'block';
+        if (aiBtn) aiBtn.textContent = '✦ 重新生成';
+      } catch(e) {
+        aiResult.style.display = 'none';
+        aiResult.innerHTML = '';
+        if (aiBtn) aiBtn.textContent = '✦ 生成機構風格個股分析';
+      }
+    } else {
+      aiResult.style.display = 'none';
+      aiResult.innerHTML = '';
+      if (aiBtn) aiBtn.textContent = '✦ 生成機構風格個股分析';
+    }
+  }
 
   // 重置顯示
   document.getElementById('modalLoading').style.display = 'block';
@@ -4705,9 +4789,7 @@ async function openStockModal(stock) {
 function closeStockModal() {
   document.getElementById('stockModal').classList.remove('open');
   document.body.classList.remove('modal-open');
-  // 重置 AI 結果
-  const aiResult = document.getElementById('modalAiResult');
-  if (aiResult) { aiResult.style.display = 'none'; aiResult.textContent = ''; }
+  // AI 結果不清空，保留在 DOM 供再次開啟時顯示
   const aiBtn = document.getElementById('modalAiBtn');
   if (aiBtn) aiBtn.disabled = false;
 }
@@ -4764,10 +4846,18 @@ async function runStockAI() {
 
   try {
     const text = await callGroq(prompt, 900, 0.65);
-    resultEl.textContent = text;
+    // 加時間戳
+    const now = new Date();
+    const ts  = now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false,
+      month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const tsHtml = `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.5rem;opacity:0.75;">◆ AI 生成｜${ts}</div>`;
+    const bodyHtml = text.replace(/\n/g, '<br>');
+    resultEl.innerHTML = tsHtml + bodyHtml;
     resultEl.style.display = 'block';
     btn.textContent = '✦ 重新生成';
     btn.disabled = false;
+    // 存入 sessionStorage（跨同一 session 保留）
+    sessionStorage.setItem(`aiResearch_${stockId}`, JSON.stringify({ html: resultEl.innerHTML, ts }));
   } catch(e) {
     resultEl.textContent = `分析失敗：${e.message}`;
     resultEl.style.display = 'block';
