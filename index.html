@@ -229,6 +229,23 @@
   body.fs-large  .card-time,
   body.fs-large  .card-source  { font-size: 0.78rem; }
 
+  /* ── 右側 Sidebar 字體縮放 ── */
+  body.fs-small  .brief-text                  { font-size: 0.68rem; }
+  body.fs-medium .brief-text                  { font-size: 0.76rem; }
+  body.fs-large  .brief-text                  { font-size: 0.88rem; }
+
+  body.fs-small  .sidebar-header              { font-size: 0.68rem; }
+  body.fs-medium .sidebar-header              { font-size: 0.76rem; }
+  body.fs-large  .sidebar-header              { font-size: 0.88rem; }
+
+  body.fs-small  .sidebar-section             { font-size: 0.68rem; }
+  body.fs-medium .sidebar-section             { font-size: 0.76rem; }
+  body.fs-large  .sidebar-section             { font-size: 0.88rem; }
+
+  body.fs-small  .sb-label                    { font-size: 0.58rem; }
+  body.fs-medium .sb-label                    { font-size: 0.65rem; }
+  body.fs-large  .sb-label                    { font-size: 0.75rem; }
+
   /* ══════════════════════════════════════════
      API Config Bar
      ══════════════════════════════════════════ */
@@ -2085,7 +2102,9 @@ async function fetchMarketaux() {
 
         // 地區黑名單（印度、捷克、菲律賓、非洲）
         const regionCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
-        if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata|czech|prague|koruna|brno|czechia|philippines|philippine|manila|peso|pse index|bangko sentral|safaricom|nairobi|kenya|nigeria|lagos|johannesburg|south africa|ghana|ethiopia|tanzania|rwanda|african stock|jse |nse nigeria|east africa|west africa|sub-saharan/i.test(regionCheck)) continue;
+        if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata|czech|prague|koruna|brno|czechia|philippines|philippine|manila|peso|pse index|bangko sentral|safaricom|nairobi|kenya|nigeria|lagos|johannesburg|south africa|ghana|ethiopia|tanzania|rwanda|african stock|jse |nse nigeria|east africa|west africa|sub-saharan|middle east.*africa|horizons.*africa|horizons.*middle|africa.*horizons/i.test(regionCheck)) continue;
+        // Newsletter / 電子報過濾：標題含日期格式（如 5/8/2026）且無明確財經事件
+        if (/^[A-Za-z\s&]+\d{1,2}\/\d{1,2}\/\d{4}$/.test((a.title||'').trim())) continue;
 
         // 過濾：必須是財經相關
         const isBiz = /stock|market|trade|economy|finance|invest|bank|rate|inflation|gdp|earnings|crypto|bitcoin|tech|ai|chip|energy|oil|gold|bond|fund|fed|nasdaq|s&p|trump|tariff|sanction|china|taiwan|ukraine|russia|war|election|policy|microsoft|apple|google|amazon|nvidia|tesla|meta|revenue|profit|quarter|fiscal|merger|acquisition|ipo|valuation|shares|equity|debt|yield|currency|dollar|euro|yen|interest|central bank|monetary|budget|deficit|surplus|export|import|supply chain|semiconductor|electric|battery|cloud|software|hardware|startup|venture|billion|trillion|million/i.test((a.title||'') + ' ' + (a.description||''));
@@ -2140,9 +2159,9 @@ async function fetchMarketaux() {
 async function translateArticles() {
   if (!allArticles.length) return;
 
-  // 只翻英文 且 熱門以上（popularityScore >= 80）的文章
+  // 只翻英文 且 熱門以上（popularityScore >= 70）的文章，約前 16 篇
   const targets = allArticles.filter(a =>
-    !/[一-鿿]/.test(a.title) && (a.popularityScore || 0) >= 80
+    !/[一-鿿]/.test(a.title) && (a.popularityScore || 0) >= 70
   );
 
   if (!targets.length) {
@@ -2154,37 +2173,24 @@ async function translateArticles() {
   setStatus(`Groq 翻譯中（熱門 ${targets.length} 篇）…`, 'loading');
 
   // 分批翻譯（每批 6 篇），避免 max_tokens 截斷
-  const BATCH = 6;
-  async function translateBatch(batch, offset) {
-    const lines = batch.map((a, j) =>
-      `${offset+j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,150).replace(/[|]/g,' ')}`
+  // 全部一批送出（只翻標題，token 量小，無需分批）
+  try {
+    const lines = targets.map((a, j) =>
+      `${j+1}. ${a.title.replace(/[|\n]/g,' ')}`
     ).join('\n');
-    const prompt = `將以下財經新聞翻譯為繁體中文，規則：①股票代號（如NVDA、TSMC）維持英文 ②公司名稱用台灣常用譯名 ③數字與單位保留原文 ④每行輸出格式完全照原始格式：「編號. 翻譯後內容 ||| 翻譯後描述」⑤不輸出任何說明、前言或額外文字，只輸出翻譯結果。\n\n${lines}`;
-    const raw = await callGroq(prompt, 1400, 0.3);
+    const prompt = `將以下財經新聞標題翻譯為繁體中文，規則：①股票代號（如NVDA、TSMC）維持英文 ②公司名稱用台灣常用譯名 ③數字與單位保留原文 ④每行僅輸出「編號. 翻譯後標題」，不加任何說明。\n\n${lines}`;
+    const raw = await callGroq(prompt, 600, 0.3);
     raw.trim().split('\n')
-      .filter(l => l.match(/^\d+\./) && l.includes('|||'))
+      .filter(l => l.match(/^\d+\./))
       .forEach(line => {
         const nm = line.match(/^(\d+)\.\s*/);
         if (!nm) return;
-        const idx = parseInt(nm[1]) - 1 - offset;
-        const rest = line.replace(/^\d+\.\s*/, '');
-        const parts = rest.split('|||');
-        const art = batch[idx];
+        const idx = parseInt(nm[1]) - 1;
+        const art = targets[idx];
         if (!art) return;
-        const t = parts[0]?.trim();
-        const d = parts[1]?.trim();
-        if (t && t !== '標題' && t !== '描述' && t.length > 2) art.title = t;
-        if (d && d !== '標題' && d !== '描述' && d.length > 2) art.description = d;
+        const t = line.replace(/^\d+\.\s*/, '').trim();
+        if (t && t.length > 2 && /[一-鿿]/.test(t)) art.title = t;
       });
-  }
-
-  try {
-    for (let i = 0; i < targets.length; i += BATCH) {
-      await translateBatch(targets.slice(i, i + BATCH), i);
-      if (i + BATCH < targets.length) {
-        await new Promise(r => setTimeout(r, 4000)); // Groq TPM 冷卻 4 秒
-      }
-    }
   } catch(e) {
     console.warn('Groq 翻譯失敗:', e.message);
   }
