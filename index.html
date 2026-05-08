@@ -4577,8 +4577,10 @@ async function loadOptions() {
 
     document.getElementById('optTs').textContent = `資料日期：${data.date || '—'}`;
   } catch(e) {
-    document.getElementById('optLoading').textContent = `選擇權資料載入失敗：${e.message}`;
-    console.warn('loadOptions error:', e);
+    const is504 = e.message.includes('504') || e.message.includes('timeout');
+    const msg   = is504 ? '選擇權資料暫時無法取得（伺服器逾時），請稍後重新整理' : `選擇權資料載入失敗：${e.message}`;
+    document.getElementById('optLoading').textContent = msg;
+    console.warn('loadOptions error:', e.message);
   }
 }
 
