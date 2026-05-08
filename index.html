@@ -2181,6 +2181,9 @@ async function translateArticles() {
   try {
     for (let i = 0; i < targets.length; i += BATCH) {
       await translateBatch(targets.slice(i, i + BATCH), i);
+      if (i + BATCH < targets.length) {
+        await new Promise(r => setTimeout(r, 4000)); // Groq TPM 冷卻 4 秒
+      }
     }
   } catch(e) {
     console.warn('Groq 翻譯失敗:', e.message);
@@ -2403,7 +2406,7 @@ function updateOwnerBadge() {
   }
 }
 
-async function callGroq(prompt, maxTokens = 800, temperature = 0.7) {
+async function callGroq(prompt, maxTokens = 800, temperature = 0.7, _retry = false) {
   return _groqEnqueue(async () => {
     const res = await fetch(`${API_BASE}?endpoint=groq`, {
       method: 'POST',
@@ -2419,6 +2422,17 @@ async function callGroq(prompt, maxTokens = 800, temperature = 0.7) {
       localStorage.removeItem(OWNER_TOKEN_KEY);
       updateOwnerBadge();
       throw new Error('需要 Owner 密碼，請點右上角 🔐 登入');
+    }
+    if (res.status === 429) {
+      // Rate limit：解析 retryAfter 並提示用戶
+      const retrySec = data.retryAfter || 10;
+      console.warn(`[callGroq] 429 rate limit，${retrySec}s 後重試`);
+      await new Promise(r => setTimeout(r, retrySec * 1000));
+      // 自動重試一次
+      const res2  = await fetch(`${API_BASE}?endpoint=groq`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-owner-token': getOwnerToken() }, body: JSON.stringify({ prompt, maxTokens, temperature }) });
+      const data2 = await res2.json();
+      if (data2.error) throw new Error('Groq 用量已達上限，請稍後再試');
+      return data2.text || '無法生成內容。';
     }
     if (data.error) throw new Error(data.error);
     return data.text || '無法生成內容。';
