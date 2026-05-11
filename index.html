@@ -1230,9 +1230,10 @@
 <!-- API Config -->
 <div class="api-config-bar">
   <div class="api-row">
-    <button class="api-fetch-btn" id="fetchBtn" onclick="fetchMarketaux()">載入財經新聞</button>
+    <button class="api-fetch-btn" id="fetchBtn" onclick="loadCachedNews()">載入財經新聞</button>
+    <button class="api-fetch-btn" id="fetchLiveBtn" onclick="fetchMarketaux()" title="即時從 RSS 抓取最新新聞" style="margin-left:6px;opacity:0.75;font-size:0.78rem;padding:0.3rem 0.7rem;">即時拉取</button>
     <span class="api-status" id="apiStatus">示範模式</span>
-    <span class="api-hint" style="margin-right:auto;">Reuters · CNBC · Bloomberg · WSJ · MarketWatch · FT</span>
+    <span class="api-hint" style="margin-right:auto;">Reuters · CNBC · Bloomberg · 經濟日報 · 工商時報 · 鉅亨網 · Google News TW</span>
     <span class="api-status ok" id="groqStatus">✓ Groq AI 已啟用</span>
     <span class="api-hint">llama-3.1-8b · Key 安全存於伺服器</span>
   </div>
@@ -2081,12 +2082,62 @@ function setStatus(msg, type) {
 }
 
 // ── News fetch: TheNewsAPI via Vercel proxy ──
+// ── 從 Supabase 載入快取新聞（頁面開啟時自動執行）──
+async function loadCachedNews() {
+  try {
+    setStatus('載入快取新聞…', 'loading');
+    const r = await fetch(`${API_BASE}?endpoint=news_cached&limit=80`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json = await r.json();
+    if (!json.data?.length) throw new Error('快取無資料');
+
+    let articles = json.data.map(a => {
+      // 地區黑名單
+      const chk = (a.title || '') + ' ' + (a.url || '');
+      if (/czech|prague|koruna|philippines|philippine|manila|bangko sentral|safaricom|nairobi|kenya|nigeria|lagos|johannesburg|south africa|ghana/i.test(chk)) return null;
+      if (/^[A-Za-z\s&]+\d{1,2}\/\d{1,2}\/\d{4}$/.test((a.title || '').trim())) return null;
+      return {
+        title:          a.title || '',
+        description:    a.description || '',
+        url:            a.url || '#',
+        publishedAt:    a.publishedAt || new Date().toISOString(),
+        source:         a.source || '',
+        lang:           a.lang || 'en',
+        category:       classifyArticle(a.title || '', a.description || ''),
+        popularityScore: 0,
+        fromCache:      true,
+      };
+    }).filter(Boolean);
+
+    // 去重
+    const seen = new Set();
+    articles = articles.filter(a => { if (!a.title || seen.has(a.title)) return false; seen.add(a.title); return true; });
+    articles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    articles.forEach((a, i) => { a.popularityScore = Math.round(100 - (i / Math.max(articles.length - 1, 1)) * 90); });
+
+    allArticles = articles;
+    const zhCnt = articles.filter(a => a.lang === 'zh').length;
+    const enCnt = articles.filter(a => a.lang === 'en').length;
+    setStatus(`✓ 快取：中文 ${zhCnt} · 英文 ${enCnt} 則`, 'ok');
+    renderFeed(getFiltered());
+    renderTrending();
+    // 英文文章才需要翻譯
+    if (articles.some(a => a.lang === 'en' && !a.title_zh)) translateArticles();
+  } catch (e) {
+    console.warn('[快取新聞] 載入失敗，顯示示範資料：', e.message);
+    setStatus('快取暫無資料，可按「即時拉取」', 'err');
+    allArticles = mockArticles;
+    renderFeed(getFiltered());
+  }
+}
+
 async function fetchMarketaux() {
   const btn = document.getElementById('fetchBtn');
+  const liveBtn = document.getElementById('fetchLiveBtn');
+  if (liveBtn) { liveBtn.disabled = true; liveBtn.textContent = '拉取中…'; }
   btn.disabled = true;
-  btn.textContent = '載入中…';
-  setStatus('連線中…', 'loading');
-  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在從 Reuters · CNBC · Bloomberg · WSJ · MarketWatch · Yahoo Finance · FT 載入新聞…</p></div>';
+  setStatus('即時連線中…', 'loading');
+  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在即時從 Reuters · CNBC · Bloomberg · MarketWatch · FT 載入新聞…</p></div>';
 
   try {
     // Fetch all+top pages concurrently via Vercel proxy
@@ -2150,7 +2201,8 @@ async function fetchMarketaux() {
     setTimeout(() => { allArticles = mockArticles; renderFeed(getFiltered()); }, 1000);
   } finally {
     btn.disabled = false;
-    btn.textContent = '載入財經新聞';
+    const liveBtn2 = document.getElementById('fetchLiveBtn');
+    if (liveBtn2) { liveBtn2.disabled = false; liveBtn2.textContent = '即時拉取'; }
   }
 }
 
@@ -5246,11 +5298,8 @@ loadOptions();
 // 頁面載入時自動顯示台股熱圖（含產業 bar）
 showHeatmap();
 loadHeatmap();
-// 載入示範資料（手動點「載入財經新聞」取得即時新聞）
-setTimeout(() => {
-  allArticles = mockArticles;
-  renderFeed(getFiltered());
-}, 500);
+// 頁面開啟自動從 Supabase 載入快取新聞
+setTimeout(() => loadCachedNews(), 500);
 </script>
 
 <!-- ══════════════════════════════════════════
