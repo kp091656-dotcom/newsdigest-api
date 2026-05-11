@@ -430,13 +430,12 @@ async function collectNews() {
       // ── 台股中文來源（新增）──
       { url: 'https://news.google.com/rss/search?q=台股+OR+台積電+OR+外資+OR+加權指數&hl=zh-TW&gl=TW&ceid=TW:zh-Hant', source: 'Google News TW', lang: 'zh' },
       { url: 'https://money.udn.com/rssfeed/news/1001/5590/index.xml',                               source: '經濟日報',     lang: 'zh' },
-      { url: 'https://ctee.com.tw/feed',                                                              source: '工商時報',     lang: 'zh' },
+      { url: 'https://news.google.com/rss/search?q=工商時報+台股&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',    source: '工商時報',     lang: 'zh' },
       { url: 'https://www.cnyes.com/rss/cat/tw_stock',                                               source: '鉅亨網',       lang: 'zh' },
     ];
 
     // 各來源客製化 headers（部分網站需要 Referer / Accept 才不會 403/406）
     const CUSTOM_HEADERS = {
-      '工商時報': { 'Referer': 'https://ctee.com.tw/', 'Origin': 'https://ctee.com.tw' },
       '鉅亨網':   { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Referer': 'https://www.cnyes.com/' },
     };
 
