@@ -38,6 +38,347 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ══════════════════════════════════════════
+  // Alpha 交易員 — 分析 endpoint
+  // ══════════════════════════════════════════
+  if (endpoint === 'alpha_analyze') {
+    const GROQ_KEY      = process.env.GROQ_API_KEY;
+    const SUPABASE_URL  = process.env.SUPABASE_URL  || 'https://fdxedcwtmlurumfjmlys.supabase.co';
+    const SUPABASE_KEY  = process.env.SUPABASE_SERVICE_KEY || 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
+    if (!GROQ_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not configured' });
+
+    // Owner 驗證
+    const OWNER_HASH = process.env.OWNER_TOKEN_HASH;
+    if (OWNER_HASH) {
+      const crypto = require('crypto');
+      const incoming = req.headers['x-owner-token'] || '';
+      const incomingHash = crypto.createHash('sha256').update(incoming).digest('hex');
+      if (incomingHash !== OWNER_HASH) return res.status(403).json({ error: 'unauthorized' });
+    }
+
+    try {
+      // ── 1. 並行抓取所有資料來源 ──
+      const [stockRows, valuationRows, newsRows, pttData, redditData, fgiData, vixData, futuresData] = await Promise.allSettled([
+        // 台股股價（近 5 日成交量前 200 檔）
+        fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?order=trade_volume.desc&limit=200&select=stock_id,stock_name,close_price,change_pct,trade_volume,date`, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          signal: AbortSignal.timeout(5000),
+        }).then(r => r.json()).catch(() => []),
+
+        // 個股估值
+        fetch(`${SUPABASE_URL}/rest/v1/stock_valuation_daily?order=dividend_yield.desc&limit=200&select=stock_id,pe_ratio,pb_ratio,dividend_yield`, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          signal: AbortSignal.timeout(5000),
+        }).then(r => r.json()).catch(() => []),
+
+        // 快取新聞（中英文各 20 則）
+        fetch(`${SUPABASE_URL}/rest/v1/news_daily?order=published_at.desc&limit=40&select=title,source,lang,published_at`, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          signal: AbortSignal.timeout(5000),
+        }).then(r => r.json()).catch(() => []),
+
+        // PTT Stock 版
+        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=ptt`, {
+          signal: AbortSignal.timeout(8000),
+        }).then(r => r.json()).catch(() => ({ data: [] })),
+
+        // Reddit
+        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=reddit`, {
+          signal: AbortSignal.timeout(8000),
+        }).then(r => r.json()).catch(() => ({ posts: [] })),
+
+        // Fear & Greed
+        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=fgi`, {
+          signal: AbortSignal.timeout(6000),
+        }).then(r => r.json()).catch(() => null),
+
+        // VIX
+        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=vix`, {
+          signal: AbortSignal.timeout(6000),
+        }).then(r => r.json()).catch(() => null),
+
+        // 全球期貨
+        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=futures`, {
+          signal: AbortSignal.timeout(8000),
+        }).then(r => r.json()).catch(() => null),
+      ]);
+
+      const stocks    = stockRows.status    === 'fulfilled' ? (stockRows.value    || []) : [];
+      const valuation = valuationRows.status === 'fulfilled' ? (valuationRows.value || []) : [];
+      const news      = newsRows.status     === 'fulfilled' ? (newsRows.value     || []) : [];
+      const ptt       = pttData.status      === 'fulfilled' ? (pttData.value?.data || []) : [];
+      const reddit    = redditData.status   === 'fulfilled' ? (redditData.value?.posts || []) : [];
+      const fgi       = fgiData.status      === 'fulfilled' ? fgiData.value : null;
+      const vix       = vixData.status      === 'fulfilled' ? vixData.value?.data : null;
+      const futures   = futuresData.status  === 'fulfilled' ? futuresData.value : null;
+
+      // ── 2. 整理估值 map ──
+      const valMap = {};
+      for (const v of valuation) valMap[v.stock_id] = v;
+
+      // ── 3. 整理股票資料（前 50 檔，加入估值）──
+      const topStocks = stocks.slice(0, 50).map(s => ({
+        id:      s.stock_id,
+        name:    s.stock_name,
+        close:   s.close_price,
+        chgPct:  s.change_pct,
+        volume:  s.trade_volume,
+        pe:      valMap[s.stock_id]?.pe_ratio    ?? null,
+        pb:      valMap[s.stock_id]?.pb_ratio    ?? null,
+        dy:      valMap[s.stock_id]?.dividend_yield ?? null,
+      }));
+
+      // ── 4. 整理市場情緒 ──
+      const fgiScore = fgi?.fear_and_greed?.score ?? fgi?.score ?? null;
+      const fgiLabel = fgi?.fear_and_greed?.rating ?? '';
+      const vixNow   = vix?.find(v => v.symbol === '^VIX')?.price ?? null;
+      const twFuture = futures?.data?.find(f => f.name?.includes('台灣') || f.name?.includes('TX')) ?? null;
+
+      // ── 5. 整理 PTT 熱門標題 ──
+      const pttTitles = ptt.slice(0, 15).map(p => `【${p.pushes >= 0 ? '+' : ''}${p.pushes}推】${p.title}`).join('
+');
+
+      // ── 6. 整理 Reddit ──
+      const redditTitles = reddit.slice(0, 10).map(r => `[${r.score || 0}↑] ${r.title}`).join('
+');
+
+      // ── 7. 整理新聞標題 ──
+      const newsTitles = news.slice(0, 30).map(n => `[${n.source}] ${n.title}`).join('
+');
+
+      // ── 8. 組裝 Prompt ──
+      const stockTable = topStocks.map(s =>
+        `${s.id} ${s.name} 收${s.close} 漲跌${s.chgPct ?? 'N/A'}% 量${s.volume} PE${s.pe ?? '-'} PB${s.pb ?? '-'} 殖${s.dy ?? '-'}%`
+      ).join('
+');
+
+      const marketContext = [
+        fgiScore !== null ? `Fear & Greed: ${fgiScore} (${fgiLabel})` : '',
+        vixNow   !== null ? `VIX: ${vixNow}` : '',
+        twFuture          ? `台指期: ${twFuture.name} ${twFuture.close ?? ''}` : '',
+      ].filter(Boolean).join(' | ');
+
+      const systemPrompt = `你是 Alpha，一位經驗豐富的台股交易員。
+你的分析風格：冷靜、數據導向、不隨波逐流。
+你會根據：技術面（量價）、基本面（PE/PB/殖利率）、市場情緒、社群聲量、新聞催化劑，綜合判斷操作方向。
+你會依市場狀況自行決定操作風格（短線波段 3-10 天 / 中線趨勢 1-4 週 / 價值布局）。
+輸出規則：
+- 必須使用繁體中文
+- 回傳嚴格 JSON，不含任何 markdown 或說明文字
+- JSON 格式如下（不可有多餘欄位）：
+{
+  "market_summary": "50字以內的市場總結",
+  "market_mood": "樂觀|中性|謹慎|悲觀",
+  "recommendations": [
+    {
+      "stock_id": "股票代號（4碼）",
+      "stock_name": "股票名稱",
+      "style": "短線|中線|價值",
+      "action": "買進|觀察|避開",
+      "entry_price": 數字,
+      "target_price": 數字,
+      "stop_loss": 數字,
+      "expected_return_pct": 數字,
+      "holding_days": 數字,
+      "confidence": "高|中|低",
+      "reason": "100字以內的操作理由，含進出場依據",
+      "risk": "30字以內的主要風險"
+    }
+  ],
+  "alpha_note": "Alpha 給投資人的一句話警語或觀察"
+}
+recommendations 必須包含 3-5 檔，action=買進 至少 2 檔。`;
+
+      const userPrompt = `【市場情緒指標】
+${marketContext || '資料暫無'}
+
+【台股量價估值（前50大成交量）】
+${stockTable}
+
+【近期財經新聞】
+${newsTitles || '無'}
+
+【PTT Stock 版熱門】
+${pttTitles || '無'}
+
+【Reddit 討論】
+${redditTitles || '無'}
+
+請根據以上資料，以 Alpha 交易員身份給出今日台股操作建議。`;
+
+      // ── 9. 呼叫 Groq（含 web_search tool）──
+      const groqBody = {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt },
+        ],
+        max_tokens: 2000,
+        temperature: 0.4,
+        tools: [{
+          type: 'function',
+          function: {
+            name: 'web_search',
+            description: '搜尋個股最新消息、法說會、營收公告等即時資訊',
+            parameters: {
+              type: 'object',
+              properties: {
+                query: { type: 'string', description: '搜尋關鍵字，例如：台積電 2025 法說會' }
+              },
+              required: ['query']
+            }
+          }
+        }],
+        tool_choice: 'auto',
+      };
+
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+        body: JSON.stringify(groqBody),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!groqRes.ok) {
+        const errText = await groqRes.text();
+        throw new Error(`Groq HTTP ${groqRes.status}: ${errText.slice(0, 200)}`);
+      }
+
+      const groqData = await groqRes.json();
+      let raw = groqData.choices?.[0]?.message?.content || '';
+
+      // 清理 JSON
+      raw = raw.replace(/```json|```/g, '').trim();
+      const startIdx = raw.indexOf('{');
+      const endIdx   = raw.lastIndexOf('}');
+      if (startIdx !== -1 && endIdx !== -1) raw = raw.slice(startIdx, endIdx + 1);
+
+      let result;
+      try { result = JSON.parse(raw); }
+      catch { result = { market_summary: '解析失敗', recommendations: [], raw }; }
+
+      // 加入資料來源資訊
+      result.data_sources = {
+        stocks:  topStocks.length,
+        news:    news.length,
+        ptt:     ptt.length,
+        reddit:  reddit.length,
+        fgi:     fgiScore,
+        vix:     vixNow,
+      };
+      result.generated_at = new Date().toISOString();
+
+      return res.status(200).json(result);
+    } catch (e) {
+      console.error('[Alpha] Error:', e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── Alpha 交易紀錄 CRUD ──
+  if (endpoint === 'alpha_positions') {
+    const SUPABASE_URL = process.env.SUPABASE_URL  || 'https://fdxedcwtmlurumfjmlys.supabase.co';
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
+    const hdrs = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' };
+
+    // Owner 驗證
+    const OWNER_HASH = process.env.OWNER_TOKEN_HASH;
+    if (OWNER_HASH) {
+      const crypto = require('crypto');
+      const incoming = req.headers['x-owner-token'] || '';
+      const incomingHash = crypto.createHash('sha256').update(incoming).digest('hex');
+      if (incomingHash !== OWNER_HASH) return res.status(403).json({ error: 'unauthorized' });
+    }
+
+    // 讀取 body
+    let body = {};
+    if (req.method === 'POST' || req.method === 'PATCH') {
+      try {
+        const raw = await new Promise((resolve, reject) => {
+          let d = ''; req.on('data', c => d += c); req.on('end', () => resolve(d)); req.on('error', reject);
+        });
+        body = raw ? JSON.parse(raw) : {};
+      } catch { body = {}; }
+    }
+
+    const action = req.query.action || 'list';
+
+    // LIST — 取所有持倉
+    if (action === 'list') {
+      const status = req.query.status || '';
+      let url = `${SUPABASE_URL}/rest/v1/trader_positions?order=opened_at.desc&limit=100`;
+      if (status) url += `&status=eq.${status}`;
+      const r = await fetch(url, { headers: hdrs, signal: AbortSignal.timeout(5000) });
+      const data = await r.json();
+      return res.status(200).json({ data });
+    }
+
+    // CREATE — 新增持倉
+    if (action === 'create' && req.method === 'POST') {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions`, {
+        method: 'POST',
+        headers: { ...hdrs, Prefer: 'return=representation' },
+        body: JSON.stringify({
+          stock_id:     body.stock_id,
+          stock_name:   body.stock_name,
+          entry_price:  body.entry_price,
+          target_price: body.target_price,
+          stop_loss:    body.stop_loss,
+          shares:       body.shares || 1,
+          style:        body.style,
+          reason:       body.reason,
+          status:       'open',
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await r.json();
+      return res.status(201).json({ data });
+    }
+
+    // CLOSE — 平倉，計算損益
+    if (action === 'close' && req.method === 'PATCH') {
+      const { id, exit_price } = body;
+      if (!id || !exit_price) return res.status(400).json({ error: 'id and exit_price required' });
+
+      // 先取原始持倉
+      const orig = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions?id=eq.${id}&select=entry_price,shares`, {
+        headers: hdrs, signal: AbortSignal.timeout(5000),
+      }).then(r => r.json());
+
+      const { entry_price, shares } = orig?.[0] || {};
+      const pnl     = entry_price ? (exit_price - entry_price) * (shares || 1) * 1000 : null;
+      const pnl_pct = entry_price ? ((exit_price - entry_price) / entry_price * 100) : null;
+
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { ...hdrs, Prefer: 'return=representation' },
+        body: JSON.stringify({
+          status:     'closed',
+          exit_price: parseFloat(exit_price),
+          pnl:        pnl     ? parseFloat(pnl.toFixed(0))     : null,
+          pnl_pct:    pnl_pct ? parseFloat(pnl_pct.toFixed(2)) : null,
+          closed_at:  new Date().toISOString(),
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await r.json();
+      return res.status(200).json({ data, pnl, pnl_pct });
+    }
+
+    // DELETE
+    if (action === 'delete' && req.method === 'POST') {
+      const { id } = body;
+      if (!id) return res.status(400).json({ error: 'id required' });
+      await fetch(`${SUPABASE_URL}/rest/v1/trader_positions?id=eq.${id}`, {
+        method: 'DELETE', headers: hdrs, signal: AbortSignal.timeout(5000),
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: 'unknown action' });
+  }
+
   // CNN Fear & Greed proxy
   if (endpoint === 'fgi') {
     try {
