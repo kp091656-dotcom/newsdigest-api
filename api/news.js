@@ -1307,7 +1307,14 @@ export default async function handler(req, res) {
           return m ? (m[1] || m[2] || '').trim() : '';
         };
         const title = get('title').replace(/&amp;/g,'&').replace(/&apos;/g,"'").replace(/&#x2019;/g,"'").replace(/&#x2018;/g,"'").replace(/&quot;/g,'"').replace(/&#[^;]+;/g,'').replace(/<[^>]+>/g,'').trim();
-        const description = get('description').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&#[^;]+;/g,'').trim().slice(0,300);
+        let description = get('description');
+        // Google News RSS 的 description 有時是整段 HTML，需多層清理
+        description = description
+          .replace(/<a[^>]*>[\s\S]*?<\/a>/gi, '')  // 移除 <a> 連結
+          .replace(/<[^>]+>/g, '')                   // 移除其他 HTML tag
+          .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#[^;]+;/g, '')
+          .replace(/https?:\/\/\S+/g, '')            // 移除殘留 URL
+          .trim().slice(0, 300);
         const link = get('link') || item.match(/<link>([^<]+)<\/link>/i)?.[1] || '';
         const pubDate = get('pubDate');
         if (!title || title.length < 5) continue;
