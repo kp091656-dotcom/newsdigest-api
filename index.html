@@ -2211,9 +2211,9 @@ async function fetchMarketaux() {
 async function translateArticles() {
   if (!allArticles.length) return;
 
-  // 只翻英文 且 熱門以上（popularityScore >= 70）的文章，約前 16 篇
+  // 只翻英文（lang !== 'zh' 且標題不含中文字）且熱門以上（popularityScore >= 70）的文章
   const targets = allArticles.filter(a =>
-    !/[一-鿿]/.test(a.title) && (a.popularityScore || 0) >= 70
+    a.lang !== 'zh' && !/[一-鿿]/.test(a.title) && (a.popularityScore || 0) >= 70
   );
 
   if (!targets.length) {
