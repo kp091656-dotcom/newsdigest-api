@@ -6,6 +6,8 @@ on:
     - cron: '0 22 * * 0-4'
     # 台灣時間 06:30 = UTC 前一天 22:30（FinMind）
     - cron: '30 22 * * 0-4'
+    # 新聞每 2 小時更新一次（全天候）
+    - cron: '0 */2 * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -34,6 +36,25 @@ jobs:
       - name: Run TWSE collect
         env:
           FINMIND_TOKEN:        ${{ secrets.FINMIND_TOKEN }}
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          COLLECT_MODE:         twse
+        run: node .github/scripts/collect_market_data.js
+
+  # ── News job：每 2 小時更新一次，或手動 all 時執行 ──
+  collect-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: |
+      github.event_name == 'schedule' && startsWith(github.event.schedule, '0 */2') ||
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.mode == 'all' || github.event.inputs.mode == 'twse')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run News collect
+        env:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           COLLECT_MODE:         twse
