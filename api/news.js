@@ -1284,7 +1284,7 @@ export default async function handler(req, res) {
 
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   try {
-    const results = await Promise.all(RSS_FEEDS.map(async ({ url, source }) => {
+    const results = await Promise.all(RSS_FEEDS.map(async ({ url, source, lang }) => {
       try {
         const extraHeaders = source === '鉅亨網'
           ? { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Referer': 'https://www.cnyes.com/' }
