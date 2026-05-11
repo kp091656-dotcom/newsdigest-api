@@ -1266,30 +1266,39 @@ export default async function handler(req, res) {
 
   // RSS news feeds
   const RSS_FEEDS = [
-    { url: 'https://feeds.reuters.com/reuters/businessNews',                                       source: 'Reuters' },
-    { url: 'https://feeds.reuters.com/reuters/technologyNews',                                     source: 'Reuters' },
-    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114', source: 'CNBC' },
-    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664',  source: 'CNBC' },
-    { url: 'https://feeds.bloomberg.com/markets/news.rss',                                         source: 'Bloomberg' },
-    { url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',                          source: 'MarketWatch' },
-    { url: 'https://feeds.content.dowjones.io/public/rss/mw_marketpulse',                         source: 'MarketWatch' },
-    { url: 'https://www.ft.com/?format=rss',                                                       source: 'FT' },
+    // ── 英文來源 ──
+    { url: 'https://feeds.reuters.com/reuters/businessNews',                                                              source: 'Reuters',        lang: 'en' },
+    { url: 'https://feeds.reuters.com/reuters/technologyNews',                                                            source: 'Reuters',        lang: 'en' },
+    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114',                       source: 'CNBC',           lang: 'en' },
+    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664',                        source: 'CNBC',           lang: 'en' },
+    { url: 'https://feeds.bloomberg.com/markets/news.rss',                                                               source: 'Bloomberg',      lang: 'en' },
+    { url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',                                                 source: 'MarketWatch',    lang: 'en' },
+    { url: 'https://feeds.content.dowjones.io/public/rss/mw_marketpulse',                                                source: 'MarketWatch',    lang: 'en' },
+    { url: 'https://www.ft.com/?format=rss',                                                                             source: 'FT',             lang: 'en' },
+    // ── 台股中文來源 ──
+    { url: 'https://news.google.com/rss/search?q=台股+OR+台積電+OR+外資+OR+加權指數&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',   source: 'Google News TW', lang: 'zh' },
+    { url: 'https://money.udn.com/rssfeed/news/1001/5590/index.xml',                                                     source: '經濟日報',        lang: 'zh' },
+    { url: 'https://news.google.com/rss/search?q=工商時報+台股&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',                        source: '工商時報',        lang: 'zh' },
+    { url: 'https://www.cnyes.com/rss/cat/tw_stock',                                                                     source: '鉅亨網',          lang: 'zh' },
   ];
 
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   try {
     const results = await Promise.all(RSS_FEEDS.map(async ({ url, source }) => {
       try {
+        const extraHeaders = source === '鉅亨網'
+          ? { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Referer': 'https://www.cnyes.com/' }
+          : {};
         const r = await fetch(url, {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/rss+xml, application/xml, text/xml' },
+          headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', 'Accept': 'application/rss+xml, application/xml, text/xml, */*', ...extraHeaders },
           signal: (()=>{ const c=new AbortController(); setTimeout(()=>c.abort(),8000); return c.signal; })(),
         });
-        return { source, xml: await r.text() };
-      } catch(e) { return { source, xml: null }; }
+        return { source, lang, xml: r.ok ? await r.text() : null };
+      } catch(e) { return { source, lang, xml: null }; }
     }));
 
     const articles = [];
-    for (const { source, xml } of results) {
+    for (const { source, lang, xml } of results) {
       if (!xml) continue;
       const items = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) || [];
       for (const item of items.slice(0, 20)) {
@@ -1297,14 +1306,16 @@ export default async function handler(req, res) {
           const m = item.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>|<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i'));
           return m ? (m[1] || m[2] || '').trim() : '';
         };
-        const title = get('title').replace(/&amp;/g,'&').replace(/&apos;/g,"'").replace(/&#x2019;/g,"'").replace(/&#x2018;/g,"'").replace(/&quot;/g,'"').replace(/&#[^;]+;/g,'');
+        const title = get('title').replace(/&amp;/g,'&').replace(/&apos;/g,"'").replace(/&#x2019;/g,"'").replace(/&#x2018;/g,"'").replace(/&quot;/g,'"').replace(/&#[^;]+;/g,'').replace(/<[^>]+>/g,'').trim();
         const description = get('description').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&#[^;]+;/g,'').trim().slice(0,300);
         const link = get('link') || item.match(/<link>([^<]+)<\/link>/i)?.[1] || '';
         const pubDate = get('pubDate');
-        if (!title || title.length < 5 || !description || description.length < 20) continue;
+        if (!title || title.length < 5) continue;
+        // 中文新聞 description 可能較短，放寬限制
+        if (lang === 'en' && (!description || description.length < 20)) continue;
         const pub = pubDate ? new Date(pubDate) : new Date();
-        if (pub < cutoff) continue;
-        articles.push({ title, description, url: link.trim(), publishedAt: pub.toISOString(), source });
+        if (isNaN(pub.getTime()) || pub < cutoff) continue;
+        articles.push({ title, description, url: link.trim(), publishedAt: pub.toISOString(), source, lang });
       }
     }
     const seen = new Set();
