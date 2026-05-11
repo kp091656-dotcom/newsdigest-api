@@ -509,6 +509,7 @@ async function collectNews() {
 async function main() {
   const isTWSE    = MODE === 'twse'    || MODE === 'all';
   const isFinMind = MODE === 'finmind' || MODE === 'all';
+  const isNews    = MODE === 'news'    || MODE === 'all';
   console.log('═══════════════════════════════════════');
   console.log('  AlphaScope — 每日資料收集 v3');
   console.log(`  執行時間：${new Date().toISOString()}`);
@@ -523,6 +524,8 @@ async function main() {
     results.twseDaily   = await collectTWSEDaily();
     results.sectorIndex = await collectSectorIndex();
     results.valuation   = await collectValuation();
+  }
+  if (isNews) {
     console.log('\n── 新聞收集 ──');
     results.news        = await collectNews();
   }
