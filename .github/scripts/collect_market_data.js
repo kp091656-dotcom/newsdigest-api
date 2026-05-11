@@ -490,13 +490,13 @@ async function collectNews() {
 
     // 清理 3 天前的舊資料
     const deleteRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/news_daily?collected_at=lt.${new Date(Date.now() - 3 * 86_400_000).toISOString()}`,
+      `${SUPABASE_URL}/rest/v1/news_daily?collected_at=lt.${new Date(Date.now() - 48 * 3_600_000).toISOString()}`,
       {
         method: 'DELETE',
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
       }
     );
-    if (deleteRes.ok) console.log('  🗑️  已清理 3 天前舊新聞');
+    if (deleteRes.ok) console.log('  🗑️  已清理 48 小時前舊新聞');
     else console.warn(`  ⚠️  清理失敗 HTTP ${deleteRes.status}`);
 
     return { ok: true, count: articles.length };
