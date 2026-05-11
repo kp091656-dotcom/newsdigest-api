@@ -6,6 +6,38 @@ export default async function handler(req, res) {
 
   const { endpoint = 'news' } = req.query;
 
+  // ── 從 Supabase 讀快取新聞 ──
+  if (endpoint === 'news_cached') {
+    const SUPABASE_URL  = 'https://fdxedcwtmlurumfjmlys.supabase.co';
+    const SUPABASE_ANON = 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
+    const lang   = req.query.lang   || '';   // '' = 全部, 'zh', 'en'
+    const limit  = Math.min(parseInt(req.query.limit) || 80, 150);
+    try {
+      let params = `order=published_at.desc&limit=${limit}`;
+      if (lang) params += `&lang=eq.${lang}`;
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/news_daily?${params}&select=title,title_zh,url,source,lang,published_at`, {
+        headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
+      const rows = await r.json();
+      // 統一格式，與原有 news RSS 格式相容
+      const data = rows.map(row => ({
+        title:       row.title_zh || row.title,
+        titleOrig:   row.title,
+        description: '',
+        url:         row.url,
+        publishedAt: row.published_at,
+        source:      row.source,
+        lang:        row.lang,
+      }));
+      res.setHeader('Cache-Control', 'public, max-age=300'); // 5 分鐘 CDN cache
+      return res.status(200).json({ data, count: data.length, source: 'supabase' });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // CNN Fear & Greed proxy
   if (endpoint === 'fgi') {
     try {
