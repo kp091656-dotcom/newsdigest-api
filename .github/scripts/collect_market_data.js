@@ -384,6 +384,119 @@ async function collectFutures() {
 }
 
 // ══════════════════════════════════════════
+// 新聞收集任務
+// ══════════════════════════════════════════
+
+/**
+ * 解析 RSS XML，回傳 [{title, url, description, publishedAt}]
+ */
+function parseRSS(xml, source, lang = 'en') {
+  const items = [];
+  const itemMatches = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) || [];
+  for (const item of itemMatches.slice(0, 30)) {
+    const get = (tag) => {
+      const m = item.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>|<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i'));
+      return m ? (m[1] || m[2] || '').trim() : '';
+    };
+    const title = get('title')
+      .replace(/&amp;/g, '&').replace(/&apos;/g, "'").replace(/&quot;/g, '"')
+      .replace(/&#[^;]+;/g, '').replace(/<[^>]+>/g, '').trim();
+    const link = get('link') || item.match(/<link>([^<]+)<\/link>/i)?.[1] || '';
+    const desc = get('description').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#[^;]+;/g, '').trim().slice(0, 300);
+    const pubDate = get('pubDate');
+    if (!title || title.length < 5 || !link) continue;
+    const pub = pubDate ? new Date(pubDate) : new Date();
+    if (isNaN(pub.getTime())) continue;
+    items.push({ title, url: link.trim(), description: desc, source, lang, publishedAt: pub.toISOString() });
+  }
+  return items;
+}
+
+async function collectNews() {
+  console.log('📰 財經新聞收集（RSS）...');
+  try {
+    const cutoff = new Date(Date.now() - 48 * 3600_000); // 抓 48 小時內（保留緩衝）
+
+    const RSS_FEEDS = [
+      // ── 英文來源（已有）──
+      { url: 'https://feeds.reuters.com/reuters/businessNews',                                        source: 'Reuters',      lang: 'en' },
+      { url: 'https://feeds.reuters.com/reuters/technologyNews',                                      source: 'Reuters',      lang: 'en' },
+      { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114',  source: 'CNBC',         lang: 'en' },
+      { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664',   source: 'CNBC',         lang: 'en' },
+      { url: 'https://feeds.bloomberg.com/markets/news.rss',                                          source: 'Bloomberg',    lang: 'en' },
+      { url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',                           source: 'MarketWatch',  lang: 'en' },
+      { url: 'https://feeds.content.dowjones.io/public/rss/mw_marketpulse',                          source: 'MarketWatch',  lang: 'en' },
+      { url: 'https://www.ft.com/?format=rss',                                                        source: 'FT',           lang: 'en' },
+      // ── 台股中文來源（新增）──
+      { url: 'https://news.google.com/rss/search?q=台股+OR+台積電+OR+外資+OR+加權指數&hl=zh-TW&gl=TW&ceid=TW:zh-Hant', source: 'Google News TW', lang: 'zh' },
+      { url: 'https://money.udn.com/rssfeed/news/1001/5590/index.xml',                               source: '經濟日報',     lang: 'zh' },
+      { url: 'https://ctee.com.tw/feed',                                                              source: '工商時報',     lang: 'zh' },
+      { url: 'https://www.cnyes.com/rss/cat/tw_stock',                                               source: '鉅亨網',       lang: 'zh' },
+    ];
+
+    // 並行抓取所有 RSS
+    const fetchResults = await Promise.all(RSS_FEEDS.map(async ({ url, source, lang }) => {
+      try {
+        const r = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/rss+xml, application/xml, text/xml' },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!r.ok) { console.log(`  ⚠️  ${source} HTTP ${r.status}`); return []; }
+        const xml = await r.text();
+        return parseRSS(xml, source, lang);
+      } catch (e) { console.log(`  ⚠️  ${source} 失敗：${e.message}`); return []; }
+    }));
+
+    // 合併、去重（依 url）、過濾時間
+    const seen = new Set();
+    const articles = fetchResults.flat().filter(a => {
+      if (seen.has(a.url)) return false;
+      seen.add(a.url);
+      if (new Date(a.publishedAt) < cutoff) return false;
+      // 地區黑名單（沿用 news.js 規則）
+      const low = (a.title + ' ' + (a.description || '')).toLowerCase();
+      const blacklist = ['czech', 'czechia', 'prague', 'koruna', 'philippines', 'philippine', 'manila', 'bangko sentral',
+        'safaricom', 'nairobi', 'kenya', 'nigeria', 'lagos', 'johannesburg', 'south africa', 'ghana'];
+      if (blacklist.some(w => low.includes(w))) return false;
+      // Newsletter 過濾
+      if (/^[A-Za-z\s&]+\d{1,2}\/\d{1,2}\/\d{4}$/.test(a.title.trim())) return false;
+      return true;
+    });
+
+    console.log(`  📊 合計 ${articles.length} 篇（去重後）`);
+
+    if (!articles.length) return { ok: true, count: 0 };
+
+    // Upsert 進 Supabase（on_conflict=url）
+    const rows = articles.map(a => ({
+      url:          a.url,
+      title:        a.title,
+      title_zh:     null,   // 翻譯由前端 Groq 即時處理，收集階段不呼叫 AI
+      description:  a.description || null,
+      source:       a.source,
+      lang:         a.lang,
+      published_at: a.publishedAt,
+      collected_at: new Date().toISOString(),
+    }));
+
+    await sbUpsert('news_daily', rows, 'url');
+
+    // 清理 3 天前的舊資料
+    const deleteRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/news_daily?collected_at=lt.${new Date(Date.now() - 3 * 86_400_000).toISOString()}`,
+      {
+        method: 'DELETE',
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      }
+    );
+    if (deleteRes.ok) console.log('  🗑️  已清理 3 天前舊新聞');
+    else console.warn(`  ⚠️  清理失敗 HTTP ${deleteRes.status}`);
+
+    return { ok: true, count: articles.length };
+  } catch (e) { console.error(`  ❌ 新聞收集 失敗：${e.message}`); return { ok: false, error: e.message }; }
+}
+
+// ══════════════════════════════════════════
 // 主程式
 // ══════════════════════════════════════════
 async function main() {
@@ -403,6 +516,8 @@ async function main() {
     results.twseDaily   = await collectTWSEDaily();
     results.sectorIndex = await collectSectorIndex();
     results.valuation   = await collectValuation();
+    console.log('\n── 新聞收集 ──');
+    results.news        = await collectNews();
   }
   if (isFinMind) {
     console.log('\n── FinMind API ──');
