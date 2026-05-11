@@ -418,9 +418,7 @@ async function collectNews() {
     const cutoff = new Date(Date.now() - 48 * 3600_000); // 抓 48 小時內（保留緩衝）
 
     const RSS_FEEDS = [
-      // ── 英文來源（已有）──
-      { url: 'https://feeds.reuters.com/reuters/businessNews',                                        source: 'Reuters',      lang: 'en' },
-      { url: 'https://feeds.reuters.com/reuters/technologyNews',                                      source: 'Reuters',      lang: 'en' },
+      // ── 英文來源（Reuters 擋 Actions IP，改由前端即時拉取）──
       { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114',  source: 'CNBC',         lang: 'en' },
       { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664',   source: 'CNBC',         lang: 'en' },
       { url: 'https://feeds.bloomberg.com/markets/news.rss',                                          source: 'Bloomberg',    lang: 'en' },
