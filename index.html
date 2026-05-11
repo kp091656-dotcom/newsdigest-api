@@ -1663,6 +1663,68 @@
     </div>
 
   </div>
+
+  <!-- ══════════════════════════════════════
+       🤖 Alpha 交易室
+       ══════════════════════════════════════ -->
+  <div id="alphaTraderSection" style="margin-top:1.5rem;">
+
+    <!-- 標題列 -->
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+      <div style="font-size:1.05rem;font-weight:700;color:var(--fg);">🤖 Alpha 交易室</div>
+      <div id="alphaStatusBadge" style="font-size:0.7rem;padding:2px 8px;border-radius:99px;background:var(--card);color:var(--muted);border:1px solid var(--border);">待機中</div>
+      <div style="flex:1"></div>
+      <button onclick="alphaAnalyze()" id="alphaBtn" style="padding:0.35rem 1rem;font-size:0.8rem;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;">⚡ 讓 Alpha 分析</button>
+      <button onclick="showAlphaReport()" style="padding:0.35rem 0.8rem;font-size:0.8rem;border-radius:6px;background:var(--card);color:var(--fg);border:1px solid var(--border);cursor:pointer;">📋 交易報告</button>
+    </div>
+
+    <!-- 市場總覽 -->
+    <div id="alphaMarketSummary" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;margin-bottom:1rem;">
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+        <span style="font-size:0.7rem;color:var(--muted);">市場判斷</span>
+        <span id="alphaMoodBadge" style="font-size:0.7rem;padding:2px 8px;border-radius:99px;font-weight:600;"></span>
+        <span style="font-size:0.65rem;color:var(--muted);margin-left:auto;" id="alphaGenTime"></span>
+      </div>
+      <div id="alphaMarketText" style="font-size:0.85rem;color:var(--fg);line-height:1.6;"></div>
+      <div id="alphaNote" style="font-size:0.78rem;color:var(--accent);margin-top:0.5rem;font-style:italic;"></div>
+    </div>
+
+    <!-- 推薦個股卡片 -->
+    <div id="alphaRecommendations" style="display:flex;flex-direction:column;gap:0.75rem;"></div>
+
+    <!-- 載入中 -->
+    <div id="alphaLoading" style="display:none;text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">
+      <div class="spinner" style="margin:0 auto 0.8rem;"></div>
+      Alpha 正在整合市場資料、新聞、社群情緒…<br>
+      <span style="font-size:0.75rem;opacity:0.6;">（約需 15-25 秒）</span>
+    </div>
+
+    <!-- 交易報告 modal -->
+    <div id="alphaReportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;overflow-y:auto;padding:1rem;">
+      <div style="max-width:700px;margin:2rem auto;background:var(--bg);border-radius:14px;padding:1.5rem;border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;margin-bottom:1.2rem;">
+          <div style="font-size:1rem;font-weight:700;">📋 Alpha 交易報告書</div>
+          <button onclick="document.getElementById('alphaReportModal').style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;">✕</button>
+        </div>
+        <div id="alphaReportContent"></div>
+      </div>
+    </div>
+
+    <!-- 平倉 modal -->
+    <div id="alphaCloseModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;">
+      <div style="background:var(--bg);border-radius:14px;padding:1.5rem;border:1px solid var(--border);width:320px;">
+        <div style="font-weight:700;margin-bottom:1rem;">平倉確認</div>
+        <div style="font-size:0.85rem;color:var(--muted);margin-bottom:0.6rem;">出場價格</div>
+        <input id="alphaExitPriceInput" type="number" step="0.01" placeholder="輸入實際出場價" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:0.9rem;box-sizing:border-box;margin-bottom:1rem;">
+        <div style="display:flex;gap:0.5rem;">
+          <button onclick="alphaConfirmClose()" style="flex:1;padding:0.5rem;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;">確認平倉</button>
+          <button onclick="document.getElementById('alphaCloseModal').style.display='none'" style="flex:1;padding:0.5rem;border-radius:6px;background:var(--card);color:var(--fg);border:1px solid var(--border);cursor:pointer;">取消</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
     </div><!-- end signalPanel -->
 
     <button class="load-more" id="loadMoreBtn" style="display:none" onclick="loadMore()">載入更多 ↓</button>
@@ -4970,6 +5032,280 @@ async function loadInstitutionalHistory() {
 
   } catch(e) {
     console.warn('loadInstitutionalHistory error:', e);
+  }
+}
+
+
+// ════════════════════════════════════════
+// 🤖 Alpha 交易員
+// ════════════════════════════════════════
+
+let alphaPendingCloseId = null;
+
+const MOOD_STYLE = {
+  '樂觀': { bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
+  '中性': { bg: 'rgba(148,163,184,0.15)', color: 'var(--muted)' },
+  '謹慎': { bg: 'rgba(251,191,36,0.15)',  color: '#fbbf24' },
+  '悲觀': { bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+};
+const ACTION_STYLE = {
+  '買進': { bg: 'rgba(34,197,94,0.12)',  color: '#22c55e', border: 'rgba(34,197,94,0.3)' },
+  '觀察': { bg: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: 'rgba(251,191,36,0.3)' },
+  '避開': { bg: 'rgba(239,68,68,0.12)',  color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+};
+const CONF_STYLE = { '高': '#22c55e', '中': '#fbbf24', '低': '#ef4444' };
+
+async function alphaAnalyze() {
+  const btn = document.getElementById('alphaBtn');
+  const loading = document.getElementById('alphaLoading');
+  const badge = document.getElementById('alphaStatusBadge');
+  btn.disabled = true; btn.textContent = '分析中…';
+  loading.style.display = 'block';
+  document.getElementById('alphaMarketSummary').style.display = 'none';
+  document.getElementById('alphaRecommendations').innerHTML = '';
+  badge.textContent = '分析中'; badge.style.background = 'rgba(99,102,241,0.15)'; badge.style.color = '#818cf8';
+
+  try {
+    const ownerToken = getOwnerToken ? getOwnerToken() : '';
+    const res = await fetch(`${API_BASE}?endpoint=alpha_analyze`, {
+      headers: { 'x-owner-token': ownerToken }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    renderAlphaResult(data);
+    badge.textContent = '✓ 分析完成'; badge.style.background = 'rgba(34,197,94,0.15)'; badge.style.color = '#22c55e';
+  } catch(e) {
+    badge.textContent = '錯誤'; badge.style.background = 'rgba(239,68,68,0.15)'; badge.style.color = '#ef4444';
+    document.getElementById('alphaRecommendations').innerHTML =
+      `<div style="color:var(--muted);font-size:0.85rem;padding:1rem;">Alpha 分析失敗：${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ 讓 Alpha 分析';
+    loading.style.display = 'none';
+  }
+}
+
+function renderAlphaResult(data) {
+  // 市場總覽
+  const mood = data.market_mood || '中性';
+  const ms = MOOD_STYLE[mood] || MOOD_STYLE['中性'];
+  const moodBadge = document.getElementById('alphaMoodBadge');
+  moodBadge.textContent = mood;
+  moodBadge.style.background = ms.bg;
+  moodBadge.style.color = ms.color;
+  document.getElementById('alphaMarketText').textContent = data.market_summary || '';
+  document.getElementById('alphaNote').textContent = data.alpha_note ? `💬 ${data.alpha_note}` : '';
+  document.getElementById('alphaGenTime').textContent = data.generated_at
+    ? new Date(data.generated_at).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })
+    : '';
+  const src = data.data_sources || {};
+  document.getElementById('alphaMarketSummary').style.display = 'block';
+
+  // 推薦個股
+  const container = document.getElementById('alphaRecommendations');
+  container.innerHTML = '';
+  for (const rec of (data.recommendations || [])) {
+    const as = ACTION_STYLE[rec.action] || ACTION_STYLE['觀察'];
+    const retPct = rec.expected_return_pct != null ? `+${rec.expected_return_pct}%` : '';
+    const card = document.createElement('div');
+    card.style.cssText = `background:${as.bg};border:1px solid ${as.border};border-radius:10px;padding:0.9rem 1.1rem;`;
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.6rem;flex-wrap:wrap;">
+        <span style="font-weight:700;font-size:0.95rem;">${rec.stock_id} ${rec.stock_name || ''}</span>
+        <span style="font-size:0.7rem;padding:2px 8px;border-radius:99px;background:${as.bg};color:${as.color};border:1px solid ${as.border};font-weight:600;">${rec.action}</span>
+        <span style="font-size:0.7rem;padding:2px 7px;border-radius:99px;background:var(--card);color:var(--muted);border:1px solid var(--border);">${rec.style || ''}</span>
+        <span style="font-size:0.7rem;color:${CONF_STYLE[rec.confidence] || 'var(--muted)'};">信心 ${rec.confidence || '-'}</span>
+        ${retPct ? `<span style="font-size:0.75rem;color:#22c55e;font-weight:600;margin-left:auto;">${retPct}</span>` : ''}
+      </div>
+      <div style="display:flex;gap:1.5rem;font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;flex-wrap:wrap;">
+        <span>進場 <b style="color:var(--fg);">${rec.entry_price ?? '-'}</b></span>
+        <span>目標 <b style="color:#22c55e;">${rec.target_price ?? '-'}</b></span>
+        <span>停損 <b style="color:#ef4444;">${rec.stop_loss ?? '-'}</b></span>
+        <span>持有 <b style="color:var(--fg);">${rec.holding_days ?? '-'} 天</b></span>
+      </div>
+      <div style="font-size:0.82rem;color:var(--fg);line-height:1.6;margin-bottom:0.5rem;">${rec.reason || ''}</div>
+      <div style="font-size:0.75rem;color:#fbbf24;">⚠️ ${rec.risk || ''}</div>
+      ${rec.action === '買進' ? `
+      <div style="margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:0.5rem;">
+        <input id="shares_${rec.stock_id}" type="number" min="1" value="1" placeholder="張數"
+          style="width:70px;padding:0.3rem 0.5rem;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:0.8rem;">
+        <span style="font-size:0.75rem;color:var(--muted);">張</span>
+        <button onclick="alphaAddPosition(${JSON.stringify(rec).replace(/"/g,'&quot;')})"
+          style="padding:0.3rem 0.8rem;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:0.78rem;font-weight:600;">
+          ＋ 加入持倉
+        </button>
+      </div>` : ''}
+    `;
+    container.appendChild(card);
+  }
+
+  // 資料來源標籤
+  const srcDiv = document.createElement('div');
+  srcDiv.style.cssText = 'font-size:0.65rem;color:var(--muted);margin-top:0.5rem;text-align:right;';
+  srcDiv.textContent = `資料來源：${src.stocks || 0} 檔股票 · ${src.news || 0} 則新聞 · PTT ${src.ptt || 0} 篇 · Reddit ${src.reddit || 0} 篇 · FGI ${src.fgi ?? '-'} · VIX ${src.vix ?? '-'}`;
+  container.appendChild(srcDiv);
+}
+
+async function alphaAddPosition(rec) {
+  const sharesEl = document.getElementById(`shares_${rec.stock_id}`);
+  const shares = parseInt(sharesEl?.value) || 1;
+  const ownerToken = getOwnerToken ? getOwnerToken() : '';
+  try {
+    const res = await fetch(`${API_BASE}?endpoint=alpha_positions&action=create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-owner-token': ownerToken },
+      body: JSON.stringify({
+        stock_id:     rec.stock_id,
+        stock_name:   rec.stock_name,
+        entry_price:  rec.entry_price,
+        target_price: rec.target_price,
+        stop_loss:    rec.stop_loss,
+        shares,
+        style:        rec.style,
+        reason:       rec.reason,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert(`✅ ${rec.stock_id} ${rec.stock_name} 已加入持倉（${shares} 張）`);
+  } catch(e) {
+    alert(`加入失敗：${e.message}`);
+  }
+}
+
+function alphaOpenCloseModal(id) {
+  alphaPendingCloseId = id;
+  document.getElementById('alphaExitPriceInput').value = '';
+  document.getElementById('alphaCloseModal').style.display = 'flex';
+}
+
+async function alphaConfirmClose() {
+  const exitPrice = parseFloat(document.getElementById('alphaExitPriceInput').value);
+  if (!exitPrice || exitPrice <= 0) { alert('請輸入有效出場價格'); return; }
+  const ownerToken = getOwnerToken ? getOwnerToken() : '';
+  try {
+    const res = await fetch(`${API_BASE}?endpoint=alpha_positions&action=close`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-owner-token': ownerToken },
+      body: JSON.stringify({ id: alphaPendingCloseId, exit_price: exitPrice }),
+    });
+    const data = await res.json();
+    document.getElementById('alphaCloseModal').style.display = 'none';
+    const pnl = data.pnl;
+    const pct = data.pnl_pct;
+    alert(`平倉完成
+損益：${pnl >= 0 ? '+' : ''}${(pnl||0).toLocaleString()} 元（${pct >= 0 ? '+' : ''}${pct?.toFixed(2) ?? 0}%）`);
+    showAlphaReport(); // 刷新報告
+  } catch(e) {
+    alert(`平倉失敗：${e.message}`);
+  }
+}
+
+async function showAlphaReport() {
+  const modal = document.getElementById('alphaReportModal');
+  const content = document.getElementById('alphaReportContent');
+  modal.style.display = 'block';
+  content.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">載入中…</div>';
+  const ownerToken = getOwnerToken ? getOwnerToken() : '';
+
+  try {
+    const [openRes, closedRes] = await Promise.all([
+      fetch(`${API_BASE}?endpoint=alpha_positions&action=list&status=open`,   { headers: { 'x-owner-token': ownerToken } }),
+      fetch(`${API_BASE}?endpoint=alpha_positions&action=list&status=closed`, { headers: { 'x-owner-token': ownerToken } }),
+    ]);
+    const openData   = await openRes.json();
+    const closedData = await closedRes.json();
+    const open   = openData.data   || [];
+    const closed = closedData.data || [];
+
+    // 統計
+    const wins    = closed.filter(p => (p.pnl || 0) > 0).length;
+    const losses  = closed.filter(p => (p.pnl || 0) <= 0).length;
+    const totalPnl = closed.reduce((s, p) => s + (p.pnl || 0), 0);
+    const winRate  = closed.length ? (wins / closed.length * 100).toFixed(1) : '-';
+    const avgPct   = closed.length
+      ? (closed.reduce((s, p) => s + (p.pnl_pct || 0), 0) / closed.length).toFixed(2)
+      : '-';
+
+    const renderRow = (p, isOpen) => {
+      const pnlColor = !isOpen ? ((p.pnl || 0) >= 0 ? '#22c55e' : '#ef4444') : 'var(--muted)';
+      const pnlText  = isOpen ? '持倉中' : `${(p.pnl || 0) >= 0 ? '+' : ''}${(p.pnl || 0).toLocaleString()} (${(p.pnl_pct || 0) >= 0 ? '+' : ''}${(p.pnl_pct || 0).toFixed(2)}%)`;
+      return `
+        <tr style="border-bottom:1px solid var(--border);font-size:0.8rem;">
+          <td style="padding:0.5rem 0.3rem;font-weight:600;">${p.stock_id}</td>
+          <td style="padding:0.5rem 0.3rem;color:var(--muted);">${p.stock_name || ''}</td>
+          <td style="padding:0.5rem 0.3rem;">${p.entry_price ?? '-'}</td>
+          <td style="padding:0.5rem 0.3rem;color:#22c55e;">${p.target_price ?? '-'}</td>
+          <td style="padding:0.5rem 0.3rem;color:#ef4444;">${p.stop_loss ?? '-'}</td>
+          <td style="padding:0.5rem 0.3rem;color:var(--muted);">${p.shares ?? '-'} 張</td>
+          <td style="padding:0.5rem 0.3rem;color:${pnlColor};font-weight:600;">${pnlText}</td>
+          <td style="padding:0.5rem 0.3rem;">
+            ${isOpen
+              ? `<button onclick="alphaOpenCloseModal(${p.id})" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;background:var(--card);border:1px solid var(--border);cursor:pointer;color:var(--fg);">平倉</button>`
+              : `<span style="color:var(--muted);font-size:0.7rem;">${p.closed_at ? new Date(p.closed_at).toLocaleDateString('zh-TW') : ''}</span>`
+            }
+          </td>
+        </tr>`;
+    };
+
+    content.innerHTML = `
+      <!-- 統計摘要 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.2rem;">
+        <div style="background:var(--card);border-radius:8px;padding:0.7rem;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:1.2rem;font-weight:700;color:${totalPnl >= 0 ? '#22c55e' : '#ef4444'};">${totalPnl >= 0 ? '+' : ''}${totalPnl.toLocaleString()}</div>
+          <div style="font-size:0.65rem;color:var(--muted);">累計損益（元）</div>
+        </div>
+        <div style="background:var(--card);border-radius:8px;padding:0.7rem;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:1.2rem;font-weight:700;color:#22c55e;">${winRate}%</div>
+          <div style="font-size:0.65rem;color:var(--muted);">勝率（${wins}勝${losses}敗）</div>
+        </div>
+        <div style="background:var(--card);border-radius:8px;padding:0.7rem;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:1.2rem;font-weight:700;">${open.length}</div>
+          <div style="font-size:0.65rem;color:var(--muted);">持倉中</div>
+        </div>
+        <div style="background:var(--card);border-radius:8px;padding:0.7rem;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:1.2rem;font-weight:700;">${avgPct}%</div>
+          <div style="font-size:0.65rem;color:var(--muted);">平均報酬率</div>
+        </div>
+      </div>
+
+      <!-- 持倉中 -->
+      ${open.length ? `
+      <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.5rem;">📂 持倉中（${open.length}）</div>
+      <div style="overflow-x:auto;margin-bottom:1.2rem;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="font-size:0.7rem;color:var(--muted);border-bottom:1px solid var(--border);">
+            <th style="padding:0.4rem 0.3rem;text-align:left;">代號</th><th style="padding:0.4rem 0.3rem;text-align:left;">名稱</th>
+            <th style="padding:0.4rem 0.3rem;text-align:left;">進場</th><th style="padding:0.4rem 0.3rem;text-align:left;">目標</th>
+            <th style="padding:0.4rem 0.3rem;text-align:left;">停損</th><th style="padding:0.4rem 0.3rem;text-align:left;">張數</th>
+            <th style="padding:0.4rem 0.3rem;text-align:left;">狀態</th><th style="padding:0.4rem 0.3rem;text-align:left;">操作</th>
+          </tr></thead>
+          <tbody>${open.map(p => renderRow(p, true)).join('')}</tbody>
+        </table>
+      </div>` : ''}
+
+      <!-- 歷史紀錄 -->
+      ${closed.length ? `
+      <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.5rem;">📜 歷史交易（${closed.length}）</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="font-size:0.7rem;color:var(--muted);border-bottom:1px solid var(--border);">
+            <th style="padding:0.4rem 0.3rem;text-align:left;">代號</th><th style="padding:0.4rem 0.3rem;text-align:left;">名稱</th>
+            <th style="padding:0.4rem 0.3rem;text-align:left;">進場</th><th style="padding:0.4rem 0.3rem;text-align:left;">目標</th>
+            <th style="padding:0.4rem 0.3rem;text-align:left;">停損</th><th style="padding:0.4rem 0.3rem;text-align:left;">張數</th>
+            <th style="padding:0.4rem 0.3rem;text-align:left;">損益</th><th style="padding:0.4rem 0.3rem;text-align:left;">平倉日</th>
+          </tr></thead>
+          <tbody>${closed.map(p => renderRow(p, false)).join('')}</tbody>
+        </table>
+      </div>` : ''}
+
+      ${!open.length && !closed.length ? '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">尚無交易紀錄<br>點擊「讓 Alpha 分析」後將推薦個股加入持倉</div>' : ''}
+
+      <div style="font-size:0.65rem;color:var(--muted);margin-top:1rem;text-align:center;">⚠️ 以上為 AI 模擬交易紀錄，不構成投資建議</div>
+    `;
+  } catch(e) {
+    content.innerHTML = `<div style="color:#ef4444;font-size:0.85rem;">載入失敗：${e.message}</div>`;
   }
 }
 
