@@ -434,11 +434,21 @@ async function collectNews() {
       { url: 'https://www.cnyes.com/rss/cat/tw_stock',                                               source: '鉅亨網',       lang: 'zh' },
     ];
 
+    // 各來源客製化 headers（部分網站需要 Referer / Accept 才不會 403/406）
+    const CUSTOM_HEADERS = {
+      '工商時報': { 'Referer': 'https://ctee.com.tw/', 'Origin': 'https://ctee.com.tw' },
+      '鉅亨網':   { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Referer': 'https://www.cnyes.com/' },
+    };
+
     // 並行抓取所有 RSS
     const fetchResults = await Promise.all(RSS_FEEDS.map(async ({ url, source, lang }) => {
       try {
         const r = await fetch(url, {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/rss+xml, application/xml, text/xml' },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+            ...(CUSTOM_HEADERS[source] || {}),
+          },
           signal: AbortSignal.timeout(10_000),
         });
         if (!r.ok) { console.log(`  ⚠️  ${source} HTTP ${r.status}`); return []; }
