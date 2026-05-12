@@ -503,6 +503,209 @@ async function collectNews() {
   } catch (e) { console.error(`  ❌ 新聞收集 失敗：${e.message}`); return { ok: false, error: e.message }; }
 }
 
+
+// ══════════════════════════════════════════
+// Alpha 每日報告生成
+// ══════════════════════════════════════════
+async function collectAlphaReport() {
+  console.log('🤖 Alpha 每日報告生成...');
+  const GROQ_KEY = process.env.GROQ_API_KEY;
+  if (!GROQ_KEY) { console.warn('  ⚠️  GROQ_API_KEY 未設定'); return { ok: false, error: 'no groq key' }; }
+
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // 檢查今日報告是否已存在
+    const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/alpha_daily_report?report_date=eq.${today}&select=id`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    const existing = await checkRes.json();
+    if (Array.isArray(existing) && existing.length > 0) {
+      console.log(`  ℹ️  今日報告已存在（${today}），跳過`);
+      return { ok: true, skipped: true };
+    }
+
+    // ── 1. 抓最新日期股價 ──
+    const dateRes = await fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?order=date.desc&limit=1&select=date`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    const dateJson = await dateRes.json();
+    const latestDate = Array.isArray(dateJson) && dateJson[0]?.date ? dateJson[0].date : null;
+
+    let stocks = [], valuation = [];
+    if (latestDate) {
+      const [sRes, vRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?date=eq.${latestDate}&order=volume.desc&limit=100&select=stock_id,name,close,prev,chg_pct,volume`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        }).then(r => r.json()).catch(() => []),
+        fetch(`${SUPABASE_URL}/rest/v1/stock_valuation_daily?order=dividend_yield.desc&limit=100&select=stock_id,pe_ratio,pb_ratio,dividend_yield`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        }).then(r => r.json()).catch(() => []),
+      ]);
+      stocks    = Array.isArray(sRes) ? sRes : [];
+      valuation = Array.isArray(vRes) ? vRes : [];
+    }
+
+    // ── 2. 抓最新新聞 ──
+    const newsRes = await fetch(`${SUPABASE_URL}/rest/v1/news_daily?order=published_at.desc&limit=40&select=title,source,lang`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    const news = await newsRes.json().catch(() => []);
+
+    // ── 3. 抓 PTT ──
+    let pttTitles = '';
+    try {
+      const pttRes = await fetch('https://www.ptt.cc/bbs/Stock/index.html', {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1' },
+        signal: AbortSignal.timeout(8000),
+      });
+      const html = await pttRes.text();
+      const blocks = html.split('<div class="r-ent">').slice(1, 16);
+      const items = [];
+      for (const blk of blocks) {
+        const linkM = blk.match(/href="(\/bbs\/Stock\/M\.[^"]+)"/i);
+        const titM  = blk.match(/<a[^>]+href="[^"]+"[^>]*>([^<]+)<\/a>/i);
+        if (!linkM || !titM) continue;
+        const title = titM[1].trim();
+        if (['[公告]','[板規]','Fw:'].some(p => title.startsWith(p))) continue;
+        const nrecM = blk.match(/<span[^>]*>(爆|\d+|X+)<\/span>/i);
+        const nrecRaw = (nrecM?.[1] || '').trim();
+        const pushes = nrecRaw === '爆' ? 99 : /^X+$/i.test(nrecRaw) ? -nrecRaw.length*10 : parseInt(nrecRaw)||0;
+        items.push(`【${pushes >= 0 ? '+' : ''}${pushes}推】${title}`);
+      }
+      pttTitles = items.join('\n');
+    } catch { pttTitles = '無法取得'; }
+
+    // ── 4. 整理資料 ──
+    const valMap = {};
+    for (const v of valuation) valMap[v.stock_id] = v;
+
+    const stockTable = stocks.slice(0, 50).map(s => {
+      const v = valMap[s.stock_id] || {};
+      return `${s.stock_id} ${s.name} 收${s.close} 漲跌${s.chg_pct != null ? (s.chg_pct*100).toFixed(2) : 'N/A'}% 量${s.volume} PE${v.pe_ratio ?? '-'} PB${v.pb_ratio ?? '-'} 殖${v.dividend_yield ?? '-'}%`;
+    }).join('\n');
+
+    const newsTitles = (Array.isArray(news) ? news : []).slice(0, 30)
+      .map(n => `[${n.source}] ${n.title}`).join('\n');
+
+    // ── 5. 呼叫 Groq ──
+    const systemPrompt = `你是 Alpha，一位經驗豐富的台股交易員。
+今天是 ${today}，台股將於 09:00 開盤。
+你的分析風格：冷靜、數據導向、不隨波逐流。
+根據：技術面（量價）、基本面（PE/PB/殖利率）、市場情緒、新聞催化劑，綜合判斷操作方向。
+依市場狀況自行決定操作風格（短線波段 3-10 天 / 中線趨勢 1-4 週 / 價值布局）。
+
+【價格規則 — 嚴格遵守】
+- entry_price 必須在收盤價的 ±5% 範圍內
+- target_price 必須在 entry_price 的 +3% ~ +20% 範圍內
+- stop_loss 必須在 entry_price 的 -3% ~ -10% 範圍內
+- 禁止使用訓練資料的歷史股價，只能用表格提供的收盤價
+
+回傳嚴格 JSON，不含任何 markdown：
+{
+  "market_summary": "50字以內市場總結",
+  "market_mood": "樂觀|中性|謹慎|悲觀",
+  "recommendations": [
+    {
+      "stock_id": "四碼代號",
+      "stock_name": "名稱",
+      "style": "短線|中線|價值",
+      "action": "買進|觀察|避開",
+      "entry_price": 數字,
+      "target_price": 數字,
+      "stop_loss": 數字,
+      "expected_return_pct": 數字,
+      "holding_days": 數字,
+      "confidence": "高|中|低",
+      "reason": "100字以內操作理由",
+      "risk": "30字以內主要風險"
+    }
+  ],
+  "alpha_note": "給投資人的一句話警語"
+}
+recommendations 包含 3-5 檔，action=買進 至少 2 檔。`;
+
+    const userPrompt = `【今日日期】${today}（09:00 開盤）
+
+【台股最新收盤（${latestDate}）前50大成交量】
+${stockTable}
+
+【近期財經新聞】
+${newsTitles}
+
+【PTT Stock 板熱門】
+${pttTitles}
+
+請給出今日開盤操作建議。`;
+
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        max_tokens: 2000,
+        temperature: 0.3,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!groqRes.ok) throw new Error(`Groq HTTP ${groqRes.status}`);
+    const groqData = await groqRes.json();
+    let raw = groqData.choices?.[0]?.message?.content || '';
+    raw = raw.replace(/```json|```/g, '').trim();
+    const si = raw.indexOf('{'), ei = raw.lastIndexOf('}');
+    if (si === -1 || ei === -1) throw new Error('Groq 未回傳 JSON');
+    const result = JSON.parse(raw.slice(si, ei + 1));
+
+    // ── 6. 校正價格 ──
+    const priceMap = {};
+    for (const s of stocks) priceMap[s.stock_id] = s.close;
+    for (const rec of (result.recommendations || [])) {
+      const realClose = priceMap[rec.stock_id];
+      if (!realClose || realClose <= 0) continue;
+      if (!rec.entry_price || Math.abs(rec.entry_price - realClose) / realClose > 0.20) {
+        rec.entry_price  = parseFloat((realClose * 1.00).toFixed(1));
+        rec.target_price = parseFloat((realClose * 1.08).toFixed(1));
+        rec.stop_loss    = parseFloat((realClose * 0.94).toFixed(1));
+        rec.price_corrected = true;
+      } else {
+        if (!rec.target_price || rec.target_price <= rec.entry_price)
+          rec.target_price = parseFloat((rec.entry_price * 1.08).toFixed(1));
+        if (!rec.stop_loss || rec.stop_loss >= rec.entry_price)
+          rec.stop_loss = parseFloat((rec.entry_price * 0.94).toFixed(1));
+      }
+    }
+
+    // ── 7. 存入 Supabase ──
+    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/alpha_daily_report`, {
+      method: 'POST',
+      headers: {
+        apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        report_date:    today,
+        market_mood:    result.market_mood || '中性',
+        market_summary: result.market_summary || '',
+        alpha_note:     result.alpha_note || '',
+        recommendations: result.recommendations || [],
+        data_sources:   { stocks: stocks.length, news: Array.isArray(news) ? news.length : 0, ptt: pttTitles.split('\n').length },
+        generated_at:   new Date().toISOString(),
+      }),
+    });
+
+    if (!upsertRes.ok) throw new Error(`Supabase upsert HTTP ${upsertRes.status}`);
+    console.log(`  ✅ Alpha 報告已生成並儲存（${today}，${result.recommendations?.length || 0} 檔推薦）`);
+    return { ok: true, date: today, count: result.recommendations?.length || 0 };
+
+  } catch (e) {
+    console.error(`  ❌ Alpha 報告生成失敗：${e.message}`);
+    return { ok: false, error: e.message };
+  }
+}
+
 // ══════════════════════════════════════════
 // 主程式
 // ══════════════════════════════════════════
@@ -510,6 +713,7 @@ async function main() {
   const isTWSE    = MODE === 'twse'    || MODE === 'all';
   const isFinMind = MODE === 'finmind' || MODE === 'all';
   const isNews    = MODE === 'news'    || MODE === 'all';
+  const isAlpha   = MODE === 'alpha'   || MODE === 'all';
   console.log('═══════════════════════════════════════');
   console.log('  AlphaScope — 每日資料收集 v3');
   console.log(`  執行時間：${new Date().toISOString()}`);
@@ -528,6 +732,10 @@ async function main() {
   if (isNews) {
     console.log('\n── 新聞收集 ──');
     results.news        = await collectNews();
+  }
+  if (isAlpha) {
+    console.log('\n── Alpha 報告生成 ──');
+    results.alpha       = await collectAlphaReport();
   }
   if (isFinMind) {
     console.log('\n── FinMind API ──');
