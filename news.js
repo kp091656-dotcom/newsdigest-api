@@ -372,7 +372,7 @@ ${redditTitles || '無'}
         }
       }
 
-      // 加入資料來源資訊
+      // 加入資料來源資訊（含 debug）
       result.data_sources = {
         stocks:  topStocks.length,
         news:    news.length,
@@ -380,6 +380,7 @@ ${redditTitles || '無'}
         reddit:  reddit.length,
         fgi:     fgiScore,
         vix:     vixNow,
+        debug_sample: topStocks.slice(0,3).map(s => ({ id: s.id, name: s.name, close: s.close })),
       };
       result.generated_at = new Date().toISOString();
 
