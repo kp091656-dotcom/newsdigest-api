@@ -601,28 +601,8 @@ async function collectAlphaReport() {
 - stop_loss 必須在 entry_price 的 -3% ~ -10% 範圍內
 - 禁止使用訓練資料的歷史股價，只能用表格提供的收盤價
 
-回傳嚴格 JSON，不含任何 markdown：
-{
-  "market_summary": "50字以內市場總結",
-  "market_mood": "樂觀|中性|謹慎|悲觀",
-  "recommendations": [
-    {
-      "stock_id": "四碼代號",
-      "stock_name": "名稱",
-      "style": "短線|中線|價值",
-      "action": "買進|觀察|避開",
-      "entry_price": 數字,
-      "target_price": 數字,
-      "stop_loss": 數字,
-      "expected_return_pct": 數字,
-      "holding_days": 數字,
-      "confidence": "高|中|低",
-      "reason": "100字以內操作理由",
-      "risk": "30字以內主要風險"
-    }
-  ],
-  "alpha_note": "給投資人的一句話警語"
-}
+只能回傳純 JSON 物件，不含 markdown、不含任何說明文字。所有字串值必須用英文半形雙引號，數字不加引號。
+格式：{"market_summary":"...","market_mood":"樂觀或中性或謹慎或悲觀","recommendations":[{"stock_id":"4碼","stock_name":"名稱","style":"短線或中線或價值","action":"買進或觀察或避開","entry_price":數字,"target_price":數字,"stop_loss":數字,"expected_return_pct":數字,"holding_days":數字,"confidence":"高或中或低","reason":"操作理由","risk":"風險"}],"alpha_note":"一句話警語"}
 recommendations 包含 3-5 檔，action=買進 至少 2 檔。`;
 
     const userPrompt = `【今日日期】${today}（09:00 開盤）
@@ -653,10 +633,25 @@ ${pttTitles}
     if (!groqRes.ok) throw new Error(`Groq HTTP ${groqRes.status}`);
     const groqData = await groqRes.json();
     let raw = groqData.choices?.[0]?.message?.content || '';
-    raw = raw.replace(/```json|```/g, '').trim();
+    // 多層清理：移除 markdown、全形引號、控制字元
+    raw = raw
+      .replace(/```json|```/g, '')
+      .replace(/“|”|‘|’/g, '"') // 全形引號→半形
+      .replace(/[ --]/g, '') // 控制字元
+      .trim();
     const si = raw.indexOf('{'), ei = raw.lastIndexOf('}');
-    if (si === -1 || ei === -1) throw new Error('Groq 未回傳 JSON');
-    const result = JSON.parse(raw.slice(si, ei + 1));
+    if (si === -1 || ei === -1) throw new Error(`Groq 未回傳 JSON，原始內容：${raw.slice(0,200)}`);
+    let jsonStr = raw.slice(si, ei + 1);
+    // 修復常見 AI JSON 錯誤：trailing comma
+    jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+    let result;
+    try {
+      result = JSON.parse(jsonStr);
+    } catch(parseErr) {
+      // 記錄原始內容方便 debug
+      console.error('  JSON 解析失敗，原始內容：', jsonStr.slice(0, 500));
+      throw new Error(`JSON 解析失敗：${parseErr.message}`);
+    }
 
     // ── 6. 校正價格 ──
     const priceMap = {};
