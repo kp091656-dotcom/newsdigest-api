@@ -217,22 +217,18 @@ export default async function handler(req, res) {
       const twFuture = futures?.data?.find(f => f.name?.includes('台灣') || f.name?.includes('TX')) ?? null;
 
       // ── 5. 整理 PTT 熱門標題 ──
-      const pttTitles = ptt.slice(0, 15).map(p => `【${p.pushes >= 0 ? '+' : ''}${p.pushes}推】${p.title}`).join('
-');
+      const pttTitles = ptt.slice(0, 15).map(p => `【${p.pushes >= 0 ? '+' : ''}${p.pushes}推】${p.title}`).join('\n');
 
       // ── 6. 整理 Reddit ──
-      const redditTitles = reddit.slice(0, 10).map(r => `[${r.score || 0}↑] ${r.title}`).join('
-');
+      const redditTitles = reddit.slice(0, 10).map(r => `[${r.score || 0}↑] ${r.title}`).join('\n');
 
       // ── 7. 整理新聞標題 ──
-      const newsTitles = news.slice(0, 30).map(n => `[${n.source}] ${n.title}`).join('
-');
+      const newsTitles = news.slice(0, 30).map(n => `[${n.source}] ${n.title}`).join('\n');
 
       // ── 8. 組裝 Prompt ──
       const stockTable = topStocks.map(s =>
         `${s.id} ${s.name} 收${s.close} 漲跌${s.chgPct ?? 'N/A'}% 量${s.volume} PE${s.pe ?? '-'} PB${s.pb ?? '-'} 殖${s.dy ?? '-'}%`
-      ).join('
-');
+      ).join('\n');
 
       const marketContext = [
         fgiScore !== null ? `Fear & Greed: ${fgiScore} (${fgiLabel})` : '',
