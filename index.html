@@ -5161,13 +5161,8 @@ function renderAlphaResult(data) {
       <div style="font-size:0.75rem;color:#fbbf24;">⚠️ ${rec.risk || ''}</div>
       ${rec.action === '買進' ? `
       <div style="margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:0.5rem;">
-        <input id="shares_${rec.stock_id}" type="number" min="1" value="1" placeholder="張數"
-          style="width:70px;padding:0.3rem 0.5rem;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:0.8rem;">
-        <span style="font-size:0.75rem;color:var(--muted);">張</span>
-        <button onclick="alphaAddPosition(${JSON.stringify(rec).replace(/"/g,'&quot;')})"
-          style="padding:0.3rem 0.8rem;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:0.78rem;font-weight:600;">
-          ＋ 加入持倉
-        </button>
+        <span style="font-size:0.75rem;color:#22c55e;font-weight:600;">✅ Alpha 已自動進場</span>
+        <span style="font-size:0.7rem;color:var(--muted);">· 持倉已記錄於交易報告</span>
       </div>` : ''}
     `;
     container.appendChild(card);
@@ -5180,31 +5175,7 @@ function renderAlphaResult(data) {
   container.appendChild(srcDiv);
 }
 
-async function alphaAddPosition(rec) {
-  const sharesEl = document.getElementById(`shares_${rec.stock_id}`);
-  const shares = parseInt(sharesEl?.value) || 1;
-  const ownerToken = getOwnerToken ? getOwnerToken() : '';
-  try {
-    const res = await fetch(`${API_BASE}?endpoint=alpha_positions&action=create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-owner-token': ownerToken },
-      body: JSON.stringify({
-        stock_id:     rec.stock_id,
-        stock_name:   rec.stock_name,
-        entry_price:  rec.entry_price,
-        target_price: rec.target_price,
-        stop_loss:    rec.stop_loss,
-        shares,
-        style:        rec.style,
-        reason:       rec.reason,
-      }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    alert(`✅ ${rec.stock_id} ${rec.stock_name} 已加入持倉（${shares} 張）`);
-  } catch(e) {
-    alert(`加入失敗：${e.message}`);
-  }
-}
+// alphaAddPosition 已移除：Alpha 進場由 GitHub Actions 自動建立
 
 function alphaOpenCloseModal(id) {
   alphaPendingCloseId = id;
