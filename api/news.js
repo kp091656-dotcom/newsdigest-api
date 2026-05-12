@@ -152,10 +152,23 @@ export default async function handler(req, res) {
       // ── 1. 並行抓取所有資料來源 ──
       const [stockRows, valuationRows, newsRows, pttData, redditData, fgiData, vixData, futuresData] = await Promise.allSettled([
         // 台股股價（近 5 日成交量前 200 檔）
-        fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?order=trade_volume.desc&limit=200&select=stock_id,stock_name,close_price,change_pct,trade_volume,date`, {
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-          signal: AbortSignal.timeout(5000),
-        }).then(r => r.json()).catch(() => []),
+        (async () => {
+          // 先取最新日期
+          const dateRes = await fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?order=date.desc&limit=1&select=date`, {
+            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+            signal: AbortSignal.timeout(5000),
+          });
+          const dateJson = await dateRes.json();
+          const latestDate = Array.isArray(dateJson) && dateJson[0]?.date ? dateJson[0].date : null;
+          if (!latestDate) return [];
+          // 只取該日期、成交量前 200
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?date=eq.${latestDate}&order=volume.desc&limit=200&select=stock_id,name,close,prev,chg_pct,volume,date`, {
+            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+            signal: AbortSignal.timeout(5000),
+          });
+          const j = await r.json();
+          return Array.isArray(j) ? j : [];
+        })().catch(() => []),
 
         // 個股估值
         fetch(`${SUPABASE_URL}/rest/v1/stock_valuation_daily?order=dividend_yield.desc&limit=200&select=stock_id,pe_ratio,pb_ratio,dividend_yield`, {
@@ -202,10 +215,10 @@ export default async function handler(req, res) {
       // ── 3. 整理股票資料（前 50 檔，加入估值）──
       const topStocks = stocks.slice(0, 50).map(s => ({
         id:      s.stock_id,
-        name:    s.stock_name,
-        close:   s.close_price,
-        chgPct:  s.change_pct,
-        volume:  s.trade_volume,
+        name:    s.name,
+        close:   s.close,
+        chgPct:  s.chg_pct,
+        volume:  s.volume,
         pe:      valMap[s.stock_id]?.pe_ratio    ?? null,
         pb:      valMap[s.stock_id]?.pb_ratio    ?? null,
         dy:      valMap[s.stock_id]?.dividend_yield ?? null,
@@ -368,7 +381,7 @@ ${redditTitles || '無'}
         }
       }
 
-      // 加入資料來源資訊
+      // 加入資料來源資訊（含 debug）
       result.data_sources = {
         stocks:  topStocks.length,
         news:    news.length,
@@ -376,6 +389,7 @@ ${redditTitles || '無'}
         reddit:  reddit.length,
         fgi:     fgiScore,
         vix:     vixNow,
+        debug_sample: topStocks.slice(0,3).map(s => ({ id: s.id, name: s.name, close: s.close })),
       };
       result.generated_at = new Date().toISOString();
 
