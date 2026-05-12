@@ -155,7 +155,11 @@ export default async function handler(req, res) {
         fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?order=volume.desc&limit=200&select=stock_id,name,close,prev,chg_pct,volume,date`, {
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           signal: AbortSignal.timeout(5000),
-        }).then(r => r.json()).catch(() => []),
+        }).then(async r => {
+          const j = await r.json();
+          console.log('[Alpha] stocks sample:', JSON.stringify(j?.slice?.(0,2) ?? j));
+          return Array.isArray(j) ? j : [];
+        }).catch(e => { console.log('[Alpha] stocks error:', e.message); return []; }),
 
         // 個股估值
         fetch(`${SUPABASE_URL}/rest/v1/stock_valuation_daily?order=dividend_yield.desc&limit=200&select=stock_id,pe_ratio,pb_ratio,dividend_yield`, {
