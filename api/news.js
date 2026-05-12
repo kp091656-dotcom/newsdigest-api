@@ -51,9 +51,10 @@ export default async function handler(req, res) {
     // Owner 驗證
     const OWNER_HASH = process.env.OWNER_TOKEN_HASH;
     if (OWNER_HASH) {
-      const crypto = require('crypto');
       const incoming = req.headers['x-owner-token'] || '';
-      const incomingHash = crypto.createHash('sha256').update(incoming).digest('hex');
+      const msgBuf = new TextEncoder().encode(incoming);
+      const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
+      const incomingHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
       if (incomingHash !== OWNER_HASH) return res.status(403).json({ error: 'unauthorized' });
     }
 
@@ -285,9 +286,10 @@ ${redditTitles || '無'}
     // Owner 驗證
     const OWNER_HASH = process.env.OWNER_TOKEN_HASH;
     if (OWNER_HASH) {
-      const crypto = require('crypto');
       const incoming = req.headers['x-owner-token'] || '';
-      const incomingHash = crypto.createHash('sha256').update(incoming).digest('hex');
+      const msgBuf = new TextEncoder().encode(incoming);
+      const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
+      const incomingHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
       if (incomingHash !== OWNER_HASH) return res.status(403).json({ error: 'unauthorized' });
     }
 
@@ -768,9 +770,10 @@ ${redditTitles || '無'}
     // 前端在 header x-owner-token 傳明文密碼，後端 hash 後比對
     const OWNER_HASH = process.env.OWNER_TOKEN_HASH;
     if (OWNER_HASH) {
-      const crypto = require('crypto');
       const incoming = req.headers['x-owner-token'] || '';
-      const incomingHash = crypto.createHash('sha256').update(incoming).digest('hex');
+      const msgBuf = new TextEncoder().encode(incoming);
+      const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
+      const incomingHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
       if (incomingHash !== OWNER_HASH) {
         console.warn('[Groq] Unauthorized — missing or wrong owner token');
         return res.status(403).json({ error: 'unauthorized', message: '需要 Owner 密碼才能使用 AI 功能' });
