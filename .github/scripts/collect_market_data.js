@@ -504,6 +504,92 @@ async function collectNews() {
 }
 
 
+
+// ══════════════════════════════════════════
+// Alpha 自動停損停利檢查
+// ══════════════════════════════════════════
+async function checkAlphaStopLossTarget() {
+  console.log('🔍 Alpha 停損停利檢查...');
+  try {
+    // 取所有開倉持倉
+    const posRes = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions?status=eq.open&select=id,stock_id,stock_name,entry_price,target_price,stop_loss,shares`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    const positions = await posRes.json();
+    if (!Array.isArray(positions) || positions.length === 0) {
+      console.log('  ℹ️  目前無開倉持倉');
+      return { ok: true, closed: 0 };
+    }
+
+    // 取最新收盤日
+    const dateRes = await fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?order=date.desc&limit=1&select=date`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    const dateJson = await dateRes.json();
+    const latestDate = Array.isArray(dateJson) && dateJson[0]?.date ? dateJson[0].date : null;
+    if (!latestDate) { console.log('  ⚠️  無法取得最新收盤日'); return { ok: true, closed: 0 }; }
+
+    // 取這些股票的最新收盤價
+    const stockIds = [...new Set(positions.map(p => p.stock_id))];
+    const priceRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/stock_daily_twse?date=eq.${latestDate}&stock_id=in.(${stockIds.join(',')})&select=stock_id,close`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    const priceRows = await priceRes.json();
+    const priceMap = {};
+    if (Array.isArray(priceRows)) for (const r of priceRows) priceMap[r.stock_id] = r.close;
+
+    let closedCount = 0;
+    for (const pos of positions) {
+      const close = priceMap[pos.stock_id];
+      if (!close || close <= 0) continue;
+
+      let exitReason = null;
+      let exitPrice  = close;
+
+      if (close >= pos.target_price) {
+        exitReason = `停利出場（收盤 ${close} ≥ 目標 ${pos.target_price}）`;
+      } else if (close <= pos.stop_loss) {
+        exitReason = `停損出場（收盤 ${close} ≤ 停損 ${pos.stop_loss}）`;
+      }
+
+      if (!exitReason) continue;
+
+      // 計算損益
+      const pnl     = parseFloat(((exitPrice - pos.entry_price) * (pos.shares || 1) * 1000).toFixed(0));
+      const pnl_pct = parseFloat(((exitPrice - pos.entry_price) / pos.entry_price * 100).toFixed(2));
+
+      // 更新持倉為 closed
+      const closeRes = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions?id=eq.${pos.id}`, {
+        method: 'PATCH',
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status:    'closed',
+          exit_price: exitPrice,
+          pnl,
+          pnl_pct,
+          closed_at: new Date().toISOString(),
+          reason:    pos.reason ? `${pos.reason}｜${exitReason}` : exitReason,
+        }),
+      });
+
+      if (closeRes.ok) {
+        const emoji = pnl >= 0 ? '✅' : '🔴';
+        console.log(`  ${emoji} ${pos.stock_id} ${pos.stock_name} ${exitReason} 損益：${pnl >= 0 ? '+' : ''}${pnl} 元（${pnl_pct >= 0 ? '+' : ''}${pnl_pct}%）`);
+        closedCount++;
+      }
+    }
+
+    if (closedCount === 0) console.log(`  ✅ 所有持倉未觸及停損停利（收盤日：${latestDate}）`);
+    else console.log(`  📊 共自動平倉 ${closedCount} 筆`);
+
+    return { ok: true, closed: closedCount };
+  } catch(e) {
+    console.error(`  ❌ 停損停利檢查失敗：${e.message}`);
+    return { ok: false, error: e.message };
+  }
+}
+
 // ══════════════════════════════════════════
 // Alpha 每日報告生成
 // ══════════════════════════════════════════
@@ -672,7 +758,7 @@ ${pttTitles}
       }
     }
 
-    // ── 7. 存入 Supabase ──
+    // ── 7. 存入 Supabase alpha_daily_report ──
     const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/alpha_daily_report`, {
       method: 'POST',
       headers: {
@@ -692,8 +778,37 @@ ${pttTitles}
     });
 
     if (!upsertRes.ok) throw new Error(`Supabase upsert HTTP ${upsertRes.status}`);
-    console.log(`  ✅ Alpha 報告已生成並儲存（${today}，${result.recommendations?.length || 0} 檔推薦）`);
-    return { ok: true, date: today, count: result.recommendations?.length || 0 };
+
+    // ── 8. 自動建立買進持倉（Alpha 直接進場）──
+    const buyRecs = (result.recommendations || []).filter(r => r.action === '買進');
+    if (buyRecs.length > 0) {
+      const positions = buyRecs.map(r => ({
+        stock_id:     r.stock_id,
+        stock_name:   r.stock_name,
+        entry_price:  r.entry_price,
+        target_price: r.target_price,
+        stop_loss:    r.stop_loss,
+        shares:       1,
+        style:        r.style,
+        reason:       r.reason,
+        status:       'open',
+        opened_at:    new Date().toISOString(),
+      }));
+      const posRes = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions`, {
+        method: 'POST',
+        headers: {
+          apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=ignore-duplicates,return=minimal',
+        },
+        body: JSON.stringify(positions),
+      });
+      if (posRes.ok) console.log(`  📈 Alpha 自動進場：${buyRecs.map(r => r.stock_id).join('、')}（${buyRecs.length} 檔）`);
+      else console.warn(`  ⚠️  持倉建立失敗 HTTP ${posRes.status}`);
+    }
+
+    console.log(`  ✅ Alpha 報告已生成並儲存（${today}，${result.recommendations?.length || 0} 檔推薦，${buyRecs.length} 檔進場）`);
+    return { ok: true, date: today, count: result.recommendations?.length || 0, bought: buyRecs.length };
 
   } catch (e) {
     console.error(`  ❌ Alpha 報告生成失敗：${e.message}`);
@@ -729,6 +844,8 @@ async function main() {
     results.news        = await collectNews();
   }
   if (isAlpha) {
+    console.log('\n── Alpha 停損停利檢查 ──');
+    results.alphaCheck  = await checkAlphaStopLossTarget();
     console.log('\n── Alpha 報告生成 ──');
     results.alpha       = await collectAlphaReport();
   }
