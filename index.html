@@ -1674,7 +1674,7 @@
       <div style="font-size:1.05rem;font-weight:700;color:var(--fg);">🤖 Alpha 交易室</div>
       <div id="alphaStatusBadge" style="font-size:0.7rem;padding:2px 8px;border-radius:99px;background:var(--card);color:var(--muted);border:1px solid var(--border);">待機中</div>
       <div style="flex:1"></div>
-      <button onclick="alphaAnalyze()" id="alphaBtn" style="padding:0.35rem 1rem;font-size:0.8rem;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;">⚡ 讓 Alpha 分析</button>
+      <button onclick="alphaAnalyze()" id="alphaBtn" style="padding:0.35rem 1rem;font-size:0.8rem;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;">🔄 手動刷新</button>
       <button onclick="showAlphaReport()" style="padding:0.35rem 0.8rem;font-size:0.8rem;border-radius:6px;background:var(--card);color:var(--fg);border:1px solid var(--border);cursor:pointer;">📋 交易報告</button>
     </div>
 
@@ -3413,6 +3413,7 @@ function showSignal() {
   document.getElementById('heatmapPanel').style.display = 'none';
   document.getElementById('signalPanel').style.display = 'block';
   loadMktSignals();
+  initAlphaIfNeeded();
 }
 
 function hideHeatmap() {
@@ -5055,7 +5056,38 @@ const ACTION_STYLE = {
 };
 const CONF_STYLE = { '高': '#22c55e', '中': '#fbbf24', '低': '#ef4444' };
 
+// 頁面載入時自動讀取今日報告
+async function loadAlphaDailyReport() {
+  const badge = document.getElementById('alphaStatusBadge');
+  const loading = document.getElementById('alphaLoading');
+  loading.style.display = 'block';
+  badge.textContent = '載入中'; badge.style.background = 'rgba(99,102,241,0.15)'; badge.style.color = '#818cf8';
+  try {
+    const res = await fetch(`${API_BASE}?endpoint=alpha_report`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // 判斷是否為今日報告
+    const today = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replace(/\//g, '-').replace(/(\d+)-(\d+)-(\d+)/, (_, y, m, d) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
+    const isToday = data.report_date === today;
+    renderAlphaResult(data);
+    badge.textContent = isToday ? '✓ 今日報告' : `報告：${data.report_date}`;
+    badge.style.background = isToday ? 'rgba(34,197,94,0.15)' : 'rgba(251,191,36,0.15)';
+    badge.style.color = isToday ? '#22c55e' : '#fbbf24';
+    // 按鈕改為手動刷新（Owner 限定）
+    const btn = document.getElementById('alphaBtn');
+    btn.textContent = '🔄 手動刷新';
+  } catch(e) {
+    badge.textContent = '尚無報告'; badge.style.background = 'rgba(148,163,184,0.15)'; badge.style.color = 'var(--muted)';
+    document.getElementById('alphaRecommendations').innerHTML =
+      `<div style="color:var(--muted);font-size:0.85rem;padding:1rem;text-align:center;">今日報告尚未生成<br><span style="font-size:0.75rem;opacity:0.6;">每個交易日 08:00 自動更新</span></div>`;
+  } finally {
+    loading.style.display = 'none';
+  }
+}
+
+// 手動刷新（Owner 限定，強制重新呼叫 AI）
 async function alphaAnalyze() {
+  if (!isOwner()) { alert('需要 Owner 身份才能手動刷新'); return; }
   const btn = document.getElementById('alphaBtn');
   const loading = document.getElementById('alphaLoading');
   const badge = document.getElementById('alphaStatusBadge');
@@ -5076,13 +5108,13 @@ async function alphaAnalyze() {
     }
     const data = await res.json();
     renderAlphaResult(data);
-    badge.textContent = '✓ 分析完成'; badge.style.background = 'rgba(34,197,94,0.15)'; badge.style.color = '#22c55e';
+    badge.textContent = '✓ 手動分析完成'; badge.style.background = 'rgba(34,197,94,0.15)'; badge.style.color = '#22c55e';
   } catch(e) {
     badge.textContent = '錯誤'; badge.style.background = 'rgba(239,68,68,0.15)'; badge.style.color = '#ef4444';
     document.getElementById('alphaRecommendations').innerHTML =
       `<div style="color:var(--muted);font-size:0.85rem;padding:1rem;">Alpha 分析失敗：${e.message}</div>`;
   } finally {
-    btn.disabled = false; btn.textContent = '⚡ 讓 Alpha 分析';
+    btn.disabled = false;
     loading.style.display = 'none';
   }
 }
@@ -5308,6 +5340,9 @@ async function showAlphaReport() {
     content.innerHTML = `<div style="color:#ef4444;font-size:0.85rem;">載入失敗：${e.message}</div>`;
   }
 }
+
+// 頁面開啟時自動載入 Alpha 今日報告（多空訊號 tab 開啟時）
+function initAlphaIfNeeded() { if (!window._alphaLoaded) { window._alphaLoaded = true; loadAlphaDailyReport(); } }
 
 // ════════ 多空訊號回測（Supabase）════════
 
