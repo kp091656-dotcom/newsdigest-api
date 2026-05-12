@@ -129,6 +129,26 @@ export default async function handler(req, res) {
 
   // ── End of Alpha helpers ──
 
+
+  // ── Alpha 每日報告讀取 ──
+  if (endpoint === 'alpha_report') {
+    const SUPABASE_URL  = process.env.SUPABASE_URL  || 'https://fdxedcwtmlurumfjmlys.supabase.co';
+    const SUPABASE_KEY  = process.env.SUPABASE_SERVICE_KEY || 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
+    try {
+      // 取最新一筆報告
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/alpha_daily_report?order=report_date.desc&limit=1&select=*`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(5000) }
+      );
+      const rows = await r.json();
+      if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'no report' });
+      res.setHeader('Cache-Control', 'public, max-age=1800'); // 30 分鐘 CDN cache
+      return res.status(200).json(rows[0]);
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ══════════════════════════════════════════
   // Alpha 交易員 — 分析 endpoint
   // ══════════════════════════════════════════
