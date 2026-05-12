@@ -185,11 +185,12 @@ export default async function handler(req, res) {
         fetchFuturesLite().catch(() => null),
       ]);
 
-      const stocks    = stockRows.status    === 'fulfilled' ? (stockRows.value    || []) : [];
-      const valuation = valuationRows.status === 'fulfilled' ? (valuationRows.value || []) : [];
-      const news      = newsRows.status     === 'fulfilled' ? (newsRows.value     || []) : [];
-      const ptt       = pttData.status      === 'fulfilled' ? (pttData.value?.data || []) : [];
-      const reddit    = redditData.status   === 'fulfilled' ? (redditData.value?.posts || []) : [];
+      const toArr = (v) => Array.isArray(v) ? v : [];
+      const stocks    = stockRows.status    === 'fulfilled' ? toArr(stockRows.value)    : [];
+      const valuation = valuationRows.status === 'fulfilled' ? toArr(valuationRows.value) : [];
+      const news      = newsRows.status     === 'fulfilled' ? toArr(newsRows.value)     : [];
+      const ptt       = pttData.status      === 'fulfilled' ? toArr(pttData.value?.data) : [];
+      const reddit    = redditData.status   === 'fulfilled' ? toArr(redditData.value?.posts) : [];
       const fgi       = fgiData.status      === 'fulfilled' ? fgiData.value : null;
       const vix       = vixData.status      === 'fulfilled' ? vixData.value?.data : null;
       const futures   = futuresData.status  === 'fulfilled' ? futuresData.value : null;
