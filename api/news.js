@@ -241,6 +241,14 @@ export default async function handler(req, res) {
 你的分析風格：冷靜、數據導向、不隨波逐流。
 你會根據：技術面（量價）、基本面（PE/PB/殖利率）、市場情緒、社群聲量、新聞催化劑，綜合判斷操作方向。
 你會依市場狀況自行決定操作風格（短線波段 3-10 天 / 中線趨勢 1-4 週 / 價值布局）。
+
+【價格規則 — 嚴格遵守】
+- 所有價格必須以「台股量價估值」表格中的「收」欄位為基準
+- entry_price 必須在該股收盤價的 ±5% 範圍內
+- target_price 必須在 entry_price 的 +3% ~ +20% 範圍內
+- stop_loss 必須在 entry_price 的 -3% ~ -10% 範圍內
+- 禁止使用訓練資料中的歷史股價，只能用表格提供的收盤價
+
 輸出規則：
 - 必須使用繁體中文
 - 回傳嚴格 JSON，不含任何 markdown 或說明文字
@@ -335,6 +343,30 @@ ${redditTitles || '無'}
       let result;
       try { result = JSON.parse(raw); }
       catch { result = { market_summary: '解析失敗', recommendations: [], raw }; }
+
+      // ── 後處理：校正 AI 給的不合理價格（以真實收盤價為基準）──
+      const priceMap = {};
+      for (const s of topStocks) priceMap[s.id] = s.close;
+
+      for (const rec of (result.recommendations || [])) {
+        const realClose = priceMap[rec.stock_id];
+        if (!realClose || realClose <= 0) continue;
+
+        const entry = rec.entry_price;
+        // 若 entry_price 偏離收盤價超過 20%，強制修正
+        if (!entry || Math.abs(entry - realClose) / realClose > 0.20) {
+          rec.entry_price  = parseFloat((realClose * 1.00).toFixed(1));  // 以收盤價為進場
+          rec.target_price = parseFloat((realClose * 1.08).toFixed(1));  // +8%
+          rec.stop_loss    = parseFloat((realClose * 0.94).toFixed(1));  // -6%
+          rec.price_corrected = true;  // 標記已校正
+        } else {
+          // entry 合理，但也檢查 target/stop 是否相對 entry 合理
+          if (!rec.target_price || rec.target_price <= rec.entry_price)
+            rec.target_price = parseFloat((rec.entry_price * 1.08).toFixed(1));
+          if (!rec.stop_loss || rec.stop_loss >= rec.entry_price)
+            rec.stop_loss = parseFloat((rec.entry_price * 0.94).toFixed(1));
+        }
+      }
 
       // 加入資料來源資訊
       result.data_sources = {
