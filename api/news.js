@@ -39,6 +39,96 @@ export default async function handler(req, res) {
   }
 
 
+
+  // ── Alpha helper functions（避免 self-referencing fetch）──
+
+  async function fetchFGI() {
+    const r = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://edition.cnn.com/', 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!r.ok) throw new Error(`FGI HTTP ${r.status}`);
+    return r.json();
+  }
+
+  async function fetchVIX() {
+    const symbols = ['^VIX', '^VVIX'];
+    const results = await Promise.all(symbols.map(async s => {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?interval=1d&range=1d`;
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(5000) });
+      const d = await r.json();
+      const q = d?.chart?.result?.[0]?.meta;
+      return { symbol: s, price: q?.regularMarketPrice ?? null, name: q?.shortName ?? s };
+    }));
+    return { data: results };
+  }
+
+  async function fetchFuturesLite() {
+    // 只抓關鍵幾檔，輕量版
+    const KEY_SYMBOLS = [
+      { symbol: 'SPY.US', name: 'S&P500 ETF' },
+      { symbol: 'QQQ.US', name: '那斯達克 ETF' },
+      { symbol: 'GC.F',   name: '黃金期貨' },
+      { symbol: 'CL.F',   name: 'WTI原油' },
+    ];
+    const d2 = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    const d1 = new Date(Date.now()-7*86400000).toISOString().slice(0,10).replace(/-/g,'');
+    const results = await Promise.allSettled(KEY_SYMBOLS.map(async s => {
+      const r = await fetch(`https://stooq.com/q/d/l/?s=${s.symbol}&d1=${d1}&d2=${d2}&i=d`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(5000),
+      });
+      const csv = await r.text();
+      if (!csv || csv.includes('No data')) return null;
+      const lines = csv.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+      if (!lines.length) return null;
+      const last = lines[lines.length-1].split(',');
+      const prev = lines.length >= 2 ? lines[lines.length-2].split(',') : last;
+      const price = parseFloat(last[4]);
+      const prevP = parseFloat(prev[4]);
+      return { name: s.name, price, chgPct: prevP ? ((price-prevP)/prevP*100).toFixed(2) : null };
+    }));
+    const data = results.map(r => r.status === 'fulfilled' ? r.value : null).filter(Boolean);
+    return { data };
+  }
+
+  async function fetchPTT() {
+    const HDR  = { 'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1' };
+    const BASE = 'https://www.ptt.cc';
+    try {
+      const r = await fetch(BASE + '/bbs/Stock/index.html', { headers: HDR, signal: AbortSignal.timeout(7000) });
+      const html = await r.text();
+      const items = [];
+      const blocks = html.split('<div class="r-ent">').slice(1);
+      for (const blk of blocks.slice(0, 20)) {
+        const linkM = blk.match(/href="(\/bbs\/Stock\/M\.[^"]+)"/i);
+        const titM  = blk.match(/<a[^>]+href="[^"]+"[^>]*>([^<]+)<\/a>/i);
+        if (!linkM || !titM) continue;
+        const title = titM[1].trim();
+        if (['[公告]','[板規]','Fw:'].some(p => title.startsWith(p))) continue;
+        const nrecM = blk.match(/<span[^>]*>(爆|\d+|X+)<\/span>/i);
+        const nrecRaw = (nrecM?.[1] || '').trim();
+        const pushes = nrecRaw === '爆' ? 99 : /^X+$/i.test(nrecRaw) ? -nrecRaw.length*10 : parseInt(nrecRaw)||0;
+        items.push({ title, link: BASE + linkM[1], pushes });
+      }
+      return { data: items };
+    } catch { return { data: [] }; }
+  }
+
+  async function fetchReddit() {
+    try {
+      const r = await fetch('https://www.reddit.com/r/investing/hot.json?limit=15', {
+        headers: { 'User-Agent': 'AlphaScope/1.0' }, signal: AbortSignal.timeout(7000),
+      });
+      const json = await r.json();
+      const posts = (json.data?.children || []).map(c => ({
+        title: c.data.title, score: c.data.score, url: c.data.url,
+      }));
+      return { posts };
+    } catch { return { posts: [] }; }
+  }
+
+  // ── End of Alpha helpers ──
+
   // ══════════════════════════════════════════
   // Alpha 交易員 — 分析 endpoint
   // ══════════════════════════════════════════
@@ -80,29 +170,19 @@ export default async function handler(req, res) {
         }).then(r => r.json()).catch(() => []),
 
         // PTT Stock 版
-        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=ptt`, {
-          signal: AbortSignal.timeout(8000),
-        }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetchPTT().catch(() => ({ data: [] })),
 
         // Reddit
-        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=reddit`, {
-          signal: AbortSignal.timeout(8000),
-        }).then(r => r.json()).catch(() => ({ posts: [] })),
+        fetchReddit().catch(() => ({ posts: [] })),
 
         // Fear & Greed
-        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=fgi`, {
-          signal: AbortSignal.timeout(6000),
-        }).then(r => r.json()).catch(() => null),
+        fetchFGI().catch(() => null),
 
         // VIX
-        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=vix`, {
-          signal: AbortSignal.timeout(6000),
-        }).then(r => r.json()).catch(() => null),
+        fetchVIX().catch(() => null),
 
-        // 全球期貨
-        fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/news?endpoint=futures`, {
-          signal: AbortSignal.timeout(8000),
-        }).then(r => r.json()).catch(() => null),
+        // 全球期貨（直接從 Supabase futures_daily 或 stooq 抓精簡版）
+        fetchFuturesLite().catch(() => null),
       ]);
 
       const stocks    = stockRows.status    === 'fulfilled' ? (stockRows.value    || []) : [];
