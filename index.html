@@ -2893,7 +2893,7 @@ function renderFuturesChart(sortKey) {
   document.querySelectorAll('.fut-sort-btn').forEach(btn => {
     const isActive = (sortKey === 'chgPct' && btn.textContent === '漲跌幅') || (sortKey === 'volPct' && btn.textContent === '波幅');
     btn.style.background = isActive ? 'var(--accent)' : 'var(--surface)';
-    btn.style.color = isActive ? '#fff' : 'var(--muted)';
+    btn.style.color      = isActive ? '#fff' : 'var(--muted)';
     btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
   });
 
@@ -2902,13 +2902,23 @@ function renderFuturesChart(sortKey) {
   const container = document.getElementById('futuresChart');
   container.innerHTML = '';
 
-  // 圖例說明
+  // 格式化收盤價（依數值大小自動決定小數位）
+  function fmtPrice(p) {
+    if (p == null || isNaN(p)) return '–';
+    if (p >= 10000) return p.toLocaleString('en', { maximumFractionDigits: 0 });
+    if (p >= 100)   return p.toLocaleString('en', { maximumFractionDigits: 2 });
+    if (p >= 1)     return p.toLocaleString('en', { maximumFractionDigits: 3 });
+    return p.toLocaleString('en', { maximumFractionDigits: 5 });
+  }
+
+  // 圖例
   const legend = document.createElement('div');
-  legend.style.cssText = 'display:flex;align-items:center;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.6rem;padding:0 0.2rem;';
+  legend.style.cssText = 'display:grid;grid-template-columns:6.5rem 1fr 1fr 5rem;align-items:center;gap:0.4rem;font-family:"IBM Plex Mono",monospace;font-size:0.52rem;color:var(--muted);margin-bottom:0.55rem;padding:0 0.1rem;border-bottom:1px solid var(--border);padding-bottom:0.35rem;';
   legend.innerHTML = `
-    <span style="color:#16a34a;">◀ 跌</span>
-    <span style="letter-spacing:0.06em;">零軸</span>
-    <span style="color:#dc2626;">漲 ▶</span>`;
+    <span></span>
+    <span style="display:flex;justify-content:space-between;padding:0 0.3rem;"><span style="color:#16a34a;">◀ 跌</span><span>零軸</span><span style="color:#dc2626;">漲 ▶</span></span>
+    <span style="text-align:right;padding-right:0.3rem;">漲跌幅</span>
+    <span style="text-align:right;">收盤價</span>`;
   container.appendChild(legend);
 
   const cats = ['波動率','美股指數','亞股指數','能源','金屬','農產品','外匯','債券','加密貨幣'];
@@ -2917,40 +2927,56 @@ function renderFuturesChart(sortKey) {
     if (!items.length) continue;
 
     const section = document.createElement('div');
-    section.style.cssText = 'margin-bottom:1.4rem;';
-    section.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.45rem;padding-bottom:0.3rem;border-bottom:1px solid var(--border);">${cat}</div>`;
+    section.style.cssText = 'margin-bottom:1.25rem;';
+    section.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.4rem;padding-bottom:0.28rem;border-bottom:1px solid var(--border);">${cat}</div>`;
 
     for (const item of items) {
-      const val = item[sortKey];
-      const pct = maxVal ? Math.abs(val) / maxVal * 48 : 0; // 最大 48%（半邊）
-      const isUp = val >= 0;
+      const val   = item[sortKey];
+      const barW  = maxVal ? Math.abs(val) / maxVal * 46 : 0;   // 最大 46%（半邊）
+      const isUp  = val >= 0;
       const color = isUp ? '#dc2626' : '#16a34a';
-      const label = (val >= 0 ? '+' : '') + (val * 100).toFixed(2) + '%';
+      const chgLabel = (val >= 0 ? '+' : '') + (val * 100).toFixed(2) + '%';
+
+      // 漲跌絕對值（元 or 點），若有 chg 欄位則用，否則從 price 推算
+      const chgAbs = item.chg != null
+        ? item.chg
+        : (item.price && item.prevClose ? item.price - item.prevClose : null);
+      const absStr = chgAbs != null
+        ? (chgAbs >= 0 ? '+' : '') + fmtPrice(Math.abs(chgAbs))
+        : '';
 
       const stooqSyms = ['%5E','EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCNH','10USY','30USY','BTCUSD','ETHUSD'];
       const isST = stooqSyms.some(s => item.symbol.includes(s));
       const srcTag = isST
-        ? `<span style="font-size:0.45rem;padding:0 2px;border:1px solid #aaa;border-radius:2px;color:var(--muted);margin-right:2px;">ST</span>`
-        : `<span style="font-size:0.45rem;padding:0 2px;border:1px solid #1a6bc8;border-radius:2px;color:#1a6bc8;margin-right:2px;">FM</span>`;
+        ? `<span style="font-size:0.43rem;padding:0 2px;border:1px solid #aaa;border-radius:2px;color:var(--muted);margin-right:3px;flex-shrink:0;">ST</span>`
+        : `<span style="font-size:0.43rem;padding:0 2px;border:1px solid #1a6bc8;border-radius:2px;color:#1a6bc8;margin-right:3px;flex-shrink:0;">FM</span>`;
+
+      // 雙向 bar
+      const leftPct  = isUp ? 0 : barW;
+      const rightPct = isUp ? barW : 0;
+      const leftBar  = leftPct  ? `<div style="height:10px;width:${leftPct.toFixed(1)}%;background:#bbf7d0;border-radius:3px 0 0 3px;margin-left:auto;"></div>` : '';
+      const rightBar = rightPct ? `<div style="height:10px;width:${rightPct.toFixed(1)}%;background:#fecaca;border-radius:0 3px 3px 0;"></div>` : '';
 
       const row = document.createElement('div');
-      row.style.cssText = 'display:grid;grid-template-columns:5.5rem 1fr 3.8rem;align-items:center;gap:0.4rem;margin-bottom:0.3rem;';
-      row.title = `${item.name}  ${label}  現價：${item.price.toLocaleString('en',{maximumFractionDigits:3})}`;
-
-      // 雙向 bar：左半=跌（右對齊）| 右半=漲（左對齊）
-      const leftPct  = isUp ? 0 : pct;
-      const rightPct = isUp ? pct : 0;
-      const leftBar  = leftPct  ? `<div style="height:12px;width:${leftPct.toFixed(1)}%;background:#bbf7d0;border-radius:3px 0 0 3px;margin-left:auto;"></div>` : '';
-      const rightBar = rightPct ? `<div style="height:12px;width:${rightPct.toFixed(1)}%;background:#fecaca;border-radius:0 3px 3px 0;"></div>` : '';
+      // 4 欄：名稱 | 雙向Bar | 漲跌幅 | 收盤價
+      row.style.cssText = 'display:grid;grid-template-columns:6.5rem 1fr 4.6rem 4.8rem;align-items:center;gap:0.4rem;margin-bottom:0.28rem;min-height:22px;';
 
       row.innerHTML = `
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.64rem;color:var(--text);display:flex;align-items:center;overflow:hidden;white-space:nowrap;">${srcTag}${item.name}</div>
-        <div style="display:grid;grid-template-columns:1fr 1px 1fr;height:12px;background:#f5f3ee;border-radius:3px;overflow:hidden;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:var(--text);display:flex;align-items:center;overflow:hidden;white-space:nowrap;">
+          ${srcTag}<span style="overflow:hidden;text-overflow:ellipsis;">${item.name}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1px 1fr;height:10px;background:rgba(0,0,0,0.04);border-radius:3px;overflow:hidden;">
           <div style="display:flex;align-items:center;justify-content:flex-end;">${leftBar}</div>
           <div style="background:var(--border-dark);width:1px;height:100%;"></div>
           <div style="display:flex;align-items:center;">${rightBar}</div>
         </div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:${color};font-weight:700;text-align:right;white-space:nowrap;">${label}</div>`;
+        <div style="text-align:right;line-height:1.25;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:${color};font-weight:700;white-space:nowrap;">${chgLabel}</div>
+          ${absStr ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:${color};opacity:0.75;white-space:nowrap;">${absStr}</div>` : ''}
+        </div>
+        <div style="text-align:right;line-height:1.25;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--text);font-weight:600;white-space:nowrap;">${fmtPrice(item.price)}</div>
+        </div>`;
       section.appendChild(row);
     }
     container.appendChild(section);
