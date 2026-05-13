@@ -5063,7 +5063,7 @@ async function loadAlphaDailyReport() {
   loading.style.display = 'block';
   badge.textContent = '載入中'; badge.style.background = 'rgba(99,102,241,0.15)'; badge.style.color = '#818cf8';
   try {
-    const res = await fetch(`${API_BASE}?endpoint=alpha_report`);
+    const res = await fetch(`${API_BASE}?endpoint=alpha_report&_t=${Date.now()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     // 判斷是否為今日報告
