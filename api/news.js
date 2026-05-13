@@ -142,7 +142,7 @@ export default async function handler(req, res) {
       );
       const rows = await r.json();
       if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'no report' });
-      res.setHeader('Cache-Control', 'public, max-age=1800'); // 30 分鐘 CDN cache
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=60'); // 5 分鐘 cache
       return res.status(200).json(rows[0]);
     } catch(e) {
       return res.status(500).json({ error: e.message });
