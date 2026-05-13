@@ -5207,9 +5207,9 @@ async function alphaConfirmClose() {
 
 async function showAlphaReport() {
   const modal = document.getElementById('alphaReportModal');
-  const content = document.getElementById('alphaReportContent');
+  const cont  = document.getElementById('alphaReportContent');
   modal.style.display = 'block';
-  content.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">載入中…</div>';
+  cont.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">載入中…</div>';
   const ownerToken = getOwnerToken ? getOwnerToken() : '';
 
   try {
@@ -5217,98 +5217,195 @@ async function showAlphaReport() {
       fetch(`${API_BASE}?endpoint=alpha_positions&action=list&status=open`,   { headers: { 'x-owner-token': ownerToken } }),
       fetch(`${API_BASE}?endpoint=alpha_positions&action=list&status=closed`, { headers: { 'x-owner-token': ownerToken } }),
     ]);
-    const openData   = await openRes.json();
-    const closedData = await closedRes.json();
-    const open   = openData.data   || [];
-    const closed = closedData.data || [];
+    const open   = (await openRes.json()).data   || [];
+    const closed = (await closedRes.json()).data || [];
 
-    // 統計
-    const wins    = closed.filter(p => (p.pnl || 0) > 0).length;
-    const losses  = closed.filter(p => (p.pnl || 0) <= 0).length;
-    const totalPnl = closed.reduce((s, p) => s + (p.pnl || 0), 0);
-    const winRate  = closed.length ? (wins / closed.length * 100).toFixed(1) : '-';
-    const avgPct   = closed.length
-      ? (closed.reduce((s, p) => s + (p.pnl_pct || 0), 0) / closed.length).toFixed(2)
-      : '-';
+    // ── 統計 ──
+    const wins     = closed.filter(p => (p.pnl||0) > 0).length;
+    const losses   = closed.filter(p => (p.pnl||0) <= 0).length;
+    const totalPnl = closed.reduce((s,p) => s+(p.pnl||0), 0);
+    const winRate  = closed.length ? (wins/closed.length*100).toFixed(1) : '-';
+    const avgPct   = closed.length ? (closed.reduce((s,p)=>s+(p.pnl_pct||0),0)/closed.length).toFixed(2) : '-';
+    const maxWin   = closed.length ? Math.max(...closed.map(p=>p.pnl||0)) : 0;
+    const maxLoss  = closed.length ? Math.min(...closed.map(p=>p.pnl||0)) : 0;
+
+    // ── 累積損益曲線資料 ──
+    const sortedClosed = [...closed].sort((a,b) => new Date(a.closed_at)-new Date(b.closed_at));
+    let cumPnl = 0;
+    const cumData = sortedClosed.map(p => { cumPnl += (p.pnl||0); return { date: p.closed_at?.slice(0,10), pnl: cumPnl, label: p.stock_id }; });
 
     const renderRow = (p, isOpen) => {
-      const pnlColor = !isOpen ? ((p.pnl || 0) >= 0 ? '#22c55e' : '#ef4444') : 'var(--muted)';
-      const pnlText  = isOpen ? '持倉中' : `${(p.pnl || 0) >= 0 ? '+' : ''}${(p.pnl || 0).toLocaleString()} (${(p.pnl_pct || 0) >= 0 ? '+' : ''}${(p.pnl_pct || 0).toFixed(2)}%)`;
-      return `
-        <tr style="border-bottom:1px solid var(--border);font-size:0.8rem;">
-          <td style="padding:0.5rem 0.3rem;font-weight:600;">${p.stock_id}</td>
-          <td style="padding:0.5rem 0.3rem;color:var(--muted);">${p.stock_name || ''}</td>
-          <td style="padding:0.5rem 0.3rem;">${p.entry_price ?? '-'}</td>
-          <td style="padding:0.5rem 0.3rem;color:#22c55e;">${p.target_price ?? '-'}</td>
-          <td style="padding:0.5rem 0.3rem;color:#ef4444;">${p.stop_loss ?? '-'}</td>
-          <td style="padding:0.5rem 0.3rem;color:var(--muted);">${p.shares ?? '-'} 張</td>
-          <td style="padding:0.5rem 0.3rem;color:${pnlColor};font-weight:600;">${pnlText}</td>
-          <td style="padding:0.5rem 0.3rem;">
-            ${isOpen
-              ? `<button onclick="alphaOpenCloseModal(${p.id})" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;background:var(--card);border:1px solid var(--border);cursor:pointer;color:var(--fg);">平倉</button>`
-              : `<span style="color:var(--muted);font-size:0.7rem;">${p.closed_at ? new Date(p.closed_at).toLocaleDateString('zh-TW') : ''}</span>`
-            }
-          </td>
-        </tr>`;
+      const pnlColor = !isOpen ? ((p.pnl||0)>=0?'#22c55e':'#ef4444') : 'var(--muted)';
+      const pnlText  = isOpen ? '持倉中' : `${(p.pnl||0)>=0?'+':''}${(p.pnl||0).toLocaleString()} (${(p.pnl_pct||0)>=0?'+':''}${(p.pnl_pct||0).toFixed(2)}%)`;
+      return `<tr style="border-bottom:1px solid var(--border);font-size:0.78rem;">
+        <td style="padding:0.45rem 0.3rem;font-weight:600;">${p.stock_id}</td>
+        <td style="padding:0.45rem 0.3rem;color:var(--muted);">${p.stock_name||''}</td>
+        <td style="padding:0.45rem 0.3rem;">${p.entry_price??'-'}</td>
+        <td style="padding:0.45rem 0.3rem;color:#22c55e;">${p.target_price??'-'}</td>
+        <td style="padding:0.45rem 0.3rem;color:#ef4444;">${p.stop_loss??'-'}</td>
+        <td style="padding:0.45rem 0.3rem;color:${pnlColor};font-weight:600;">${pnlText}</td>
+        <td style="padding:0.45rem 0.3rem;">
+          ${isOpen
+            ? `<button onclick="alphaOpenCloseModal(${p.id})" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;background:var(--card);border:1px solid var(--border);cursor:pointer;color:var(--fg);">平倉</button>`
+            : `<span style="color:var(--muted);font-size:0.7rem;">${p.closed_at?new Date(p.closed_at).toLocaleDateString('zh-TW'):''}</span>`}
+        </td>
+      </tr>`;
     };
 
-    content.innerHTML = `
-      <!-- 統計摘要 -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.2rem;">
-        <div style="background:var(--card);border-radius:8px;padding:0.7rem;text-align:center;border:1px solid var(--border);">
-          <div style="font-size:1.2rem;font-weight:700;color:${totalPnl >= 0 ? '#22c55e' : '#ef4444'};">${totalPnl >= 0 ? '+' : ''}${totalPnl.toLocaleString()}</div>
-          <div style="font-size:0.65rem;color:var(--muted);">累計損益（元）</div>
+    cont.innerHTML = `
+      <!-- ① 統計摘要 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin-bottom:1rem;">
+        <div style="background:var(--card);border-radius:8px;padding:0.65rem;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:1.1rem;font-weight:700;color:${totalPnl>=0?'#22c55e':'#ef4444'};">${totalPnl>=0?'+':''}${totalPnl.toLocaleString()}</div>
+          <div style="font-size:0.62rem;color:var(--muted);">累計損益（元）</div>
         </div>
-        <div style="background:var(--card);border-radius:8px;padding:0.7rem;text-align:center;border:1px solid var(--border);">
-          <div style="font-size:1.2rem;font-weight:700;color:#22c55e;">${winRate}%</div>
-          <div style="font-size:0.65rem;color:var(--muted);">勝率（${wins}勝${losses}敗）</div>
+        <div style="background:var(--card);border-radius:8px;padding:0.65rem;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:1.1rem;font-weight:700;color:${parseFloat(winRate)>=50?'#22c55e':'#ef4444'};">${winRate}%</div>
+          <div style="font-size:0.62rem;color:var(--muted);">勝率（${wins}勝${losses}敗）</div>
         </div>
-        <div style="background:var(--card);border-radius:8px;padding:0.7rem;text-align:center;border:1px solid var(--border);">
-          <div style="font-size:1.2rem;font-weight:700;">${open.length}</div>
-          <div style="font-size:0.65rem;color:var(--muted);">持倉中</div>
+        <div style="background:var(--card);border-radius:8px;padding:0.65rem;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:1.1rem;font-weight:700;">${open.length}</div>
+          <div style="font-size:0.62rem;color:var(--muted);">持倉中</div>
         </div>
-        <div style="background:var(--card);border-radius:8px;padding:0.7rem;text-align:center;border:1px solid var(--border);">
-          <div style="font-size:1.2rem;font-weight:700;">${avgPct}%</div>
-          <div style="font-size:0.65rem;color:var(--muted);">平均報酬率</div>
+        <div style="background:var(--card);border-radius:8px;padding:0.65rem;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:1.1rem;font-weight:700;color:${parseFloat(avgPct)>=0?'#22c55e':'#ef4444'};">${avgPct}%</div>
+          <div style="font-size:0.62rem;color:var(--muted);">平均報酬率</div>
         </div>
       </div>
 
-      <!-- 持倉中 -->
+      <!-- ② 圖表區 -->
+      ${closed.length >= 2 ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+        <!-- 累積損益曲線 -->
+        <div style="background:var(--card);border-radius:10px;padding:0.8rem;border:1px solid var(--border);">
+          <div style="font-size:0.75rem;font-weight:600;margin-bottom:0.5rem;color:var(--fg);">📈 累積損益曲線</div>
+          <canvas id="alphaCumChart" height="120"></canvas>
+        </div>
+        <!-- 個別損益條狀圖 -->
+        <div style="background:var(--card);border-radius:10px;padding:0.8rem;border:1px solid var(--border);">
+          <div style="font-size:0.75rem;font-weight:600;margin-bottom:0.5rem;color:var(--fg);">📊 個別交易損益</div>
+          <canvas id="alphaBarChart" height="120"></canvas>
+        </div>
+      </div>
+      <!-- 勝率圓餅圖 + 最大獲利/虧損 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+        <div style="background:var(--card);border-radius:10px;padding:0.8rem;border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:0.75rem;font-weight:600;margin-bottom:0.5rem;color:var(--fg);">🥧 勝率分布</div>
+          <canvas id="alphaWinChart" height="110" style="max-width:140px;"></canvas>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:0.8rem;border:1px solid var(--border);">
+          <div style="font-size:0.75rem;font-weight:600;margin-bottom:0.7rem;color:var(--fg);">🏆 極值紀錄</div>
+          <div style="font-size:0.82rem;margin-bottom:0.4rem;">最大獲利 <b style="color:#22c55e;float:right;">+${maxWin.toLocaleString()} 元</b></div>
+          <div style="font-size:0.82rem;margin-bottom:0.4rem;">最大虧損 <b style="color:#ef4444;float:right;">${maxLoss.toLocaleString()} 元</b></div>
+          <div style="font-size:0.82rem;margin-bottom:0.4rem;">總交易次數 <b style="float:right;">${closed.length} 次</b></div>
+          <div style="font-size:0.82rem;">目前持倉 <b style="float:right;">${open.length} 檔</b></div>
+        </div>
+      </div>` : closed.length === 1 ? `
+      <div style="background:var(--card);border-radius:10px;padding:0.8rem;border:1px solid var(--border);margin-bottom:1rem;font-size:0.8rem;color:var(--muted);text-align:center;">
+        累積 2 筆以上平倉後將顯示圖表分析
+      </div>` : ''}
+
+      <!-- ③ 持倉中 -->
       ${open.length ? `
-      <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.5rem;">📂 持倉中（${open.length}）</div>
-      <div style="overflow-x:auto;margin-bottom:1.2rem;">
+      <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.4rem;">📂 持倉中（${open.length}）</div>
+      <div style="overflow-x:auto;margin-bottom:1rem;">
         <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="font-size:0.7rem;color:var(--muted);border-bottom:1px solid var(--border);">
-            <th style="padding:0.4rem 0.3rem;text-align:left;">代號</th><th style="padding:0.4rem 0.3rem;text-align:left;">名稱</th>
-            <th style="padding:0.4rem 0.3rem;text-align:left;">進場</th><th style="padding:0.4rem 0.3rem;text-align:left;">目標</th>
-            <th style="padding:0.4rem 0.3rem;text-align:left;">停損</th><th style="padding:0.4rem 0.3rem;text-align:left;">張數</th>
-            <th style="padding:0.4rem 0.3rem;text-align:left;">狀態</th><th style="padding:0.4rem 0.3rem;text-align:left;">操作</th>
+          <thead><tr style="font-size:0.68rem;color:var(--muted);border-bottom:1px solid var(--border);">
+            <th style="padding:0.35rem 0.3rem;text-align:left;">代號</th><th style="padding:0.35rem 0.3rem;text-align:left;">名稱</th>
+            <th style="padding:0.35rem 0.3rem;text-align:left;">進場</th><th style="padding:0.35rem 0.3rem;text-align:left;">目標</th>
+            <th style="padding:0.35rem 0.3rem;text-align:left;">停損</th>
+            <th style="padding:0.35rem 0.3rem;text-align:left;">狀態</th><th style="padding:0.35rem 0.3rem;text-align:left;">操作</th>
           </tr></thead>
-          <tbody>${open.map(p => renderRow(p, true)).join('')}</tbody>
+          <tbody>${open.map(p=>renderRow(p,true)).join('')}</tbody>
         </table>
       </div>` : ''}
 
-      <!-- 歷史紀錄 -->
+      <!-- ④ 歷史交易 -->
       ${closed.length ? `
-      <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.5rem;">📜 歷史交易（${closed.length}）</div>
+      <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.4rem;">📜 歷史交易（${closed.length}）</div>
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="font-size:0.7rem;color:var(--muted);border-bottom:1px solid var(--border);">
-            <th style="padding:0.4rem 0.3rem;text-align:left;">代號</th><th style="padding:0.4rem 0.3rem;text-align:left;">名稱</th>
-            <th style="padding:0.4rem 0.3rem;text-align:left;">進場</th><th style="padding:0.4rem 0.3rem;text-align:left;">目標</th>
-            <th style="padding:0.4rem 0.3rem;text-align:left;">停損</th><th style="padding:0.4rem 0.3rem;text-align:left;">張數</th>
-            <th style="padding:0.4rem 0.3rem;text-align:left;">損益</th><th style="padding:0.4rem 0.3rem;text-align:left;">平倉日</th>
+          <thead><tr style="font-size:0.68rem;color:var(--muted);border-bottom:1px solid var(--border);">
+            <th style="padding:0.35rem 0.3rem;text-align:left;">代號</th><th style="padding:0.35rem 0.3rem;text-align:left;">名稱</th>
+            <th style="padding:0.35rem 0.3rem;text-align:left;">進場</th><th style="padding:0.35rem 0.3rem;text-align:left;">目標</th>
+            <th style="padding:0.35rem 0.3rem;text-align:left;">停損</th>
+            <th style="padding:0.35rem 0.3rem;text-align:left;">損益</th><th style="padding:0.35rem 0.3rem;text-align:left;">平倉日</th>
           </tr></thead>
-          <tbody>${closed.map(p => renderRow(p, false)).join('')}</tbody>
+          <tbody>${closed.map(p=>renderRow(p,false)).join('')}</tbody>
         </table>
       </div>` : ''}
 
-      ${!open.length && !closed.length ? '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">尚無交易紀錄<br>點擊「讓 Alpha 分析」後將推薦個股加入持倉</div>' : ''}
-
-      <div style="font-size:0.65rem;color:var(--muted);margin-top:1rem;text-align:center;">⚠️ 以上為 AI 模擬交易紀錄，不構成投資建議</div>
+      ${!open.length && !closed.length ? '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">Alpha 尚無交易紀錄<br><span style="font-size:0.75rem;opacity:0.6;">每個交易日 08:00 自動生成報告並進場</span></div>' : ''}
+      <div style="font-size:0.62rem;color:var(--muted);margin-top:1rem;text-align:center;">⚠️ 以上為 AI 模擬交易紀錄，不構成投資建議</div>
     `;
+
+    // ── 繪製圖表（需要 closed.length >= 2）──
+    if (closed.length >= 2) {
+      // 動態載入 Chart.js
+      if (!window.Chart) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+
+      const fg    = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim()    || '#e2e8f0';
+      const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#64748b';
+      const gridColor = 'rgba(100,116,139,0.15)';
+      const baseOpts = { responsive: true, plugins: { legend: { display: false } }, scales: {
+        x: { ticks: { color: muted, font: { size: 9 } }, grid: { color: gridColor } },
+        y: { ticks: { color: muted, font: { size: 9 } }, grid: { color: gridColor } },
+      }};
+
+      // 1️⃣ 累積損益曲線
+      new window.Chart(document.getElementById('alphaCumChart'), {
+        type: 'line',
+        data: {
+          labels: cumData.map(d => d.date),
+          datasets: [{
+            data: cumData.map(d => d.pnl),
+            borderColor: totalPnl >= 0 ? '#22c55e' : '#ef4444',
+            backgroundColor: totalPnl >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+            fill: true, tension: 0.3, pointRadius: 3,
+            pointBackgroundColor: cumData.map(d => d.pnl >= 0 ? '#22c55e' : '#ef4444'),
+          }],
+        },
+        options: { ...baseOpts, plugins: { legend: { display: false }, tooltip: {
+          callbacks: { label: ctx => `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toLocaleString()} 元` }
+        }}},
+      });
+
+      // 2️⃣ 個別損益條狀圖
+      const barColors = sortedClosed.map(p => (p.pnl||0) >= 0 ? 'rgba(34,197,94,0.75)' : 'rgba(239,68,68,0.75)');
+      new window.Chart(document.getElementById('alphaBarChart'), {
+        type: 'bar',
+        data: {
+          labels: sortedClosed.map(p => p.stock_id),
+          datasets: [{ data: sortedClosed.map(p => p.pnl||0), backgroundColor: barColors, borderRadius: 3 }],
+        },
+        options: { ...baseOpts, plugins: { legend: { display: false }, tooltip: {
+          callbacks: { label: ctx => `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toLocaleString()} 元` }
+        }}},
+      });
+
+      // 3️⃣ 勝率圓餅圖
+      new window.Chart(document.getElementById('alphaWinChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['獲利', '虧損'],
+          datasets: [{ data: [wins, losses], backgroundColor: ['rgba(34,197,94,0.8)', 'rgba(239,68,68,0.8)'], borderWidth: 0 }],
+        },
+        options: { responsive: true, cutout: '60%', plugins: {
+          legend: { display: true, position: 'bottom', labels: { color: muted, font: { size: 9 }, boxWidth: 10 } },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}：${ctx.parsed} 次` } },
+        }},
+      });
+    }
+
   } catch(e) {
-    content.innerHTML = `<div style="color:#ef4444;font-size:0.85rem;">載入失敗：${e.message}</div>`;
+    cont.innerHTML = `<div style="color:#ef4444;font-size:0.85rem;">載入失敗：${e.message}</div>`;
   }
 }
 
