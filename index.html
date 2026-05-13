@@ -5050,11 +5050,11 @@ const MOOD_STYLE = {
   '悲觀': { bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
 };
 const ACTION_STYLE = {
-  '買進': { bg: 'rgba(34,197,94,0.12)',  color: '#22c55e', border: 'rgba(34,197,94,0.3)' },
-  '觀察': { bg: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: 'rgba(251,191,36,0.3)' },
-  '避開': { bg: 'rgba(239,68,68,0.12)',  color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+  '買進': { bg: 'rgba(220,38,38,0.10)',  color: 'var(--up)',   border: 'rgba(220,38,38,0.25)' },  // 漲紅
+  '觀察': { bg: 'rgba(110,110,126,0.10)', color: 'var(--muted)', border: 'rgba(110,110,126,0.2)' }, // 中性灰
+  '避開': { bg: 'rgba(22,163,74,0.10)',  color: 'var(--down)', border: 'rgba(22,163,74,0.25)' },   // 跌綠
 };
-const CONF_STYLE = { '高': '#22c55e', '中': '#fbbf24', '低': '#ef4444' };
+const CONF_STYLE = { '高': 'var(--up)', '中': 'var(--muted)', '低': 'var(--down)' };
 
 // 頁面載入時自動讀取今日報告
 async function loadAlphaDailyReport() {
@@ -5153,15 +5153,15 @@ function renderAlphaResult(data) {
       </div>
       <div style="display:flex;gap:1.5rem;font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;flex-wrap:wrap;">
         <span>進場 <b style="color:var(--fg);">${rec.entry_price ?? '-'}</b></span>
-        <span>目標 <b style="color:#22c55e;">${rec.target_price ?? '-'}</b></span>
-        <span>停損 <b style="color:#ef4444;">${rec.stop_loss ?? '-'}</b></span>
+        <span>目標 <b style="color:var(--up);">${rec.target_price ?? '-'}</b></span>
+        <span>停損 <b style="color:var(--down);">${rec.stop_loss ?? '-'}</b></span>
         <span>持有 <b style="color:var(--fg);">${rec.holding_days ?? '-'} 天</b></span>
       </div>
       <div style="font-size:0.82rem;color:var(--fg);line-height:1.6;margin-bottom:0.5rem;">${rec.reason || ''}</div>
       <div style="font-size:0.75rem;color:#fbbf24;">⚠️ ${rec.risk || ''}</div>
       ${rec.action === '買進' ? `
       <div style="margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:0.5rem;">
-        <span style="font-size:0.75rem;color:#22c55e;font-weight:600;">✅ Alpha 已自動進場</span>
+        <span style="font-size:0.75rem;color:var(--up);font-weight:600;">✅ Alpha 已自動進場</span>
         <span style="font-size:0.7rem;color:var(--muted);">· 持倉已記錄於交易報告</span>
       </div>` : ''}
     `;
@@ -5235,14 +5235,14 @@ async function showAlphaReport() {
     const cumData = sortedClosed.map(p => { cumPnl += (p.pnl||0); return { date: p.closed_at?.slice(0,10), pnl: cumPnl, label: p.stock_id }; });
 
     const renderRow = (p, isOpen) => {
-      const pnlColor = !isOpen ? ((p.pnl||0)>=0?'#22c55e':'#ef4444') : 'var(--muted)';
+      const pnlColor = !isOpen ? ((p.pnl||0)>=0?'var(--up)':'var(--down)') : 'var(--muted)';
       const pnlText  = isOpen ? '持倉中' : `${(p.pnl||0)>=0?'+':''}${(p.pnl||0).toLocaleString()} (${(p.pnl_pct||0)>=0?'+':''}${(p.pnl_pct||0).toFixed(2)}%)`;
       return `<tr style="border-bottom:1px solid var(--border);font-size:0.78rem;">
         <td style="padding:0.45rem 0.3rem;font-weight:600;">${p.stock_id}</td>
         <td style="padding:0.45rem 0.3rem;color:var(--muted);">${p.stock_name||''}</td>
         <td style="padding:0.45rem 0.3rem;">${p.entry_price??'-'}</td>
-        <td style="padding:0.45rem 0.3rem;color:#22c55e;">${p.target_price??'-'}</td>
-        <td style="padding:0.45rem 0.3rem;color:#ef4444;">${p.stop_loss??'-'}</td>
+        <td style="padding:0.45rem 0.3rem;color:var(--up);">${p.target_price??'-'}</td>
+        <td style="padding:0.45rem 0.3rem;color:var(--down);">${p.stop_loss??'-'}</td>
         <td style="padding:0.45rem 0.3rem;color:${pnlColor};font-weight:600;">${pnlText}</td>
         <td style="padding:0.45rem 0.3rem;">
           ${isOpen
@@ -5256,11 +5256,11 @@ async function showAlphaReport() {
       <!-- ① 統計摘要 -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin-bottom:1rem;">
         <div style="background:var(--card);border-radius:8px;padding:0.65rem;text-align:center;border:1px solid var(--border);">
-          <div style="font-size:1.1rem;font-weight:700;color:${totalPnl>=0?'#22c55e':'#ef4444'};">${totalPnl>=0?'+':''}${totalPnl.toLocaleString()}</div>
+          <div style="font-size:1.1rem;font-weight:700;color:${totalPnl>=0?'var(--up)':'var(--down)'};">${totalPnl>=0?'+':''}${totalPnl.toLocaleString()}</div>
           <div style="font-size:0.62rem;color:var(--muted);">累計損益（元）</div>
         </div>
         <div style="background:var(--card);border-radius:8px;padding:0.65rem;text-align:center;border:1px solid var(--border);">
-          <div style="font-size:1.1rem;font-weight:700;color:${parseFloat(winRate)>=50?'#22c55e':'#ef4444'};">${winRate}%</div>
+          <div style="font-size:1.1rem;font-weight:700;color:${parseFloat(winRate)>=50?'var(--up)':'var(--down)'};">${winRate}%</div>
           <div style="font-size:0.62rem;color:var(--muted);">勝率（${wins}勝${losses}敗）</div>
         </div>
         <div style="background:var(--card);border-radius:8px;padding:0.65rem;text-align:center;border:1px solid var(--border);">
@@ -5268,7 +5268,7 @@ async function showAlphaReport() {
           <div style="font-size:0.62rem;color:var(--muted);">持倉中</div>
         </div>
         <div style="background:var(--card);border-radius:8px;padding:0.65rem;text-align:center;border:1px solid var(--border);">
-          <div style="font-size:1.1rem;font-weight:700;color:${parseFloat(avgPct)>=0?'#22c55e':'#ef4444'};">${avgPct}%</div>
+          <div style="font-size:1.1rem;font-weight:700;color:${parseFloat(avgPct)>=0?'var(--up)':'var(--down)'};">${avgPct}%</div>
           <div style="font-size:0.62rem;color:var(--muted);">平均報酬率</div>
         </div>
       </div>
@@ -5295,8 +5295,8 @@ async function showAlphaReport() {
         </div>
         <div style="background:var(--card);border-radius:10px;padding:0.8rem;border:1px solid var(--border);">
           <div style="font-size:0.75rem;font-weight:600;margin-bottom:0.7rem;color:var(--fg);">🏆 極值紀錄</div>
-          <div style="font-size:0.82rem;margin-bottom:0.4rem;">最大獲利 <b style="color:#22c55e;float:right;">+${maxWin.toLocaleString()} 元</b></div>
-          <div style="font-size:0.82rem;margin-bottom:0.4rem;">最大虧損 <b style="color:#ef4444;float:right;">${maxLoss.toLocaleString()} 元</b></div>
+          <div style="font-size:0.82rem;margin-bottom:0.4rem;">最大獲利 <b style="color:var(--up);float:right;">+${maxWin.toLocaleString()} 元</b></div>
+          <div style="font-size:0.82rem;margin-bottom:0.4rem;">最大虧損 <b style="color:var(--down);float:right;">${maxLoss.toLocaleString()} 元</b></div>
           <div style="font-size:0.82rem;margin-bottom:0.4rem;">總交易次數 <b style="float:right;">${closed.length} 次</b></div>
           <div style="font-size:0.82rem;">目前持倉 <b style="float:right;">${open.length} 檔</b></div>
         </div>
@@ -5366,10 +5366,10 @@ async function showAlphaReport() {
           labels: cumData.map(d => d.date),
           datasets: [{
             data: cumData.map(d => d.pnl),
-            borderColor: totalPnl >= 0 ? '#22c55e' : '#ef4444',
-            backgroundColor: totalPnl >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+            borderColor: totalPnl >= 0 ? 'var(--up)' : 'var(--down)',
+            backgroundColor: totalPnl >= 0 ? 'rgba(220,38,38,0.08)' : 'rgba(22,163,74,0.08)',
             fill: true, tension: 0.3, pointRadius: 3,
-            pointBackgroundColor: cumData.map(d => d.pnl >= 0 ? '#22c55e' : '#ef4444'),
+            pointBackgroundColor: cumData.map(d => d.pnl >= 0 ? '#dc2626' : '#16a34a'),
           }],
         },
         options: { ...baseOpts, plugins: { legend: { display: false }, tooltip: {
@@ -5378,7 +5378,7 @@ async function showAlphaReport() {
       });
 
       // 2️⃣ 個別損益條狀圖
-      const barColors = sortedClosed.map(p => (p.pnl||0) >= 0 ? 'rgba(34,197,94,0.75)' : 'rgba(239,68,68,0.75)');
+      const barColors = sortedClosed.map(p => (p.pnl||0) >= 0 ? 'rgba(220,38,38,0.75)' : 'rgba(22,163,74,0.75)');
       new window.Chart(document.getElementById('alphaBarChart'), {
         type: 'bar',
         data: {
@@ -5395,7 +5395,7 @@ async function showAlphaReport() {
         type: 'doughnut',
         data: {
           labels: ['獲利', '虧損'],
-          datasets: [{ data: [wins, losses], backgroundColor: ['rgba(34,197,94,0.8)', 'rgba(239,68,68,0.8)'], borderWidth: 0 }],
+          datasets: [{ data: [wins, losses], backgroundColor: ['rgba(220,38,38,0.8)', 'rgba(22,163,74,0.8)'], borderWidth: 0 }],
         },
         options: { responsive: true, cutout: '60%', plugins: {
           legend: { display: true, position: 'bottom', labels: { color: muted, font: { size: 9 }, boxWidth: 10 } },
