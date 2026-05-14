@@ -6231,14 +6231,26 @@ async function loadDailySummary() {
     pill.textContent = mood; pill.style.background = mbg; pill.style.color = mc;
     pill.style.border = `1px solid ${mc}`;
 
-    // 大盤
-    const twseData = twseRes.status === 'fulfilled' && Array.isArray(twseRes.value) ? twseRes.value[0] : null;
+    // 大盤：從 futuresData 取台灣加權（%5Etwii），若尚未載入則呼叫 futures API
     const twseEl = document.getElementById('dsbTWSE');
-    if (twseData) {
-      const pct = (twseData.chg_pct * 100).toFixed(2);
-      const clr = twseData.chg_pct >= 0 ? '#dc2626' : '#16a34a';
-      twseEl.innerHTML = `<span style="color:${clr}">${twseData.close?.toLocaleString() ?? '—'} <span style="font-size:0.7rem">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
-    } else { twseEl.textContent = '—'; }
+    try {
+      // 優先從已載入的 futuresData 取
+      let twiiItem = (window.futuresData || []).find(d => d.symbol && d.symbol.includes('%5Etwii') || d.symbol === '^TWII');
+      if (!twiiItem) {
+        // futuresData 還沒載入，直接呼叫 API
+        const futRes = await fetch(API_BASE + '?endpoint=futures');
+        const futJson = await futRes.json();
+        twiiItem = (futJson.data || []).find(d => d.symbol && (d.symbol.includes('%5Etwii') || d.symbol.includes('twii')));
+      }
+      if (twiiItem) {
+        const pct = (twiiItem.chgPct * 100).toFixed(2);
+        const clr = twiiItem.chgPct >= 0 ? '#dc2626' : '#16a34a';
+        const priceStr = twiiItem.price ? twiiItem.price.toLocaleString('en', { maximumFractionDigits: 0 }) : '—';
+        twseEl.innerHTML = `<span style="color:${clr}">${priceStr} <span style="font-size:0.75em">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
+      } else {
+        twseEl.textContent = '見全球商品';
+      }
+    } catch { twseEl.textContent = '—'; }
 
     // Alpha 建議
     const recs = alpha?.recommendations || [];
@@ -6249,8 +6261,21 @@ async function loadDailySummary() {
       ? `<span style="color:#dc2626">${buys}買進</span> <span style="color:var(--muted);font-size:0.7rem">/ ${avoids}避開</span>`
       : `<span style="color:var(--muted)">—</span>`;
 
-    // VIX（從 futures 或 options 推算，暫用 options date 當指示）
-    document.getElementById('dsbVIX').textContent = '見全球商品';
+    // VIX：從 futuresData 取
+    try {
+      let vixItem = (window.futuresData || []).find(d => d.symbol && d.symbol.toLowerCase().includes('vix'));
+      if (!vixItem && window._dsbFutJson) {
+        vixItem = (window._dsbFutJson.data || []).find(d => d.symbol && d.symbol.toLowerCase().includes('vix'));
+      }
+      const vixEl = document.getElementById('dsbVIX');
+      if (vixItem) {
+        const clr = vixItem.chgPct >= 0 ? '#dc2626' : '#16a34a';
+        const pct = (vixItem.chgPct * 100).toFixed(2);
+        vixEl.innerHTML = `<span style="color:${clr}">${vixItem.price?.toFixed(2) ?? '—'} <span style="font-size:0.75em">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
+      } else {
+        vixEl.textContent = '見全球商品';
+      }
+    } catch { document.getElementById('dsbVIX').textContent = '—'; }
 
     // 日期
     document.getElementById('dsbDate').textContent = alpha?.report_date
