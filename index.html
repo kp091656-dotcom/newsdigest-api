@@ -206,9 +206,13 @@
 
   /* Font scale：用 CSS custom property 控制，讓所有用 em/rem 的元素都吃到 */
   :root { --fs-base: 15px; }
+  /* A/A/A 字體大小：設定 html root font-size，所有 rem 單位等比縮放 */
+  html.fs-small  { font-size: 13px; }
+  html.fs-medium { font-size: 15px; }
+  html.fs-large  { font-size: 18px; }
   body.fs-small  { font-size: 13px; --fs-base: 13px; }
   body.fs-medium { font-size: 15px; --fs-base: 15px; }
-  body.fs-large  { font-size: 17px; --fs-base: 17px; }
+  body.fs-large  { font-size: 18px; --fs-base: 18px; }
 
   /* 新聞卡片文字跟著縮放（對應實際 class） */
   body.fs-small  .card-title  { font-size: 0.88rem; }
@@ -6074,6 +6078,9 @@ async function debugHeatmapDates() {
 
 // ── 字體大小控制 ──
 function setFontSize(size) {
+  // 同時設 html（root rem 基準）和 body（component class 相容）
+  document.documentElement.classList.remove('fs-small', 'fs-medium', 'fs-large');
+  document.documentElement.classList.add(`fs-${size}`);
   document.body.classList.remove('fs-small', 'fs-medium', 'fs-large');
   document.body.classList.add(`fs-${size}`);
   document.querySelectorAll('.font-size-btn').forEach(b => b.classList.remove('active'));
