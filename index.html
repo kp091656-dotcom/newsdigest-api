@@ -6231,27 +6231,39 @@ async function loadDailySummary() {
     pill.textContent = mood; pill.style.background = mbg; pill.style.color = mc;
     pill.style.border = `1px solid ${mc}`;
 
-    // 大盤：從 futuresData 取台灣加權（%5Etwii），若尚未載入則呼叫 futures API
+    // 大盤 + VIX：直接呼叫 futures API（不依賴 futuresData 是否已載入）
     const twseEl = document.getElementById('dsbTWSE');
+    const vixEl  = document.getElementById('dsbVIX');
     try {
-      // 優先從已載入的 futuresData 取
-      let twiiItem = (window.futuresData || []).find(d => d.symbol && d.symbol.includes('%5Etwii') || d.symbol === '^TWII');
-      if (!twiiItem) {
-        // futuresData 還沒載入，直接呼叫 API
-        const futRes = await fetch(API_BASE + '?endpoint=futures');
-        const futJson = await futRes.json();
-        twiiItem = (futJson.data || []).find(d => d.symbol && (d.symbol.includes('%5Etwii') || d.symbol.includes('twii')));
-      }
-      if (twiiItem) {
-        const pct = (twiiItem.chgPct * 100).toFixed(2);
-        const clr = twiiItem.chgPct >= 0 ? '#dc2626' : '#16a34a';
-        const priceStr = twiiItem.price ? twiiItem.price.toLocaleString('en', { maximumFractionDigits: 0 }) : '—';
-        twseEl.innerHTML = `<span style="color:${clr}">${priceStr} <span style="font-size:0.75em">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
-      } else {
-        twseEl.textContent = '見全球商品';
-      }
-    } catch { twseEl.textContent = '—'; }
+      const fData = (window.futuresData && window.futuresData.length)
+        ? window.futuresData
+        : await fetch(API_BASE + '?endpoint=futures').then(r => r.json()).then(j => j.data || []);
 
+      // 台灣加權（symbol='%5Etwii' 或 name='台灣加權'）
+      const twii = fData.find(d =>
+        (d.symbol && (d.symbol.includes('twii') || d.symbol.includes('TWII'))) ||
+        (d.name && d.name.includes('台灣加權'))
+      );
+      if (twii) {
+        const pct = ((twii.chgPct || 0) * 100).toFixed(2);
+        const clr = (twii.chgPct || 0) >= 0 ? '#dc2626' : '#16a34a';
+        twseEl.innerHTML = `<span style="color:${clr}">${Math.round(twii.price||0).toLocaleString()}<span style="font-size:0.75em;margin-left:0.3em">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
+      } else { twseEl.textContent = '—'; }
+
+      // VIX（name='VIX波動率' 或 symbol 含 'VIX'）
+      const vix = fData.find(d =>
+        (d.name && d.name.includes('VIX')) ||
+        (d.symbol && d.symbol.toUpperCase().includes('VIX'))
+      );
+      if (vix) {
+        const pct = ((vix.chgPct || 0) * 100).toFixed(2);
+        const clr = (vix.chgPct || 0) >= 0 ? '#dc2626' : '#16a34a';
+        vixEl.innerHTML = `<span style="color:${clr}">${(vix.price||0).toFixed(2)}<span style="font-size:0.75em;margin-left:0.3em">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
+      } else { vixEl.textContent = '—'; }
+    } catch {
+      twseEl.textContent = '—';
+      vixEl.textContent  = '—';
+    }
     // Alpha 建議
     const recs = alpha?.recommendations || [];
     const buys = recs.filter(r => r.action === '買進').length;
