@@ -6231,36 +6231,48 @@ async function loadDailySummary() {
     pill.textContent = mood; pill.style.background = mbg; pill.style.color = mc;
     pill.style.border = `1px solid ${mc}`;
 
-    // 大盤 + VIX：直接呼叫 futures API（不依賴 futuresData 是否已載入）
+    // 大盤 + VIX：直接呼叫 futures API
     const twseEl = document.getElementById('dsbTWSE');
     const vixEl  = document.getElementById('dsbVIX');
     try {
-      const fData = (window.futuresData && window.futuresData.length)
-        ? window.futuresData
-        : await fetch(API_BASE + '?endpoint=futures').then(r => r.json()).then(j => j.data || []);
+      // 每次都重新抓，確保資料最新
+      const fRes  = await fetch(API_BASE + '?endpoint=futures');
+      const fJson = await fRes.json();
+      const fData = fJson.data || [];
 
-      // 台灣加權（symbol='%5Etwii' 或 name='台灣加權'）
-      const twii = fData.find(d =>
-        (d.symbol && (d.symbol.includes('twii') || d.symbol.includes('TWII'))) ||
-        (d.name && d.name.includes('台灣加權'))
-      );
-      if (twii) {
-        const pct = ((twii.chgPct || 0) * 100).toFixed(2);
-        const clr = (twii.chgPct || 0) >= 0 ? '#dc2626' : '#16a34a';
-        twseEl.innerHTML = `<span style="color:${clr}">${Math.round(twii.price||0).toLocaleString()}<span style="font-size:0.75em;margin-left:0.3em">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
-      } else { twseEl.textContent = '—'; }
-
-      // VIX（name='VIX波動率' 或 symbol 含 'VIX'）
+      // VIX：symbol='^VIX'，name='VIX波動率'
       const vix = fData.find(d =>
-        (d.name && d.name.includes('VIX')) ||
-        (d.symbol && d.symbol.toUpperCase().includes('VIX'))
+        (d.symbol && d.symbol.toUpperCase().includes('VIX')) ||
+        (d.name && d.name.includes('VIX'))
       );
       if (vix) {
         const pct = ((vix.chgPct || 0) * 100).toFixed(2);
         const clr = (vix.chgPct || 0) >= 0 ? '#dc2626' : '#16a34a';
         vixEl.innerHTML = `<span style="color:${clr}">${(vix.price||0).toFixed(2)}<span style="font-size:0.75em;margin-left:0.3em">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
-      } else { vixEl.textContent = '—'; }
-    } catch {
+      } else {
+        vixEl.textContent = '—';
+      }
+
+      // 台灣加權：futures API 無此資料，改從 Supabase stock_daily_twse 抓
+      // 依序嘗試：Y9999（大盤指數）→ 0050（元大台灣50）→ —
+      let twseShown = false;
+      for (const stockId of ['Y9999', '0050', 'IX0001']) {
+        try {
+          const rows = await sbFetch('stock_daily_twse',
+            `stock_id=eq.${stockId}&order=date.desc&limit=1&select=stock_id,name,close,chg_pct`);
+          const r = Array.isArray(rows) && rows[0];
+          if (r && r.close) {
+            const pct = ((r.chg_pct || 0) * 100).toFixed(2);
+            const clr = (r.chg_pct || 0) >= 0 ? '#dc2626' : '#16a34a';
+            const label = stockId === '0050' ? '0050' : '';
+            twseEl.innerHTML = `<span style="color:${clr}">${Math.round(r.close).toLocaleString()}<span style="font-size:0.75em;margin-left:0.3em">${pct >= 0 ? '+' : ''}${pct}%</span></span>${label ? `<span style="font-size:0.6em;color:var(--muted);margin-left:0.3em">(${label})</span>` : ''}`;
+            twseShown = true;
+            break;
+          }
+        } catch { continue; }
+      }
+      if (!twseShown) twseEl.textContent = '—';
+    } catch(e) {
       twseEl.textContent = '—';
       vixEl.textContent  = '—';
     }
