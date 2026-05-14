@@ -789,7 +789,7 @@ ${pttTitles}
         market_summary: result.market_summary || '',
         alpha_note:     result.alpha_note || '',
         recommendations: result.recommendations || [],
-        data_sources:   { stocks: stocks.length, news: Array.isArray(news) ? news.length : 0, ptt: pttTitles.split('\n').length },
+        data_sources:   { stocks: stocks.length, news: Array.isArray(news) ? news.length : 0, ptt: (pttTitles && pttTitles !== '無法取得') ? pttTitles.split('\n').filter(l => l.trim()).length : 0 },
         generated_at:   new Date().toISOString(),
       }),
     });
