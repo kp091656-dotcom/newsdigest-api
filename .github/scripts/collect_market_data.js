@@ -567,8 +567,9 @@ async function checkAlphaStopLossTarget() {
       const pnl_pct = parseFloat(((exitPrice - pos.entry_price) / pos.entry_price * 100).toFixed(2));
 
       // 持有天數
-      const daysHeld = pos.opened_at
-        ? Math.round((new Date(latestDate) - new Date(pos.opened_at.slice(0,10))) / 86400000)
+      const openedDate = pos.opened_at ? pos.opened_at.slice(0, 10) : null;
+      const daysHeld   = openedDate && latestDate
+        ? Math.max(0, Math.round((new Date(latestDate) - new Date(openedDate)) / 86400000))
         : '-';
 
       // 更新持倉為 closed
@@ -796,19 +797,34 @@ ${pttTitles}
 
     if (!upsertRes.ok) throw new Error(`Supabase upsert HTTP ${upsertRes.status}`);
 
-    // ── 8. 自動建立買進持倉（重複建倉防護）──
+    // ── 8. 自動建立買進持倉（重複建倉防護 + 當日平倉防護）──
     const buyRecs = (result.recommendations || []).filter(r => r.action === '買進');
     if (buyRecs.length > 0) {
-      // 先查目前已有哪些 open 持倉（避免同股重複建倉）
-      const existRes = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions?status=eq.open&select=stock_id`, {
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      });
-      const existRows = await existRes.json().catch(() => []);
-      const existIds  = new Set(Array.isArray(existRows) ? existRows.map(r => r.stock_id) : []);
+      const todayStr = today; // 今日日期（YYYY-MM-DD）
+
+      // 查①：目前 open 持倉（避免重複建倉）
+      // 查②：今日已平倉持倉（避免停損/停利後當天重新進場同一檔）
+      const [existRes, todayClosedRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/trader_positions?status=eq.open&select=stock_id`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        }),
+        fetch(`${SUPABASE_URL}/rest/v1/trader_positions?status=eq.closed&closed_at=gte.${todayStr}T00:00:00&select=stock_id`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        }),
+      ]);
+      const existRows      = await existRes.json().catch(() => []);
+      const todayClosedRows = await todayClosedRes.json().catch(() => []);
+
+      const existIds      = new Set(Array.isArray(existRows)       ? existRows.map(r => r.stock_id)       : []);
+      const todayClosedIds = new Set(Array.isArray(todayClosedRows) ? todayClosedRows.map(r => r.stock_id) : []);
 
       const newRecs = buyRecs.filter(r => {
         if (existIds.has(r.stock_id)) {
           console.log(`  ⏭️  ${r.stock_id} 已有開倉持倉，跳過重複建倉`);
+          return false;
+        }
+        if (todayClosedIds.has(r.stock_id)) {
+          console.log(`  🚫  ${r.stock_id} 今日已停損/停利出場，當天不再重新進場`);
           return false;
         }
         return true;
