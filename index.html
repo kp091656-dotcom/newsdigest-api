@@ -1221,20 +1221,18 @@
     display: flex; flex-direction: column; gap: 0.15rem;
   }
   #dailySummaryBanner .dsb-label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.55rem; color: var(--muted); letter-spacing: 0.07em;
+    font-size: 0.7rem; color: var(--muted); letter-spacing: 0.02em;
   }
   #dailySummaryBanner .dsb-val {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.88rem; font-weight: 700;
+    font-size: 0.95rem; font-weight: 700;
   }
   #dailySummaryBanner .dsb-note {
-    font-size: 0.78rem; color: var(--text); line-height: 1.55;
-    grid-column: 1 / -1; padding-top: 0.5rem;
-    border-top: 1px solid var(--border); margin-top: 0.15rem;
+    font-size: 0.82rem; color: var(--text); line-height: 1.6;
+    grid-column: 1 / -1; padding-top: 0.55rem;
+    border-top: 1px solid var(--border); margin-top: 0.2rem;
   }
   #dailySummaryBanner .dsb-mood-pill {
-    font-size: 0.65rem; padding: 2px 9px; border-radius: 99px;
+    font-size: 0.7rem; padding: 2px 10px; border-radius: 99px;
     font-weight: 600; white-space: nowrap;
   }
   @media(max-width:640px){
@@ -1338,16 +1336,16 @@
     <!-- 今日總結橫幅 -->
     <div id="dailySummaryBanner">
       <div style="display:flex;align-items:center;gap:0.55rem;margin-bottom:0.6rem;flex-wrap:wrap;">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.08em;">◆ 今日總結</span>
+        <span style="font-size:0.72rem;color:var(--muted);font-weight:600;">◆ 今日總結</span>
         <span id="dsbMoodPill" class="dsb-mood-pill"></span>
-        <span id="dsbDate" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);margin-left:auto;"></span>
-        <button onclick="refreshDailySummary()" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">↻</button>
+        <span id="dsbDate" style="font-size:0.68rem;color:var(--muted);margin-left:auto;"></span>
+        <button onclick="refreshDailySummary()" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">↻</button>
       </div>
       <div class="dsb-grid" id="dsbGrid">
         <div class="dsb-stat"><span class="dsb-label">加權指數</span><span class="dsb-val" id="dsbTWSE">—</span></div>
         <div class="dsb-stat"><span class="dsb-label">VIX 波動率</span><span class="dsb-val" id="dsbVIX">—</span></div>
         <div class="dsb-stat"><span class="dsb-label">Alpha 建議</span><span class="dsb-val" id="dsbAlpha">—</span></div>
-        <button onclick="openWatchlistPanel()" style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;padding:0.3rem 0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap;">⭐ 自選股</button>
+        <button onclick="openWatchlistPanel()" style="font-size:0.75rem;padding:0.3rem 0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap;">⭐ 自選股</button>
       </div>
       <div class="dsb-note" id="dsbNote">載入中…</div>
     </div>
@@ -1358,16 +1356,16 @@
     <!-- 自選股面板 -->
     <div id="watchlistPanel">
       <div style="display:flex;align-items:center;margin-bottom:0.6rem;gap:0.5rem;">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;font-weight:700;">⭐ 自選股</span>
+        <span style="font-size:0.78rem;font-weight:700;">⭐ 自選股</span>
         <input id="wlSearchInput" type="text" placeholder="輸入代號加入…" maxlength="6"
-          style="flex:1;padding:0.28rem 0.6rem;border:1px solid var(--border);border-radius:5px;font-size:0.75rem;font-family:'IBM Plex Mono',monospace;background:var(--surface);color:var(--text);"
+          style="flex:1;padding:0.28rem 0.6rem;border:1px solid var(--border);border-radius:5px;font-size:0.78rem;background:var(--surface);color:var(--text);"
           onkeydown="if(event.key==='Enter')wlAddStock(this.value)">
         <button onclick="wlAddStock(document.getElementById('wlSearchInput').value)"
           style="padding:0.28rem 0.75rem;border-radius:5px;border:none;background:var(--accent);color:#fff;font-size:0.72rem;cursor:pointer;">+加入</button>
         <button onclick="document.getElementById('watchlistPanel').style.display='none'"
           style="padding:0.28rem 0.5rem;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.78rem;cursor:pointer;">✕</button>
       </div>
-      <div id="wlList"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--muted);padding:0.5rem 0;">尚未加入自選股</div></div>
+      <div id="wlList"><div style="font-size:0.78rem;color:var(--muted);padding:0.5rem 0;">尚未加入自選股</div></div>
     </div>
 
     <!-- 今日市場摘要 -->
@@ -1405,7 +1403,7 @@
       <button class="icon-btn" onclick="loadFutures()">↻ 更新</button>
     </div>
   </div>
-  <div id="futuresLoading" style="text-align:center;padding:3rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.78rem;">載入中…</div>
+  <div id="futuresLoading" style="text-align:center;padding:3rem;color:var(--muted);font-size:0.78rem;">載入中…</div>
   <div id="futuresContent" style="display:none;">
     <!-- Sort tabs -->
     <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
@@ -1561,7 +1559,7 @@
         <button class="hm-filter-btn active" data-sector="all" onclick="hmFilterSector('all',this)">全部</button>
       </div>
       <!-- Loading -->
-      <div id="heatmapLoading" style="text-align:center;padding:3rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.78rem;"><div class="spinner" style="margin:0 auto 12px;"></div>載入台股資料中…</div>
+      <div id="heatmapLoading" style="text-align:center;padding:3rem;color:var(--muted);font-size:0.78rem;"><div class="spinner" style="margin:0 auto 12px;"></div>載入台股資料中…</div>
       <!-- SVG treemap -->
       <div id="heatmapSvgWrap" style="display:none;">
         <svg id="heatmapSvg" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -3079,8 +3077,8 @@ function renderFuturesChart(sortKey) {
   futuresSortKey = sortKey;
   document.querySelectorAll('.fut-sort-btn').forEach(btn => {
     const isActive = (sortKey === 'chgPct' && btn.textContent === '漲跌幅') || (sortKey === 'volPct' && btn.textContent === '波幅');
-    btn.style.background = isActive ? 'var(--accent)' : 'var(--surface)';
-    btn.style.color      = isActive ? '#fff' : 'var(--muted)';
+    btn.style.background  = isActive ? 'var(--accent)' : 'var(--surface)';
+    btn.style.color       = isActive ? '#fff' : 'var(--muted)';
     btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
   });
 
@@ -3089,7 +3087,7 @@ function renderFuturesChart(sortKey) {
   const container = document.getElementById('futuresChart');
   container.innerHTML = '';
 
-  // 格式化收盤價（依數值大小自動決定小數位）
+  // 格式化收盤價
   function fmtPrice(p) {
     if (p == null || isNaN(p)) return '–';
     if (p >= 10000) return p.toLocaleString('en', { maximumFractionDigits: 0 });
@@ -3098,13 +3096,15 @@ function renderFuturesChart(sortKey) {
     return p.toLocaleString('en', { maximumFractionDigits: 5 });
   }
 
-  // 圖例
+  // 欄位頭
   const legend = document.createElement('div');
-  legend.style.cssText = 'display:grid;grid-template-columns:6.5rem 1fr 1fr 5rem;align-items:center;gap:0.4rem;font-family:"IBM Plex Mono",monospace;font-size:0.52rem;color:var(--muted);margin-bottom:0.55rem;padding:0 0.1rem;border-bottom:1px solid var(--border);padding-bottom:0.35rem;';
+  legend.style.cssText = 'display:grid;grid-template-columns:7rem 1fr 5rem 5.5rem;align-items:center;gap:0.5rem;font-size:0.65rem;color:var(--muted);margin-bottom:0.5rem;padding-bottom:0.35rem;border-bottom:1px solid var(--border);';
   legend.innerHTML = `
     <span></span>
-    <span style="display:flex;justify-content:space-between;padding:0 0.3rem;"><span style="color:#16a34a;">◀ 跌</span><span>零軸</span><span style="color:#dc2626;">漲 ▶</span></span>
-    <span style="text-align:right;padding-right:0.3rem;">漲跌幅</span>
+    <span style="display:flex;justify-content:space-between;padding:0 0.3rem;">
+      <span style="color:#16a34a;">◀ 跌</span><span>零軸</span><span style="color:#dc2626;">漲 ▶</span>
+    </span>
+    <span style="text-align:right;">漲跌幅</span>
     <span style="text-align:right;">收盤價</span>`;
   container.appendChild(legend);
 
@@ -3114,42 +3114,36 @@ function renderFuturesChart(sortKey) {
     if (!items.length) continue;
 
     const section = document.createElement('div');
-    section.style.cssText = 'margin-bottom:1.25rem;';
-    section.innerHTML = `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.4rem;padding-bottom:0.28rem;border-bottom:1px solid var(--border);">${cat}</div>`;
+    section.style.cssText = 'margin-bottom:1.2rem;';
+    section.innerHTML = `<div style="font-size:0.68rem;color:var(--muted);letter-spacing:0.06em;margin-bottom:0.4rem;padding-bottom:0.25rem;border-bottom:1px solid var(--border);">${cat}</div>`;
 
     for (const item of items) {
       const val   = item[sortKey];
-      const barW  = maxVal ? Math.abs(val) / maxVal * 46 : 0;   // 最大 46%（半邊）
+      const barW  = maxVal ? Math.abs(val) / maxVal * 46 : 0;
       const isUp  = val >= 0;
       const color = isUp ? '#dc2626' : '#16a34a';
       const chgLabel = (val >= 0 ? '+' : '') + (val * 100).toFixed(2) + '%';
 
-      // 漲跌絕對值（元 or 點），若有 chg 欄位則用，否則從 price 推算
-      const chgAbs = item.chg != null
-        ? item.chg
-        : (item.price && item.prevClose ? item.price - item.prevClose : null);
-      const absStr = chgAbs != null
-        ? (chgAbs >= 0 ? '+' : '') + fmtPrice(Math.abs(chgAbs))
-        : '';
-
       const stooqSyms = ['%5E','EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCNH','10USY','30USY','BTCUSD','ETHUSD'];
       const isST = stooqSyms.some(s => item.symbol.includes(s));
       const srcTag = isST
-        ? `<span style="font-size:0.43rem;padding:0 2px;border:1px solid #aaa;border-radius:2px;color:var(--muted);margin-right:3px;flex-shrink:0;">ST</span>`
-        : `<span style="font-size:0.43rem;padding:0 2px;border:1px solid #1a6bc8;border-radius:2px;color:#1a6bc8;margin-right:3px;flex-shrink:0;">FM</span>`;
+        ? `<span style="font-size:0.42rem;padding:0 2px;border:1px solid #aaa;border-radius:2px;color:var(--muted);margin-right:3px;flex-shrink:0;">ST</span>`
+        : `<span style="font-size:0.42rem;padding:0 2px;border:1px solid #1a6bc8;border-radius:2px;color:#1a6bc8;margin-right:3px;flex-shrink:0;">FM</span>`;
 
-      // 雙向 bar
       const leftPct  = isUp ? 0 : barW;
       const rightPct = isUp ? barW : 0;
       const leftBar  = leftPct  ? `<div style="height:10px;width:${leftPct.toFixed(1)}%;background:#bbf7d0;border-radius:3px 0 0 3px;margin-left:auto;"></div>` : '';
       const rightBar = rightPct ? `<div style="height:10px;width:${rightPct.toFixed(1)}%;background:#fecaca;border-radius:0 3px 3px 0;"></div>` : '';
 
-      const row = document.createElement('div');
-      // 4 欄：名稱 | 雙向Bar | 漲跌幅 | 收盤價
-      row.style.cssText = 'display:grid;grid-template-columns:6.5rem 1fr 4.6rem 4.8rem;align-items:center;gap:0.4rem;margin-bottom:0.28rem;min-height:22px;';
+      // 絕對變動值
+      const chgAbs = item.chg != null ? item.chg : (item.price && item.prevClose ? item.price - item.prevClose : null);
+      const absStr = chgAbs != null ? `${chgAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(chgAbs))}` : '';
 
+      const row = document.createElement('div');
+      // 4欄：名稱(7rem) | Bar(1fr) | 漲跌幅(5rem) | 收盤價(5.5rem)
+      row.style.cssText = 'display:grid;grid-template-columns:7rem 1fr 5rem 5.5rem;align-items:center;gap:0.5rem;margin-bottom:0.3rem;min-height:24px;';
       row.innerHTML = `
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:var(--text);display:flex;align-items:center;overflow:hidden;white-space:nowrap;">
+        <div style="font-size:0.72rem;color:var(--text);display:flex;align-items:center;overflow:hidden;white-space:nowrap;">
           ${srcTag}<span style="overflow:hidden;text-overflow:ellipsis;">${item.name}</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1px 1fr;height:10px;background:rgba(0,0,0,0.04);border-radius:3px;overflow:hidden;">
@@ -3157,12 +3151,12 @@ function renderFuturesChart(sortKey) {
           <div style="background:var(--border-dark);width:1px;height:100%;"></div>
           <div style="display:flex;align-items:center;">${rightBar}</div>
         </div>
-        <div style="text-align:right;line-height:1.25;">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:${color};font-weight:700;white-space:nowrap;">${chgLabel}</div>
-          ${absStr ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:${color};opacity:0.75;white-space:nowrap;">${absStr}</div>` : ''}
+        <div style="text-align:right;line-height:1.3;">
+          <div style="font-size:0.78rem;color:${color};font-weight:700;white-space:nowrap;">${chgLabel}</div>
+          ${absStr ? `<div style="font-size:0.62rem;color:${color};opacity:0.7;white-space:nowrap;">${absStr}</div>` : ''}
         </div>
-        <div style="text-align:right;line-height:1.25;">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--text);font-weight:600;white-space:nowrap;">${fmtPrice(item.price)}</div>
+        <div style="text-align:right;">
+          <div style="font-size:0.82rem;color:var(--text);font-weight:600;white-space:nowrap;">${fmtPrice(item.price)}</div>
         </div>`;
       section.appendChild(row);
     }
@@ -6328,7 +6322,7 @@ async function wlRender() {
   }
 
   el.innerHTML = `
-    <div class="wl-item" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);border-bottom:1px solid var(--border);">
+    <div class="wl-item" style="font-size:0.58rem;color:var(--muted);border-bottom:1px solid var(--border);">
       <span>代號</span><span>名稱</span><span>收盤</span><span>漲跌</span><span></span>
     </div>`;
 
@@ -6352,7 +6346,7 @@ async function wlRender() {
           <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r?.name || '—'}</span>
           <span>${r?.close ?? '—'}</span>
           <span style="color:${clr};font-weight:600;">${pct}</span>
-          <button onclick="wlRemove('${id}')" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:0.75rem;padding:0 0.2rem;">✕</button>`;
+          <button onclick="wlRemove('${id}')" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0 0.2rem;">✕</button>`;
         row.querySelector('span').addEventListener('click', () => {
           if (r) openStockModal({ id, name: r.name, price: r.close, chgPct: r.chg_pct, prev: r.close, sector: '', mcap: 0 });
         });
