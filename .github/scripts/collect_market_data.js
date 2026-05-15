@@ -124,6 +124,26 @@ async function collectSectorIndex() {
       console.error(`  ⚠️ 0 筆（原始 ${raw.length} 筆），第一筆：${JSON.stringify(raw[0])}`);
     }
     await sbUpsert('sector_index_daily', rows, 'date,index_name');
+
+    // ── 額外：把「發行量加權股價指數」寫入 stock_daily_twse（stock_id='TAIEX'）──
+    // 供今日總結橫幅直接讀取
+    const taiexRow = rows.find(r => r.index_name === '發行量加權股價指數');
+    if (taiexRow) {
+      const prev = taiexRow.close - taiexRow.change;
+      const chgPct = prev > 0 ? parseFloat((taiexRow.change / prev).toFixed(6)) : 0;
+      await sbUpsert('stock_daily_twse', [{
+        date:     taiexRow.date,
+        stock_id: 'TAIEX',
+        name:     '台灣加權指數',
+        close:    taiexRow.close,
+        prev:     parseFloat(prev.toFixed(2)),
+        chg_pct:  chgPct,
+        volume:   0,
+        source:   'twse_index',
+      }], 'date,stock_id');
+      console.log(`  📊 台灣加權指數寫入 stock_daily_twse：${taiexRow.close}（${chgPct >= 0 ? '+' : ''}${(chgPct*100).toFixed(2)}%）`);
+    }
+
     return { ok: true, count: rows.length };
   } catch (e) { console.error(`  ❌ 產業指數 失敗：${e.message}`); return { ok: false, error: e.message }; }
 }
