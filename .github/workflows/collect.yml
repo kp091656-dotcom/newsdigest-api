@@ -8,8 +8,6 @@ on:
     - cron: '30 22 * * 0-4'
     # 新聞每 2 小時更新一次（全天候）
     - cron: '0 */2 * * *'
-    # Alpha 每日報告（台灣時間 08:05 = UTC 00:05）
-    - cron: '5 0 * * 1-5'
   workflow_dispatch:
     inputs:
       mode:
@@ -45,7 +43,32 @@ jobs:
           COLLECT_MODE:         twse
         run: node .github/scripts/collect_market_data.js
 
-  # ── News job：contains 避免萬用字元比對問題 ──
+  # ── Alpha job：TWSE 跑完後自動接著跑（台灣時間約 08:10）──
+  # 同時支援手動觸發
+  collect-alpha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [collect-twse]
+    if: |
+      always() &&
+      (
+        (github.event_name == 'schedule' && github.event.schedule == '0 22 * * 0-4') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.mode == 'alpha' || github.event.inputs.mode == 'all'))
+      )
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run Alpha Report
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GROQ_API_KEY:         ${{ secrets.GROQ_API_KEY }}
+          COLLECT_MODE:         alpha
+        run: node .github/scripts/collect_market_data.js
+
+  # ── News job ──
   collect-news:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -62,26 +85,6 @@ jobs:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           COLLECT_MODE:         news
-        run: node .github/scripts/collect_market_data.js
-
-  # ── Alpha job ──
-  collect-alpha:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: |
-      (github.event_name == 'schedule' && github.event.schedule == '5 0 * * 1-5') ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.mode == 'alpha' || github.event.inputs.mode == 'all'))
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Run Alpha Report
-        env:
-          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          GROQ_API_KEY:         ${{ secrets.GROQ_API_KEY }}
-          COLLECT_MODE:         alpha
         run: node .github/scripts/collect_market_data.js
 
   # ── FinMind job ──
