@@ -6253,10 +6253,10 @@ async function loadDailySummary() {
         vixEl.textContent = '—';
       }
 
-      // 台灣加權：futures API 無此資料，改從 Supabase stock_daily_twse 抓
-      // 依序嘗試：Y9999（大盤指數）→ 0050（元大台灣50）→ —
+      // 台灣加權：從 stock_daily_twse 抓 TAIEX（由 collectSectorIndex 每日寫入）
+      // fallback：0050
       let twseShown = false;
-      for (const stockId of ['Y9999', '0050', 'IX0001']) {
+      for (const stockId of ['TAIEX', '0050']) {
         try {
           const rows = await sbFetch('stock_daily_twse',
             `stock_id=eq.${stockId}&order=date.desc&limit=1&select=stock_id,name,close,chg_pct`);
@@ -6264,8 +6264,8 @@ async function loadDailySummary() {
           if (r && r.close) {
             const pct = ((r.chg_pct || 0) * 100).toFixed(2);
             const clr = (r.chg_pct || 0) >= 0 ? '#dc2626' : '#16a34a';
-            const label = stockId === '0050' ? '0050' : '';
-            twseEl.innerHTML = `<span style="color:${clr}">${Math.round(r.close).toLocaleString()}<span style="font-size:0.75em;margin-left:0.3em">${pct >= 0 ? '+' : ''}${pct}%</span></span>${label ? `<span style="font-size:0.6em;color:var(--muted);margin-left:0.3em">(${label})</span>` : ''}`;
+            const isFallback = stockId === '0050';
+            twseEl.innerHTML = `<span style="color:${clr}">${r.close.toLocaleString('en', {maximumFractionDigits: 2})}<span style="font-size:0.75em;margin-left:0.3em">${pct >= 0 ? '+' : ''}${pct}%</span></span>${isFallback ? '<span style="font-size:0.6em;color:var(--muted);margin-left:0.3em">(0050)</span>' : ''}`;
             twseShown = true;
             break;
           }
