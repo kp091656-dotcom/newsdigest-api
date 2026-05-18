@@ -8,6 +8,8 @@ on:
     - cron: '30 22 * * 0-4'
     # 新聞每 2 小時更新一次（全天候）
     - cron: '0 */2 * * *'
+    # 每週備份：週日 UTC 01:00（台灣時間週日 09:00）
+    - cron: '0 1 * * 0'
   workflow_dispatch:
     inputs:
       mode:
@@ -21,6 +23,7 @@ on:
           - finmind
           - alpha
           - news
+          - backup
 
 jobs:
   # ── TWSE job ──
@@ -106,3 +109,51 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           COLLECT_MODE:         finmind
         run: node .github/scripts/collect_market_data.js
+
+  # ── Weekly Backup job ──
+  backup-to-pcloud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 1 * * 0') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backup')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # 安裝 rclone
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone version
+
+      # 從 Secret 還原 rclone pcloud 設定
+      - name: Configure rclone pCloud
+        env:
+          RCLONE_PCLOUD_TOKEN:    ${{ secrets.RCLONE_PCLOUD_TOKEN }}
+          RCLONE_PCLOUD_HOSTNAME: ${{ secrets.RCLONE_PCLOUD_HOSTNAME }}
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [pcloud]
+          type = pcloud
+          hostname = ${RCLONE_PCLOUD_HOSTNAME}
+          token = ${RCLONE_PCLOUD_TOKEN}
+          EOF
+          echo "✅ rclone 設定完成"
+
+      # 測試 pCloud 連線
+      - name: Test pCloud connection
+        run: |
+          rclone lsd pcloud: || echo "⚠️ pCloud 根目錄列出失敗，繼續執行"
+          rclone mkdir pcloud:AlphaScope-Backups || true
+
+      # 執行備份腳本
+      - name: Run backup
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node .github/scripts/backup.js
