@@ -52,15 +52,58 @@ export default async function handler(req, res) {
   }
 
   async function fetchVIX() {
-    const symbols = ['^VIX', '^VVIX'];
-    const results = await Promise.all(symbols.map(async s => {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?interval=1d&range=1d`;
-      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(5000) });
-      const d = await r.json();
-      const q = d?.chart?.result?.[0]?.meta;
-      return { symbol: s, price: q?.regularMarketPrice ?? null, name: q?.shortName ?? s };
-    }));
-    return { data: results };
+    const FINMIND_TOKEN = process.env.FINMIND_TOKEN;
+    const start = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10);
+
+    // ── 優先：FinMind（穩定 / 官方 API）──
+    if (FINMIND_TOKEN) {
+      try {
+        const [vixRes, vvixRes] = await Promise.all([
+          fetch(`https://api.finmindtrade.com/api/v4/data?dataset=USStockPrice&data_id=%5EVIX&start_date=${start}`, {
+            headers: { Authorization: `Bearer ${FINMIND_TOKEN}` },
+            signal: AbortSignal.timeout(8000),
+          }),
+          fetch(`https://api.finmindtrade.com/api/v4/data?dataset=USStockPrice&data_id=%5EVVIX&start_date=${start}`, {
+            headers: { Authorization: `Bearer ${FINMIND_TOKEN}` },
+            signal: AbortSignal.timeout(8000),
+          }),
+        ]);
+        const [vixJson, vvixJson] = await Promise.all([vixRes.json(), vvixRes.json()]);
+        const getLatest = (json) => {
+          const rows = (json.data || []).sort((a, b) => b.date.localeCompare(a.date));
+          return rows[0] || null;
+        };
+        const vixLatest  = getLatest(vixJson);
+        const vvixLatest = getLatest(vvixJson);
+        if (vixLatest) {
+          return {
+            data: [
+              { symbol: '^VIX',  price: vixLatest.close,              name: 'CBOE Volatility Index', source: 'finmind' },
+              vvixLatest
+                ? { symbol: '^VVIX', price: vvixLatest.close, name: 'CBOE VVIX Index', source: 'finmind' }
+                : { symbol: '^VVIX', price: null,             name: 'CBOE VVIX Index', source: 'finmind' },
+            ],
+          };
+        }
+      } catch (e) {
+        console.warn('[fetchVIX] FinMind 失敗，fallback Yahoo:', e.message);
+      }
+    }
+
+    // ── Fallback：Yahoo Finance v8（非官方，備用）──
+    try {
+      const symbols = ['^VIX', '^VVIX'];
+      const results = await Promise.all(symbols.map(async s => {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?interval=1d&range=1d`;
+        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(5000) });
+        const d = await r.json();
+        const q = d?.chart?.result?.[0]?.meta;
+        return { symbol: s, price: q?.regularMarketPrice ?? null, name: q?.shortName ?? s, source: 'yahoo' };
+      }));
+      return { data: results };
+    } catch {
+      return { data: [{ symbol: '^VIX', price: null, name: 'VIX', source: 'error' }] };
+    }
   }
 
   async function fetchFuturesLite() {
@@ -94,6 +137,29 @@ export default async function handler(req, res) {
   async function fetchPTT() {
     const HDR  = { 'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1' };
     const BASE = 'https://www.ptt.cc';
+
+    // ── 優先：PTT JSON API（更穩定，不受 HTML 結構改版影響）──
+    try {
+      const r = await fetch(BASE + '/api/board/Stock/index', { headers: HDR, signal: AbortSignal.timeout(7000) });
+      if (!r.ok) throw new Error(`PTT JSON API HTTP ${r.status}`);
+      const json = await r.json();
+      const posts = json?.posts || json?.items || [];
+      const items = [];
+      for (const post of posts.slice(0, 20)) {
+        const title = (post.title || post.subject || '').trim();
+        if (!title || ['[公告]', '[板規]', 'Fw:'].some(p => title.startsWith(p))) continue;
+        const pushes = typeof post.num_comments === 'number' ? post.num_comments
+                     : typeof post.recommend    === 'number' ? post.recommend : 0;
+        const link = post.url || (BASE + (post.href || ''));
+        items.push({ title, link, pushes });
+      }
+      if (items.length > 0) return { data: items };
+      throw new Error('PTT JSON API 回傳空陣列');
+    } catch (e) {
+      console.warn('[fetchPTT] JSON API 失敗，fallback HTML:', e.message);
+    }
+
+    // ── Fallback：HTML 解析（保留原邏輯）──
     try {
       const r = await fetch(BASE + '/bbs/Stock/index.html', { headers: HDR, signal: AbortSignal.timeout(7000) });
       const html = await r.text();
@@ -104,10 +170,10 @@ export default async function handler(req, res) {
         const titM  = blk.match(/<a[^>]+href="[^"]+"[^>]*>([^<]+)<\/a>/i);
         if (!linkM || !titM) continue;
         const title = titM[1].trim();
-        if (['[公告]','[板規]','Fw:'].some(p => title.startsWith(p))) continue;
+        if (['[公告]', '[板規]', 'Fw:'].some(p => title.startsWith(p))) continue;
         const nrecM = blk.match(/<span[^>]*>(爆|\d+|X+)<\/span>/i);
         const nrecRaw = (nrecM?.[1] || '').trim();
-        const pushes = nrecRaw === '爆' ? 99 : /^X+$/i.test(nrecRaw) ? -nrecRaw.length*10 : parseInt(nrecRaw)||0;
+        const pushes = nrecRaw === '爆' ? 99 : /^X+$/i.test(nrecRaw) ? -nrecRaw.length * 10 : parseInt(nrecRaw) || 0;
         items.push({ title, link: BASE + linkM[1], pushes });
       }
       return { data: items };
