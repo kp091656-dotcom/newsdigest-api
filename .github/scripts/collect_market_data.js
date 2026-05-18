@@ -116,7 +116,6 @@ async function collectSectorIndex() {
         const rawPct    = parseFloat((r['漲跌百分比'] || '').replace(/,/g, '')) || 0;
         const chgPct    = sign === '-' ? -rawPct : rawPct;
         const change    = sign === '-' ? -chgPts : chgPts;
-        // sector_index_daily 實際欄位（Supabase截圖確認）：date, index_name, close, change, chg_pct
         return { date: tradeDate, index_name: indexName, close, change, chg_pct: chgPct };
       })
       .filter(r => r.close > 0 && r.index_name);
@@ -126,7 +125,6 @@ async function collectSectorIndex() {
     await sbUpsert('sector_index_daily', rows, 'date,index_name');
 
     // ── 額外：把「發行量加權股價指數」寫入 stock_daily_twse（stock_id='TAIEX'）──
-    // 供今日總結橫幅直接讀取
     const taiexRow = rows.find(r => r.index_name === '發行量加權股價指數');
     if (taiexRow) {
       const prev = taiexRow.close - taiexRow.change;
@@ -163,7 +161,6 @@ async function collectValuation() {
         name: r.Name || null,
         pe_ratio: (() => {
           const v = parseFloat(r.PEratio);
-          // 過濾無效值：NaN、負數、極端值（>200 通常為微利股失真）
           return (!isNaN(v) && v > 0 && v <= 200) ? v : null;
         })(),
         pb_ratio: (() => {
@@ -208,11 +205,6 @@ async function collectInstitutional() {
   } catch (e) { console.error(`  ❌ 三大法人 失敗：${e.message}`); return { ok: false, error: e.message }; }
 }
 
-/**
- * 融資融券 → margin_daily
- * Supabase 實際欄位（截圖已確認）：date, margin_balance, margin_chg, short_balance, short_chg
- * FinMind TaiwanStockTotalMarginPurchaseShortSale：TodayBalance, YesBalance, buy, date, name, Return, sell
- */
 async function collectMargin() {
   console.log('💳 融資融券（FinMind）...');
   try {
@@ -229,7 +221,6 @@ async function collectMargin() {
       const today = parseInt(r.TodayBalance) || 0;
       const yes   = parseInt(r.YesBalance)   || 0;
       const name  = r.name || '';
-      // FinMind 實際 name 值（從 log 確認）：MarginPurchase | ShortSale | MarginPurchaseMoney
       if (name === 'MarginPurchase') {
         byDate[dt].margin_balance = today;
         byDate[dt].margin_chg    = today - yes;
@@ -244,12 +235,6 @@ async function collectMargin() {
   } catch (e) { console.error(`  ❌ 融資融券 失敗：${e.message}`); return { ok: false, error: e.message }; }
 }
 
-/**
- * 台指選擇權 → options_daily
- * 前端讀取欄位（index.html 確認）：date, pc_ratio_oi, foreign_opt_net
- * FinMind TaiwanOptionDaily：date, option_id, strike_price, call_put, volume, open_interest, trading_session
- * FinMind TaiwanOptionInstitutionalInvestors：institutional_investors, long/short_open_interest_balance_volume
- */
 async function collectOptions() {
   console.log('🎯 台指選擇權（FinMind）...');
   try {
@@ -280,7 +265,6 @@ async function collectOptions() {
       }
     }
 
-    // Max Pain
     const strikes = Object.keys(byStrike).map(Number).sort((a, b) => a - b);
     let maxPain = null, minLoss = Infinity;
     for (const settle of strikes) {
@@ -292,7 +276,6 @@ async function collectOptions() {
       if (loss < minLoss) { minLoss = loss; maxPain = settle; }
     }
 
-    // 法人部位
     let foreignLong = 0, foreignShort = 0;
     try {
       const inst = await fmFetch('TaiwanOptionInstitutionalInvestors',
@@ -310,18 +293,13 @@ async function collectOptions() {
       date:            tradeDate,
       pc_ratio_vol:    callVol > 0 ? parseFloat((putVol  / callVol).toFixed(4)) : null,
       pc_ratio_oi:     callOI  > 0 ? parseFloat((putOI   / callOI).toFixed(4))  : null,
-      foreign_opt_net: foreignLong - foreignShort,  // ← 前端用 foreign_opt_net
+      foreign_opt_net: foreignLong - foreignShort,
     };
-    // ⚠️ 只寫入 Supabase 已確認存在的欄位（call_vol/put_vol/call_oi/put_oi/max_pain 需先建欄位）
     await sbUpsert('options_daily', [row], 'date');
     return { ok: true, count: 1, date: tradeDate };
   } catch (e) { console.error(`  ❌ 選擇權 失敗：${e.message}`); return { ok: false, error: e.message }; }
 }
 
-/**
- * 全球商品/指數 — 前端走 Vercel proxy，Supabase futures_daily 欄位未確認
- * 暫時只抓資料並 log，不寫入 Supabase（避免 400 錯誤）
- */
 async function collectFutures() {
   console.log('🌍 全球商品/指數（stooq + FinMind）...');
   try {
@@ -358,19 +336,14 @@ async function collectFutures() {
       } catch { return null; }
     }))).filter(Boolean);
 
-    // ── FinMind（美股指數 + 商品）──
-    // dataset 名稱已從 FinMind 文件確認
     const FM_ITEMS = [
-      // 美股指數：USStockPrice 支援 ^GSPC, ^IXIC, ^DJI, ^VIX
-      { ds: 'USStockPrice',       id: '^GSPC',  name: 'S&P500',    cat: '美股指數', ck: 'Close' },
-      { ds: 'USStockPrice',       id: '^IXIC',  name: '那斯達克',  cat: '美股指數', ck: 'Close' },
-      { ds: 'USStockPrice',       id: '^DJI',   name: '道瓊',      cat: '美股指數', ck: 'Close' },
-      { ds: 'USStockPrice',       id: '^VIX',   name: 'VIX',       cat: '波動率',   ck: 'Close' },
-      // 黃金：正確 dataset 為 GoldPrice（GoldFuturesDailyPrice 為 422）
-      { ds: 'GoldPrice',          id: '',       name: '黃金現貨',  cat: '金屬',     ck: 'price' },
-      // 原油：data_id 應為 'WTI'/'Brent'，需確認大小寫
-      { ds: 'CrudeOilPrices',     id: 'WTI',    name: 'WTI原油',   cat: '能源',     ck: 'price' },
-      { ds: 'CrudeOilPrices',     id: 'Brent',  name: 'Brent原油', cat: '能源',     ck: 'price' },
+      { ds: 'USStockPrice',   id: '^GSPC',  name: 'S&P500',    cat: '美股指數', ck: 'Close' },
+      { ds: 'USStockPrice',   id: '^IXIC',  name: '那斯達克',  cat: '美股指數', ck: 'Close' },
+      { ds: 'USStockPrice',   id: '^DJI',   name: '道瓊',      cat: '美股指數', ck: 'Close' },
+      { ds: 'USStockPrice',   id: '^VIX',   name: 'VIX',       cat: '波動率',   ck: 'Close' },
+      { ds: 'GoldPrice',      id: '',       name: '黃金現貨',  cat: '金屬',     ck: 'price' },
+      { ds: 'CrudeOilPrices', id: 'WTI',    name: 'WTI原油',   cat: '能源',     ck: 'price' },
+      { ds: 'CrudeOilPrices', id: 'Brent',  name: 'Brent原油', cat: '能源',     ck: 'price' },
     ];
 
     const fmRows = FM_TOKEN ? (await Promise.all(FM_ITEMS.map(async s => {
@@ -394,9 +367,7 @@ async function collectFutures() {
     console.log(`  stooq: ${stooqRows.length}/${STOOQ.length}，FinMind: ${fmRows.length}/${FM_ITEMS.length}，合計: ${allRows.length}`);
     console.log(`  ℹ️  futures_daily Supabase 欄位待確認，本次不寫入（前端走 Vercel proxy）`);
 
-    // stooq 在 GitHub Actions IP 被擋屬正常，只要 FinMind 有資料即可
     if (!allRows.length) {
-      // 不 throw — 改為 warn，避免整個 pipeline 標記失敗
       console.warn(`  ⚠️  全球商品：stooq 被擋且 FinMind 無資料，前端改從 Vercel proxy 即時取得`);
     }
     return { ok: true, count: allRows.length };
@@ -407,9 +378,6 @@ async function collectFutures() {
 // 新聞收集任務
 // ══════════════════════════════════════════
 
-/**
- * 解析 RSS XML，回傳 [{title, url, description, publishedAt}]
- */
 function parseRSS(xml, source, lang = 'en') {
   const items = [];
   const itemMatches = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) || [];
@@ -435,29 +403,25 @@ function parseRSS(xml, source, lang = 'en') {
 async function collectNews() {
   console.log('📰 財經新聞收集（RSS）...');
   try {
-    const cutoff = new Date(Date.now() - 48 * 3600_000); // 抓 48 小時內（保留緩衝）
+    const cutoff = new Date(Date.now() - 48 * 3600_000);
 
     const RSS_FEEDS = [
-      // ── 英文來源（Reuters 擋 Actions IP，改由前端即時拉取）──
       { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114',  source: 'CNBC',         lang: 'en' },
       { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664',   source: 'CNBC',         lang: 'en' },
       { url: 'https://feeds.bloomberg.com/markets/news.rss',                                          source: 'Bloomberg',    lang: 'en' },
       { url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',                           source: 'MarketWatch',  lang: 'en' },
       { url: 'https://feeds.content.dowjones.io/public/rss/mw_marketpulse',                          source: 'MarketWatch',  lang: 'en' },
       { url: 'https://www.ft.com/?format=rss',                                                        source: 'FT',           lang: 'en' },
-      // ── 台股中文來源（新增）──
       { url: 'https://news.google.com/rss/search?q=台股+OR+台積電+OR+外資+OR+加權指數&hl=zh-TW&gl=TW&ceid=TW:zh-Hant', source: 'Google News TW', lang: 'zh' },
       { url: 'https://money.udn.com/rssfeed/news/1001/5590/index.xml',                               source: '經濟日報',     lang: 'zh' },
       { url: 'https://news.google.com/rss/search?q=工商時報+台股&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',    source: '工商時報',     lang: 'zh' },
       { url: 'https://www.cnyes.com/rss/cat/tw_stock',                                               source: '鉅亨網',       lang: 'zh' },
     ];
 
-    // 各來源客製化 headers（部分網站需要 Referer / Accept 才不會 403/406）
     const CUSTOM_HEADERS = {
-      '鉅亨網':   { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Referer': 'https://www.cnyes.com/' },
+      '鉅亨網': { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Referer': 'https://www.cnyes.com/' },
     };
 
-    // 並行抓取所有 RSS
     const fetchResults = await Promise.all(RSS_FEEDS.map(async ({ url, source, lang }) => {
       try {
         const r = await fetch(url, {
@@ -474,31 +438,26 @@ async function collectNews() {
       } catch (e) { console.log(`  ⚠️  ${source} 失敗：${e.message}`); return []; }
     }));
 
-    // 合併、去重（依 url）、過濾時間
     const seen = new Set();
     const articles = fetchResults.flat().filter(a => {
       if (seen.has(a.url)) return false;
       seen.add(a.url);
       if (new Date(a.publishedAt) < cutoff) return false;
-      // 地區黑名單（沿用 news.js 規則）
       const low = (a.title + ' ' + (a.description || '')).toLowerCase();
       const blacklist = ['czech', 'czechia', 'prague', 'koruna', 'philippines', 'philippine', 'manila', 'bangko sentral',
         'safaricom', 'nairobi', 'kenya', 'nigeria', 'lagos', 'johannesburg', 'south africa', 'ghana'];
       if (blacklist.some(w => low.includes(w))) return false;
-      // Newsletter 過濾
       if (/^[A-Za-z\s&]+\d{1,2}\/\d{1,2}\/\d{4}$/.test(a.title.trim())) return false;
       return true;
     });
 
     console.log(`  📊 合計 ${articles.length} 篇（去重後）`);
-
     if (!articles.length) return { ok: true, count: 0 };
 
-    // Upsert 進 Supabase（on_conflict=url）
     const rows = articles.map(a => ({
       url:          a.url,
       title:        a.title,
-      title_zh:     null,   // 翻譯由前端 Groq 即時處理，收集階段不呼叫 AI
+      title_zh:     null,
       description:  a.description || null,
       source:       a.source,
       lang:         a.lang,
@@ -508,13 +467,9 @@ async function collectNews() {
 
     await sbUpsert('news_daily', rows, 'url');
 
-    // 清理 3 天前的舊資料
     const deleteRes = await fetch(
       `${SUPABASE_URL}/rest/v1/news_daily?collected_at=lt.${new Date(Date.now() - 48 * 3_600_000).toISOString()}`,
-      {
-        method: 'DELETE',
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      }
+      { method: 'DELETE', headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     );
     if (deleteRes.ok) console.log('  🗑️  已清理 48 小時前舊新聞');
     else console.warn(`  ⚠️  清理失敗 HTTP ${deleteRes.status}`);
@@ -523,16 +478,12 @@ async function collectNews() {
   } catch (e) { console.error(`  ❌ 新聞收集 失敗：${e.message}`); return { ok: false, error: e.message }; }
 }
 
-
-
 // ══════════════════════════════════════════
-// ══════════════════════════════════════════
-// Alpha 自動停損停利檢查（含重複建倉防護）
+// Alpha 自動停損停利檢查
 // ══════════════════════════════════════════
 async function checkAlphaStopLossTarget() {
   console.log('🔍 Alpha 停損停利檢查...');
   try {
-    // 取所有開倉持倉
     const posRes = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions?status=eq.open&select=id,stock_id,stock_name,entry_price,target_price,stop_loss,shares,opened_at`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     });
@@ -542,7 +493,6 @@ async function checkAlphaStopLossTarget() {
       return { ok: true, closed: 0 };
     }
 
-    // 取最新收盤日
     const dateRes = await fetch(`${SUPABASE_URL}/rest/v1/stock_daily_twse?order=date.desc&limit=1&select=date`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     });
@@ -550,7 +500,6 @@ async function checkAlphaStopLossTarget() {
     const latestDate = Array.isArray(dateJson) && dateJson[0]?.date ? dateJson[0].date : null;
     if (!latestDate) { console.log('  ⚠️  無法取得最新收盤日'); return { ok: true, closed: 0 }; }
 
-    // 取這些股票的最新收盤價
     const stockIds = [...new Set(positions.map(p => p.stock_id))];
     const priceRes = await fetch(
       `${SUPABASE_URL}/rest/v1/stock_daily_twse?date=eq.${latestDate}&stock_id=in.(${stockIds.join(',')})&select=stock_id,close`,
@@ -582,28 +531,20 @@ async function checkAlphaStopLossTarget() {
 
       if (!exitReason) continue;
 
-      // 計算損益
       const pnl     = parseFloat(((exitPrice - pos.entry_price) * (pos.shares || 1) * 1000).toFixed(0));
       const pnl_pct = parseFloat(((exitPrice - pos.entry_price) / pos.entry_price * 100).toFixed(2));
-
-      // 持有天數
       const openedDate = pos.opened_at ? pos.opened_at.slice(0, 10) : null;
       const daysHeld   = openedDate && latestDate
         ? Math.max(0, Math.round((new Date(latestDate) - new Date(openedDate)) / 86400000))
         : '-';
 
-      // 更新持倉為 closed
       const fullReason = [pos.reason, exitReason].filter(Boolean).join('｜');
       const closeRes = await fetch(`${SUPABASE_URL}/rest/v1/trader_positions?id=eq.${pos.id}`, {
         method: 'PATCH',
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status:     'closed',
-          exit_price: exitPrice,
-          pnl,
-          pnl_pct,
-          closed_at:  new Date().toISOString(),
-          reason:     fullReason,
+          status: 'closed', exit_price: exitPrice, pnl, pnl_pct,
+          closed_at: new Date().toISOString(), reason: fullReason,
         }),
       });
 
@@ -628,7 +569,7 @@ async function checkAlphaStopLossTarget() {
   }
 }
 
-
+// ══════════════════════════════════════════
 // Alpha 每日報告生成
 // ══════════════════════════════════════════
 async function collectAlphaReport() {
@@ -637,9 +578,9 @@ async function collectAlphaReport() {
   if (!GROQ_KEY) { console.warn('  ⚠️  GROQ_API_KEY 未設定'); return { ok: false, error: 'no groq key' }; }
 
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    // ⚠️ 使用台灣時間（UTC+8），避免 UTC 22:xx 跑時寫入前一天日期
+    const today = todayTW();
 
-    // 檢查今日報告是否已存在
     const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/alpha_daily_report?report_date=eq.${today}&select=id`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     });
@@ -676,29 +617,50 @@ async function collectAlphaReport() {
     });
     const news = await newsRes.json().catch(() => []);
 
-    // ── 3. 抓 PTT ──
+    // ── 3. 抓 PTT（JSON API，比 HTML 解析更穩定）──
     let pttTitles = '';
     try {
-      const pttRes = await fetch('https://www.ptt.cc/bbs/Stock/index.html', {
+      const pttRes = await fetch('https://www.ptt.cc/api/board/Stock/index', {
         headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1' },
         signal: AbortSignal.timeout(8000),
       });
-      const html = await pttRes.text();
-      const blocks = html.split('<div class="r-ent">').slice(1, 16);
+      if (!pttRes.ok) throw new Error(`PTT JSON API HTTP ${pttRes.status}`);
+      const pttJson = await pttRes.json();
+      const posts = pttJson?.posts || pttJson?.items || [];
       const items = [];
-      for (const blk of blocks) {
-        const linkM = blk.match(/href="(\/bbs\/Stock\/M\.[^"]+)"/i);
-        const titM  = blk.match(/<a[^>]+href="[^"]+"[^>]*>([^<]+)<\/a>/i);
-        if (!linkM || !titM) continue;
-        const title = titM[1].trim();
-        if (['[公告]','[板規]','Fw:'].some(p => title.startsWith(p))) continue;
-        const nrecM = blk.match(/<span[^>]*>(爆|\d+|X+)<\/span>/i);
-        const nrecRaw = (nrecM?.[1] || '').trim();
-        const pushes = nrecRaw === '爆' ? 99 : /^X+$/i.test(nrecRaw) ? -nrecRaw.length*10 : parseInt(nrecRaw)||0;
+      for (const post of posts.slice(0, 20)) {
+        const title = (post.title || post.subject || '').trim();
+        if (!title || ['[公告]', '[板規]', 'Fw:'].some(p => title.startsWith(p))) continue;
+        const pushes = typeof post.num_comments === 'number' ? post.num_comments
+                     : typeof post.recommend    === 'number' ? post.recommend : 0;
         items.push(`【${pushes >= 0 ? '+' : ''}${pushes}推】${title}`);
       }
-      pttTitles = items.join('\n');
-    } catch { pttTitles = '無法取得'; }
+      pttTitles = items.length ? items.join('\n') : '無熱門討論';
+    } catch (e) {
+      // JSON API 失敗時 fallback 到 HTML 解析
+      console.warn(`  ⚠️  PTT JSON API 失敗（${e.message}），fallback 到 HTML 解析`);
+      try {
+        const pttRes = await fetch('https://www.ptt.cc/bbs/Stock/index.html', {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': 'over18=1' },
+          signal: AbortSignal.timeout(8000),
+        });
+        const html = await pttRes.text();
+        const blocks = html.split('<div class="r-ent">').slice(1, 16);
+        const items = [];
+        for (const blk of blocks) {
+          const linkM = blk.match(/href="(\/bbs\/Stock\/M\.[^"]+)"/i);
+          const titM  = blk.match(/<a[^>]+href="[^"]+"[^>]*>([^<]+)<\/a>/i);
+          if (!linkM || !titM) continue;
+          const title = titM[1].trim();
+          if (['[公告]', '[板規]', 'Fw:'].some(p => title.startsWith(p))) continue;
+          const nrecM = blk.match(/<span[^>]*>(爆|\d+|X+)<\/span>/i);
+          const nrecRaw = (nrecM?.[1] || '').trim();
+          const pushes = nrecRaw === '爆' ? 99 : /^X+$/i.test(nrecRaw) ? -nrecRaw.length * 10 : parseInt(nrecRaw) || 0;
+          items.push(`【${pushes >= 0 ? '+' : ''}${pushes}推】${title}`);
+        }
+        pttTitles = items.join('\n') || '無熱門討論';
+      } catch { pttTitles = '無法取得'; }
+    }
 
     // ── 4. 整理資料 ──
     const valMap = {};
@@ -757,22 +719,19 @@ ${pttTitles}
     if (!groqRes.ok) throw new Error(`Groq HTTP ${groqRes.status}`);
     const groqData = await groqRes.json();
     let raw = groqData.choices?.[0]?.message?.content || '';
-    // 多層清理：移除 markdown、全形引號、控制字元
     raw = raw
       .replace(/```json|```/g, '')
-      .replace(/“|”|‘|’/g, '"') // 全形引號→半形
-      .replace(/[ --]/g, '') // 控制字元
+      .replace(/"|"|'|'/g, '"')
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
       .trim();
     const si = raw.indexOf('{'), ei = raw.lastIndexOf('}');
     if (si === -1 || ei === -1) throw new Error(`Groq 未回傳 JSON，原始內容：${raw.slice(0,200)}`);
     let jsonStr = raw.slice(si, ei + 1);
-    // 修復常見 AI JSON 錯誤：trailing comma
     jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
     let result;
     try {
       result = JSON.parse(jsonStr);
     } catch(parseErr) {
-      // 記錄原始內容方便 debug
       console.error('  JSON 解析失敗，原始內容：', jsonStr.slice(0, 500));
       throw new Error(`JSON 解析失敗：${parseErr.message}`);
     }
@@ -817,13 +776,21 @@ ${pttTitles}
 
     if (!upsertRes.ok) throw new Error(`Supabase upsert HTTP ${upsertRes.status}`);
 
+    // ── 7.5 清理 180 天前的舊報告（節省 Supabase 空間）──
+    try {
+      const cutoffDate = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
+      const delRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/alpha_daily_report?report_date=lt.${cutoffDate}`,
+        { method: 'DELETE', headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=minimal' } }
+      );
+      if (delRes.ok) console.log(`  🗑️  已清理 ${cutoffDate} 前的舊 Alpha 報告`);
+    } catch { /* 清理失敗不中斷主流程 */ }
+
     // ── 8. 自動建立買進持倉（重複建倉防護 + 當日平倉防護）──
     const buyRecs = (result.recommendations || []).filter(r => r.action === '買進');
     if (buyRecs.length > 0) {
-      const todayStr = today; // 今日日期（YYYY-MM-DD）
+      const todayStr = today;
 
-      // 查①：目前 open 持倉（避免重複建倉）
-      // 查②：今日已平倉持倉（避免停損/停利後當天重新進場同一檔）
       const [existRes, todayClosedRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/trader_positions?status=eq.open&select=stock_id`, {
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
@@ -832,10 +799,10 @@ ${pttTitles}
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
         }),
       ]);
-      const existRows      = await existRes.json().catch(() => []);
+      const existRows       = await existRes.json().catch(() => []);
       const todayClosedRows = await todayClosedRes.json().catch(() => []);
 
-      const existIds      = new Set(Array.isArray(existRows)       ? existRows.map(r => r.stock_id)       : []);
+      const existIds       = new Set(Array.isArray(existRows)       ? existRows.map(r => r.stock_id)       : []);
       const todayClosedIds = new Set(Array.isArray(todayClosedRows) ? todayClosedRows.map(r => r.stock_id) : []);
 
       const newRecs = buyRecs.filter(r => {
