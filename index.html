@@ -1779,6 +1779,141 @@
 
     </div><!-- end 估值+β grid -->
 
+    <!-- ══ 籌碼面板：現貨+期貨+選擇權三大法人 ══ -->
+    <div id="chipsPanel" style="margin-top:1rem;">
+
+      <!-- 標題 -->
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.9rem;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);
+          border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">
+          籌碼面板
+        </div>
+        <span id="chips-date" style="font-size:0.55rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;"></span>
+        <span id="chips-loading" style="font-size:0.55rem;color:var(--muted);">載入中…</span>
+      </div>
+
+      <!-- 第一列：現貨 + TX 台指期 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+
+        <!-- 現貨三大法人 -->
+        <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;">
+            🏢 三大法人現貨 <span style="font-size:0.52rem;opacity:0.7;">億元</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.68rem;">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">身份</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">買進</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">賣出</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">買賣超</th>
+            </tr></thead>
+            <tbody id="chips-spot-body"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:12px;font-size:0.65rem;">載入中…</td></tr></tbody>
+          </table>
+          <div style="margin-top:8px;padding:6px 8px;background:var(--bg);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.52rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;">三大法人合計</span>
+            <span id="chips-spot-total" style="font-size:0.8rem;font-weight:700;font-family:'IBM Plex Mono',monospace;"></span>
+          </div>
+        </div>
+
+        <!-- TX 台指期 -->
+        <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;">
+            📈 台指期 TX（大台）<span style="font-size:0.52rem;opacity:0.7;margin-left:4px;">OI 口數</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.68rem;">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">身份</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">多方</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">空方</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">淨額</th>
+            </tr></thead>
+            <tbody id="chips-tx-body"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:12px;font-size:0.65rem;">載入中…</td></tr></tbody>
+          </table>
+          <div style="margin-top:8px;padding:6px 8px;background:var(--bg);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.52rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;">三大法人合計淨額</span>
+            <span id="chips-tx-total" style="font-size:0.8rem;font-weight:700;font-family:'IBM Plex Mono',monospace;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第二列：MTX 小台 + TMF 微台 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+
+        <!-- MTX 小台 -->
+        <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;">
+            📉 小型台指 MTX（小台）<span style="font-size:0.52rem;opacity:0.7;margin-left:4px;">OI 口數</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.68rem;">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">身份</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">淨額口數</th>
+            </tr></thead>
+            <tbody id="chips-mtx-body"><tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px;font-size:0.65rem;">載入中…</td></tr></tbody>
+          </table>
+          <div style="margin-top:8px;padding:6px 8px;background:var(--bg);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.52rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;">合計淨額</span>
+            <span id="chips-mtx-total" style="font-size:0.8rem;font-weight:700;font-family:'IBM Plex Mono',monospace;"></span>
+          </div>
+        </div>
+
+        <!-- TMF 微台 -->
+        <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;">
+            🔬 微型台指 TMF（微台）<span style="font-size:0.52rem;opacity:0.7;margin-left:4px;">OI 口數</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.68rem;">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">身份</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">淨額口數</th>
+            </tr></thead>
+            <tbody id="chips-tmf-body"><tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px;font-size:0.65rem;">載入中…</td></tr></tbody>
+          </table>
+          <div style="margin-top:8px;padding:6px 8px;background:var(--bg);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.52rem;color:var(--muted);font-family:'IBM Plex Mono',monospace;">合計淨額</span>
+            <span id="chips-tmf-total" style="font-size:0.8rem;font-weight:700;font-family:'IBM Plex Mono',monospace;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第三列：選擇權 CALL + PUT -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:0.5rem;">
+
+        <!-- CALL -->
+        <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;color:#ef4444;font-weight:600;">
+            ▲ 選擇權 CALL（買權 OI）<span style="font-size:0.52rem;font-weight:400;margin-left:4px;color:var(--muted);">口數</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.68rem;">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">身份</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">買方</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">賣方</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">淨部位</th>
+            </tr></thead>
+            <tbody id="chips-call-body"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:12px;font-size:0.65rem;">載入中…</td></tr></tbody>
+          </table>
+        </div>
+
+        <!-- PUT -->
+        <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;color:#22c55e;font-weight:600;">
+            ▼ 選擇權 PUT（賣權 OI）<span style="font-size:0.52rem;font-weight:400;margin-left:4px;color:var(--muted);">口數</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.68rem;">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">身份</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">買方</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">賣方</th>
+              <th style="text-align:right;padding:4px 6px;color:var(--muted);font-size:0.52rem;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-weight:400;">淨部位</th>
+            </tr></thead>
+            <tbody id="chips-put-body"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:12px;font-size:0.65rem;">載入中…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- end chipsPanel -->
+
         <!-- 免責聲明 -->
     <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);line-height:1.6;padding:0 0.2rem;">
       ⚠️ 盤後資料，僅供參考，不構成投資建議
@@ -3635,6 +3770,7 @@ function showSignal() {
   document.getElementById('signalPanel').style.display = 'block';
   loadMktSignals();
   initAlphaIfNeeded();
+  loadChipsPanel();  // 籌碼面板
 }
 
 function hideHeatmap() {
@@ -6203,6 +6339,119 @@ if ('serviceWorker' in navigator) {
 })();
 </script>
 
+
+<script>
+// ════════ 籌碼面板 ════════
+let _chipsPanelLoaded = false;
+
+async function loadChipsPanel() {
+  // 只在首次載入，避免重複請求
+  if (_chipsPanelLoaded) return;
+  const loadingEl = document.getElementById('chips-loading');
+
+  try {
+    const res  = await fetch('/api/news?endpoint=chips&limit=1');
+    const json = await res.json();
+    const d    = (json.data || [])[0];
+    if (!d) { if (loadingEl) loadingEl.textContent = '暫無資料'; return; }
+    if (loadingEl) loadingEl.textContent = '';
+    _chipsPanelLoaded = true;
+
+    const dateEl = document.getElementById('chips-date');
+    if (dateEl) dateEl.textContent = d.date;
+
+    // ── 格式化函式（沿用網站現有風格）──
+    const mono = "font-family:'IBM Plex Mono',monospace;";
+    const fmtBil = (v) => {
+      if (v == null) return `<span style="${mono}color:var(--muted);">—</span>`;
+      const n = parseFloat(v), c = n > 0 ? 'var(--up)' : n < 0 ? 'var(--down)' : 'var(--muted)';
+      return `<span style="${mono}color:${c};font-weight:700;">${n > 0 ? '+' : ''}${n.toFixed(2)}</span>`;
+    };
+    const fmtInt = (v) => {
+      if (v == null) return `<span style="${mono}color:var(--muted);">—</span>`;
+      const n = parseInt(v), c = n > 0 ? 'var(--up)' : n < 0 ? 'var(--down)' : 'var(--muted)';
+      return `<span style="${mono}color:${c};font-weight:700;">${n > 0 ? '+' : ''}${n.toLocaleString()}</span>`;
+    };
+    const fmtGray = (v, isInt = true) => {
+      if (v == null) return `<span style="${mono}color:var(--muted);">—</span>`;
+      const n = isInt ? parseInt(v) : parseFloat(v);
+      return `<span style="${mono}color:var(--muted);">${isInt ? n.toLocaleString() : n.toFixed(2)}</span>`;
+    };
+
+    const tdStyle  = "padding:5px 6px;border-bottom:1px solid rgba(42,42,66,0.35);";
+    const tdR      = tdStyle + "text-align:right;";
+    const hlStyle  = "background:rgba(99,102,241,0.05);";
+
+    const tr4 = (label, c1, c2, c3, hl=false) =>
+      `<tr style="${hl ? hlStyle : ''}">
+        <td style="${tdStyle}color:var(--text);font-size:0.68rem;">${label}</td>
+        <td style="${tdR}font-size:0.68rem;">${c1}</td>
+        <td style="${tdR}font-size:0.68rem;">${c2}</td>
+        <td style="${tdR}font-size:0.68rem;">${c3}</td>
+       </tr>`;
+    const tr2 = (label, c1, hl=false) =>
+      `<tr style="${hl ? hlStyle : ''}">
+        <td style="${tdStyle}color:var(--text);font-size:0.68rem;">${label}</td>
+        <td style="${tdR}font-size:0.68rem;">${c1}</td>
+       </tr>`;
+
+    // 現貨
+    const sb = document.getElementById('chips-spot-body');
+    if (sb) sb.innerHTML =
+      tr4('外資及陸資', fmtGray(d.spot_foreign_buy,false), fmtGray(d.spot_foreign_sell,false), fmtBil(d.spot_foreign_net), true) +
+      tr4('投信',       fmtGray(d.spot_trust_buy,  false), fmtGray(d.spot_trust_sell,  false), fmtBil(d.spot_trust_net)) +
+      tr4('自營商',     fmtGray(d.spot_dealer_buy, false), fmtGray(d.spot_dealer_sell, false), fmtBil(d.spot_dealer_net));
+    const st = document.getElementById('chips-spot-total');
+    if (st) st.innerHTML = fmtBil(d.spot_total_net) + `<span style="font-size:0.55rem;color:var(--muted);margin-left:3px;">億</span>`;
+
+    // TX 台指期
+    const tb = document.getElementById('chips-tx-body');
+    if (tb) tb.innerHTML =
+      tr4('外資及陸資', fmtGray(d.fut_tx_foreign_long), fmtGray(d.fut_tx_foreign_short), fmtInt(d.fut_tx_foreign_net), true) +
+      tr4('投信',       fmtGray(d.fut_tx_trust_long),   fmtGray(d.fut_tx_trust_short),   fmtInt(d.fut_tx_trust_net)) +
+      tr4('自營商',     fmtGray(d.fut_tx_dealer_long),  fmtGray(d.fut_tx_dealer_short),  fmtInt(d.fut_tx_dealer_net));
+    const tt = document.getElementById('chips-tx-total');
+    if (tt) tt.innerHTML = fmtInt(d.fut_tx_total_net) + `<span style="font-size:0.55rem;color:var(--muted);margin-left:3px;">口</span>`;
+
+    // MTX 小台
+    const mb = document.getElementById('chips-mtx-body');
+    if (mb) mb.innerHTML =
+      tr2('外資及陸資', fmtInt(d.fut_mtx_foreign_net), true) +
+      tr2('投信',       fmtInt(d.fut_mtx_trust_net)) +
+      tr2('自營商',     fmtInt(d.fut_mtx_dealer_net));
+    const mt = document.getElementById('chips-mtx-total');
+    if (mt) mt.innerHTML = fmtInt(d.fut_mtx_total_net) + `<span style="font-size:0.55rem;color:var(--muted);margin-left:3px;">口</span>`;
+
+    // TMF 微台
+    const tfb = document.getElementById('chips-tmf-body');
+    if (tfb) tfb.innerHTML =
+      tr2('外資及陸資', fmtInt(d.fut_tmf_foreign_net), true) +
+      tr2('投信',       fmtInt(d.fut_tmf_trust_net)) +
+      tr2('自營商',     fmtInt(d.fut_tmf_dealer_net));
+    const tft = document.getElementById('chips-tmf-total');
+    if (tft) tft.innerHTML = fmtInt(d.fut_tmf_total_net) + `<span style="font-size:0.55rem;color:var(--muted);margin-left:3px;">口</span>`;
+
+    // CALL
+    const cb = document.getElementById('chips-call-body');
+    if (cb) cb.innerHTML =
+      tr4('外資及陸資', fmtGray(d.opt_call_foreign_long), fmtGray(d.opt_call_foreign_short), fmtInt(d.opt_call_foreign_net), true) +
+      tr4('投信',       fmtGray(d.opt_call_trust_long),   fmtGray(d.opt_call_trust_short),   fmtInt(d.opt_call_trust_net)) +
+      tr4('自營商',     fmtGray(d.opt_call_dealer_long),  fmtGray(d.opt_call_dealer_short),  fmtInt(d.opt_call_dealer_net));
+
+    // PUT
+    const pb = document.getElementById('chips-put-body');
+    if (pb) pb.innerHTML =
+      tr4('外資及陸資', fmtGray(d.opt_put_foreign_long), fmtGray(d.opt_put_foreign_short), fmtInt(d.opt_put_foreign_net), true) +
+      tr4('投信',       fmtGray(d.opt_put_trust_long),   fmtGray(d.opt_put_trust_short),   fmtInt(d.opt_put_trust_net)) +
+      tr4('自營商',     fmtGray(d.opt_put_dealer_long),  fmtGray(d.opt_put_dealer_short),  fmtInt(d.opt_put_dealer_net));
+
+  } catch (e) {
+    console.warn('[chips] 載入失敗：', e.message);
+    const loadingEl = document.getElementById('chips-loading');
+    if (loadingEl) loadingEl.textContent = '載入失敗';
+  }
+}
+</script>
 </body>
 </html>
 
