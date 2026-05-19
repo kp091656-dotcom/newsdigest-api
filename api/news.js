@@ -216,6 +216,27 @@ export default async function handler(req, res) {
   }
 
   // ══════════════════════════════════════════
+  // 籌碼資料 endpoint
+  // ══════════════════════════════════════════
+  if (endpoint === 'chips') {
+    const SUPABASE_URL = process.env.SUPABASE_URL  || 'https://fdxedcwtmlurumfjmlys.supabase.co';
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
+    try {
+      const limit = Math.min(parseInt(req.query.limit) || 10, 30);
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/chips_daily?order=date.desc&limit=${limit}&select=*`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(5000) }
+      );
+      if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
+      const rows = await r.json();
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+      return res.status(200).json({ data: rows, count: rows.length });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ══════════════════════════════════════════
   // Alpha 交易員 — 分析 endpoint
   // ══════════════════════════════════════════
   if (endpoint === 'alpha_analyze') {
