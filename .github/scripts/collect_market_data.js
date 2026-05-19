@@ -375,6 +375,226 @@ async function collectFutures() {
 }
 
 // ══════════════════════════════════════════
+// 籌碼資料任務 v2（含小台/微台/選擇權）
+// ══════════════════════════════════════════
+
+async function collectChips() {
+  console.log('📡 籌碼資料（TWSE MI_INST + TAIFEX 期貨/選擇權三大法人）...');
+  const tradeDate = lastTradingDay();
+
+  const result = {
+    date: tradeDate,
+    // ── 現貨三大法人（億元）──
+    spot_dealer_buy: null, spot_dealer_sell: null, spot_dealer_net: null,
+    spot_trust_buy:  null, spot_trust_sell:  null, spot_trust_net:  null,
+    spot_foreign_buy:null, spot_foreign_sell:null, spot_foreign_net:null,
+    spot_total_net:  null,
+    // ── 期貨 TX 台指期（口數）──
+    fut_tx_dealer_long: null, fut_tx_dealer_short: null, fut_tx_dealer_net: null,
+    fut_tx_trust_long:  null, fut_tx_trust_short:  null, fut_tx_trust_net:  null,
+    fut_tx_foreign_long:null, fut_tx_foreign_short:null, fut_tx_foreign_net:null,
+    fut_tx_total_net:   null,
+    // ── 期貨 MTX 小型台指（口數）──
+    fut_mtx_dealer_net: null,
+    fut_mtx_trust_net:  null,
+    fut_mtx_foreign_net:null,
+    fut_mtx_total_net:  null,
+    // ── 期貨 TMF 微型台指（口數）──
+    fut_tmf_dealer_net: null,
+    fut_tmf_trust_net:  null,
+    fut_tmf_foreign_net:null,
+    fut_tmf_total_net:  null,
+    // ── 選擇權 CALL OI（口數）──
+    opt_call_dealer_long: null, opt_call_dealer_short: null, opt_call_dealer_net: null,
+    opt_call_trust_long:  null, opt_call_trust_short:  null, opt_call_trust_net:  null,
+    opt_call_foreign_long:null, opt_call_foreign_short:null, opt_call_foreign_net:null,
+    // ── 選擇權 PUT OI（口數）──
+    opt_put_dealer_long:  null, opt_put_dealer_short:  null, opt_put_dealer_net:  null,
+    opt_put_trust_long:   null, opt_put_trust_short:   null, opt_put_trust_net:   null,
+    opt_put_foreign_long: null, opt_put_foreign_short: null, opt_put_foreign_net: null,
+  };
+
+  // ── 1. TWSE 現貨三大法人（MI_INST）──
+  try {
+    const r = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/MI_INST', {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const raw = await r.json();
+    if (raw.length > 0) console.log(`  🔍 MI_INST 欄位：${Object.keys(raw[0]).join(', ')}`);
+
+    // 金額單位千元 → 除以 100,000 → 億元
+    const toBil = (str) => {
+      const n = parseFloat((str || '').replace(/,/g, ''));
+      return isNaN(n) ? null : parseFloat((n / 100000).toFixed(2));
+    };
+
+    for (const row of raw) {
+      const type = (row['買賣別'] || row['Identity'] || '').trim();
+      const buy  = toBil(row['買進金額'] || row['Buy']  || '');
+      const sell = toBil(row['賣出金額'] || row['Sell'] || '');
+      const net  = toBil(row['買賣超額'] || row['Diff'] || '');
+      if (type.includes('自營商') && type.includes('自行')) {
+        result.spot_dealer_buy = buy; result.spot_dealer_sell = sell; result.spot_dealer_net = net;
+      } else if (type.includes('投信')) {
+        result.spot_trust_buy  = buy; result.spot_trust_sell  = sell; result.spot_trust_net  = net;
+      } else if (type.includes('外資') && !type.includes('自營商')) {
+        result.spot_foreign_buy = buy; result.spot_foreign_sell = sell; result.spot_foreign_net = net;
+      } else if (type.includes('三大法人') || type.includes('合計')) {
+        result.spot_total_net = net;
+      }
+    }
+    if (result.spot_total_net === null &&
+        result.spot_dealer_net !== null && result.spot_trust_net !== null && result.spot_foreign_net !== null) {
+      result.spot_total_net = parseFloat((result.spot_dealer_net + result.spot_trust_net + result.spot_foreign_net).toFixed(2));
+    }
+    console.log(`  ✅ 現貨：外資 ${result.spot_foreign_net?.toFixed(2)} 億，投信 ${result.spot_trust_net?.toFixed(2)} 億，自營 ${result.spot_dealer_net?.toFixed(2)} 億，合計 ${result.spot_total_net?.toFixed(2)} 億`);
+  } catch (e) {
+    console.error(`  ❌ TWSE MI_INST 失敗：${e.message}`);
+  }
+
+  // ── 2. TAIFEX 期貨三大法人（TX / MTX / TMF）──
+  // 使用新 endpoint：MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate
+  // 欄位：commodity_id, institutional_traders_name, open_interest_long_volume,
+  //        open_interest_short_volume（TMF 也包含在內）
+  try {
+    const dateStr = tradeDate.replace(/-/g, ''); // YYYYMMDD
+    const futUrl  = `https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate?queryDate=${dateStr}`;
+    const r = await fetch(futUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const raw = await r.json();
+    if (raw.length > 0) console.log(`  🔍 TAIFEX 新期貨欄位：${Object.keys(raw[0]).join(', ')}`);
+    console.log(`  📊 回傳筆數：${raw.length}，唯一商品代碼：${[...new Set(raw.map(r => (r.commodity_id || r['商品代碼'] || '').trim()))].join(', ')}`);
+
+    const toInt = (v) => { const n = parseInt((String(v || '')).replace(/,/g, '')); return isNaN(n) ? null : n; };
+
+    // 從新 endpoint 解析各商品三大法人
+    const parseFutNew = (rows, prefix) => {
+      let totalNet = 0;
+      for (const row of rows) {
+        const ident   = (row.institutional_traders_name || row['身份別'] || '').trim();
+        // OI 欄位名稱
+        const longVol  = toInt(row.open_interest_long_volume  || row['多方未平倉口數'] || row['多方口數'] || 0);
+        const shortVol = toInt(row.open_interest_short_volume || row['空方未平倉口數'] || row['空方口數'] || 0);
+        const net      = toInt(row.open_interest_net_volume   || row['多空淨額口數']   || null);
+        const finalNet = net !== null ? net : (longVol !== null && shortVol !== null ? longVol - shortVol : null);
+
+        if (ident.includes('自營商') && !ident.includes('避險')) {
+          result[`${prefix}_dealer_long`]  = longVol;
+          result[`${prefix}_dealer_short`] = shortVol;
+          result[`${prefix}_dealer_net`]   = finalNet;
+          if (finalNet !== null) totalNet += finalNet;
+        } else if (ident.includes('投信')) {
+          result[`${prefix}_trust_long`]   = longVol;
+          result[`${prefix}_trust_short`]  = shortVol;
+          result[`${prefix}_trust_net`]    = finalNet;
+          if (finalNet !== null) totalNet += finalNet;
+        } else if (ident.includes('外資') && !ident.includes('自營商')) {
+          result[`${prefix}_foreign_long`]  = longVol;
+          result[`${prefix}_foreign_short`] = shortVol;
+          result[`${prefix}_foreign_net`]   = finalNet;
+          if (finalNet !== null) totalNet += finalNet;
+        }
+      }
+      if (result[`${prefix}_foreign_net`] !== null || result[`${prefix}_trust_net`] !== null ||
+          result[`${prefix}_dealer_net`] !== null) {
+        result[`${prefix}_total_net`] = totalNet;
+      }
+    };
+
+    const getCid = (row) => (row.commodity_id || row['商品代碼'] || '').trim();
+
+    // TX 台指期
+    const txRows = raw.filter(row => getCid(row) === 'TX');
+    if (txRows.length) { parseFutNew(txRows, 'fut_tx'); console.log(`  ✅ TX：外資 ${result.fut_tx_foreign_net} 口，投信 ${result.fut_tx_trust_net} 口，自營 ${result.fut_tx_dealer_net} 口`); }
+    else console.warn('  ⚠️  TX 無資料');
+
+    // MTX 小型台指
+    const mtxRows = raw.filter(row => getCid(row) === 'MTX');
+    if (mtxRows.length) { parseFutNew(mtxRows, 'fut_mtx'); console.log(`  ✅ MTX：外資 ${result.fut_mtx_foreign_net} 口，投信 ${result.fut_mtx_trust_net} 口，自營 ${result.fut_mtx_dealer_net} 口`); }
+    else console.warn('  ⚠️  MTX 無資料');
+
+    // TMF 微型台指
+    const tmfRows = raw.filter(row => getCid(row) === 'TMF');
+    if (tmfRows.length) { parseFutNew(tmfRows, 'fut_tmf'); console.log(`  ✅ TMF：外資 ${result.fut_tmf_foreign_net} 口，投信 ${result.fut_tmf_trust_net} 口，自營 ${result.fut_tmf_dealer_net} 口`); }
+    else console.warn('  ⚠️  TMF 無資料（2024-07-29 後才有）');
+
+  } catch (e) {
+    console.error(`  ❌ TAIFEX 期貨法人 失敗：${e.message}`);
+  }
+
+  // ── 3. TAIFEX 選擇權三大法人（TXO CALL / PUT）──
+  // 使用原 DailyInstitutionalInvestorsFuturesAndOptionsTrading endpoint
+  try {
+    const r = await fetch(
+      'https://openapi.taifex.com.tw/v1/DailyInstitutionalInvestorsFuturesAndOptionsTrading',
+      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(20_000) }
+    );
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const raw = await r.json();
+
+    const toInt2   = (str) => { const n = parseInt((str || '').replace(/,/g, '')); return isNaN(n) ? null : n; };
+    const getCode  = (row) => (row['商品代碼'] || row['ContractCode'] || row['OptionsId'] || '').trim();
+    const getIdent = (row) => (row['身份別']   || row['Identity'] || '').trim();
+    const getLong  = (row) => toInt2(row['多方口數']     || row['LongOpenInterest']  || '');
+    const getShort = (row) => toInt2(row['空方口數']     || row['ShortOpenInterest'] || '');
+    const getNet   = (row) => toInt2(row['多空淨額口數'] || row['NetOpenInterest']   || '');
+    const getCpType= (row) => (row['買賣權別'] || row['CallPut'] || row['OptionType'] || '').trim().toUpperCase();
+
+    const parseOpt = (rows, prefix) => {
+      let totalNet = 0;
+      for (const row of rows) {
+        const ident    = getIdent(row);
+        const longVol  = getLong(row);
+        const shortVol = getShort(row);
+        const rawNet   = getNet(row);
+        const net = rawNet !== null ? rawNet : (longVol !== null && shortVol !== null ? longVol - shortVol : null);
+        if (ident.includes('自營商') && !ident.includes('避險')) {
+          result[`${prefix}_dealer_long`] = longVol; result[`${prefix}_dealer_short`] = shortVol; result[`${prefix}_dealer_net`] = net;
+          if (net !== null) totalNet += net;
+        } else if (ident.includes('投信')) {
+          result[`${prefix}_trust_long`]  = longVol; result[`${prefix}_trust_short`]  = shortVol; result[`${prefix}_trust_net`]  = net;
+          if (net !== null) totalNet += net;
+        } else if (ident.includes('外資') && !ident.includes('自營商')) {
+          result[`${prefix}_foreign_long`] = longVol; result[`${prefix}_foreign_short`] = shortVol; result[`${prefix}_foreign_net`] = net;
+          if (net !== null) totalNet += net;
+        }
+      }
+    };
+
+    // TXO 選擇權，按 CALL/PUT 分
+    const txoRows   = raw.filter(row => { const c = getCode(row); return c === 'TXO'; });
+    const callRows  = txoRows.filter(row => { const cp = getCpType(row); return cp === 'C' || cp === 'CALL' || cp.includes('買'); });
+    const putRows   = txoRows.filter(row => { const cp = getCpType(row); return cp === 'P' || cp === 'PUT'  || cp.includes('賣'); });
+
+    if (callRows.length) { parseOpt(callRows, 'opt_call'); console.log(`  ✅ TXO CALL：外資淨 ${result.opt_call_foreign_net} 口，自營淨 ${result.opt_call_dealer_net} 口`); }
+    if (putRows.length)  { parseOpt(putRows,  'opt_put');  console.log(`  ✅ TXO PUT：外資淨 ${result.opt_put_foreign_net} 口，自營淨 ${result.opt_put_dealer_net} 口`);  }
+
+    if (!callRows.length && !putRows.length) {
+      // 印出唯一代碼和買賣權別，方便 debug
+      const allCodes = [...new Set(raw.map(getCode))].slice(0, 20);
+      const allCp    = [...new Set(raw.map(getCpType))].slice(0, 10);
+      console.warn(`  ⚠️  TXO 選擇權無資料，代碼：${allCodes.join(',')}，買賣權：${allCp.join(',')}`);
+    }
+  } catch (e) {
+    console.error(`  ❌ TAIFEX 選擇權法人 失敗：${e.message}`);
+  }
+
+  // ── 4. 寫入 chips_daily ──
+  try {
+    await sbUpsert('chips_daily', [result], 'date');
+    return { ok: true, date: tradeDate };
+  } catch (e) {
+    console.error(`  ❌ chips_daily 寫入失敗：${e.message}`);
+    return { ok: false, error: e.message };
+  }
+}
+
+// ══════════════════════════════════════════
 // 新聞收集任務
 // ══════════════════════════════════════════
 
@@ -882,6 +1102,7 @@ async function main() {
     results.twseDaily   = await collectTWSEDaily();
     results.sectorIndex = await collectSectorIndex();
     results.valuation   = await collectValuation();
+    results.chips       = await collectChips();
   }
   if (isNews) {
     console.log('\n── 新聞收集 ──');
