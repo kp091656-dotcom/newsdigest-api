@@ -480,9 +480,14 @@ async function collectChips() {
           const latest = data.sort((a,b) => b.date.localeCompare(a.date))[0].date.slice(0,10);
           for (const r of data.filter(r => r.date?.slice(0,10) === latest)) {
             const name = (r.name || '').trim();
-            const buy  = toB(r.buy  != null ? String(r.buy)  : '');
-            const sell = toB(r.sell != null ? String(r.sell) : '');
-            const net  = buy !== null && sell !== null ? parseFloat((buy - sell).toFixed(2)) : null;
+            // FinMind buy/sell 單位是千元，除以 100000 轉億元
+            const buyRaw  = parseFloat(String(r.buy  ?? 0).replace(/,/g, ''));
+            const sellRaw = parseFloat(String(r.sell ?? 0).replace(/,/g, ''));
+            if (isNaN(buyRaw) || isNaN(sellRaw)) continue;
+            const buy  = parseFloat((buyRaw  / 100000).toFixed(2));
+            const sell = parseFloat((sellRaw / 100000).toFixed(2));
+            const net  = parseFloat((buy - sell).toFixed(2));
+            console.log(`    ${name}：買${buy.toFixed(2)} 賣${sell.toFixed(2)} 超${net.toFixed(2)} 億`);
             if (name.includes('自營商') && name.includes('自行')) {
               result.spot_dealer_buy = buy; result.spot_dealer_sell = sell; result.spot_dealer_net = net;
             } else if (name.includes('投信')) {
@@ -590,77 +595,72 @@ async function collectChips() {
   }
 
   // ── 3. TAIFEX 選擇權三大法人（TXO CALL / PUT）──
-  // 正確 endpoint：MarketDataOfMajorInstitutionalTradersDetailsOfOptionsContractsBytheDate
+  // 使用 FinMind TaiwanOptionInstitutionalInvestors（有 call_put 欄位）
+  // TAIFEX OpenAPI 的選擇權 endpoint 不提供 CALL/PUT 分開資料
   try {
-    const dateStr = tradeDate.replace(/-/g, '');
-    const toInt2  = (v) => { const n = parseInt((String(v||'')).replace(/,/g,'')); return isNaN(n) ? null : n; };
+    if (!FM_TOKEN) throw new Error('FINMIND_TOKEN 未設定，選擇權略過');
+    const toInt2 = (v) => { const n = parseInt(String(v ?? 0).replace(/,/g,'')); return isNaN(n) ? null : n; };
 
-    const optUrl = `https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfOptionsContractsBytheDate?queryDate=${dateStr}`;
-    const optRes = await fetch(optUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(20_000) });
-    const optText = await optRes.text();
-    if (optText.includes('<!') || optText.includes('<html')) throw new Error('回傳 HTML');
-    const allOpt = JSON.parse(optText);
-    if (!Array.isArray(allOpt) || !allOpt.length) throw new Error('無資料');
+    const optData = await fmFetch('TaiwanOptionInstitutionalInvestors',
+      { data_id: 'TXO', start_date: daysAgo(3), end_date: todayTW() });
+    if (!optData.length) throw new Error('FinMind TXO 無資料');
 
-    console.log(`  🔍 TXO 選擇權欄位：${Object.keys(allOpt[0]).join(', ')}`);
-    const optCodes = [...new Set(allOpt.map(r => (r.ContractCode || r.commodity_id || '').trim()))];
-    const getCP    = (r) => (r.CallPut || r.PutCall || r['買賣權別'] || '').trim().toUpperCase();
-    const allCP    = [...new Set(allOpt.map(getCP))];
-    console.log(`  📊 選擇權商品：${optCodes.join(', ')}，CP值：${allCP.join(', ')}`);
+    console.log(`  🔍 FinMind TXO 欄位：${Object.keys(optData[0]).join(', ')}`);
 
-    const parseOpt = (rows, prefix) => {
+    // 取最近交易日
+    const latestOptDate = optData.map(r => r.date?.slice(0,10)).filter(Boolean).sort().reverse()[0];
+    const latestOpt = optData.filter(r => r.date?.slice(0,10) === latestOptDate);
+    console.log(`  📊 TXO ${latestOptDate}：${latestOpt.length} 筆，樣本：${JSON.stringify(latestOpt[0])}`);
+
+    // FinMind 欄位：call_put（C/P）, institutional_investors（身份別）
+    //   long_open_interest_balance_volume, short_open_interest_balance_volume
+    const parseOptFM = (rows, prefix) => {
       for (const row of rows) {
-        const ident    = (row.Item || row.institutional_traders_name || row['身份別'] || '').trim();
-        const longVol  = toInt2(row['OpenInterest(Long)']  || row.open_interest_long_volume  || 0);
-        const shortVol = toInt2(row['OpenInterest(Short)'] || row.open_interest_short_volume || 0);
-        const netVol   = toInt2(row['OpenInterest(Net)']   || row.open_interest_net_volume   || null);
-        const net = netVol !== null ? netVol : (longVol - shortVol);
+        const ident    = (row.institutional_investors || row.name || '').trim();
+        const longVol  = toInt2(row.long_open_interest_balance_volume  || row.buy_open_interest_balance_volume  || 0);
+        const shortVol = toInt2(row.short_open_interest_balance_volume || row.sell_open_interest_balance_volume || 0);
+        const net = longVol - shortVol;
         if (ident.includes('自營商') && !ident.includes('避險')) {
           result[`${prefix}_dealer_long`] = longVol; result[`${prefix}_dealer_short`] = shortVol; result[`${prefix}_dealer_net`] = net;
         } else if (ident.includes('投信')) {
           result[`${prefix}_trust_long`]  = longVol; result[`${prefix}_trust_short`]  = shortVol; result[`${prefix}_trust_net`]  = net;
-        } else if (ident.includes('外資') && !ident.includes('自營商')) {
+        } else if (ident.includes('外資') && !ident.includes('自營')) {
           result[`${prefix}_foreign_long`] = longVol; result[`${prefix}_foreign_short`] = shortVol; result[`${prefix}_foreign_net`] = net;
         }
       }
     };
 
-    // ContractCode 是中文（臺指選擇權），CallPut 欄位為空
-    // Item 欄位格式：「身份別+買賣權」，例如：「自營商買權」「外資及陸資賣權」
-    const txoRows = allOpt.filter(r => r.ContractCode === '臺指選擇權');
-    console.log(`  📊 臺指選擇權筆數：${txoRows.length}，Item 樣本：${[...new Set(txoRows.map(r => r.Item || ''))].slice(0,6).join(', ')}`);
+    const getCP = (r) => (r.call_put || r.CallPut || '').trim().toUpperCase();
+    const callRows = latestOpt.filter(r => { const cp = getCP(r); return cp === 'C' || cp === 'CALL'; });
+    const putRows  = latestOpt.filter(r => { const cp = getCP(r); return cp === 'P' || cp === 'PUT'; });
 
-    // 從 Item 欄位拆分身份別和買賣權
-    const parseOptByItem = (rows, prefix, cpKeyword) => {
-      // 過濾包含 cpKeyword（買/賣）的 Item
-      const filtered = rows.filter(r => (r.Item || '').includes(cpKeyword));
-      for (const row of filtered) {
-        const item = (row.Item || '').trim();
-        // 身份別判斷
-        const isDealer  = item.includes('自營商') && !item.includes('避險');
-        const isTrust   = item.includes('投信');
-        const isForeign = item.includes('外資') && !item.includes('自營');
-        const longVol   = toInt2(row['OpenInterest(Long)']  || 0);
-        const shortVol  = toInt2(row['OpenInterest(Short)'] || 0);
-        const netVol    = toInt2(row['OpenInterest(Net)']   || null);
-        const net = netVol !== null ? netVol : (longVol - shortVol);
-        if (isDealer)  { result[`${prefix}_dealer_long`]  = longVol; result[`${prefix}_dealer_short`]  = shortVol; result[`${prefix}_dealer_net`]  = net; }
-        if (isTrust)   { result[`${prefix}_trust_long`]   = longVol; result[`${prefix}_trust_short`]   = shortVol; result[`${prefix}_trust_net`]   = net; }
-        if (isForeign) { result[`${prefix}_foreign_long`] = longVol; result[`${prefix}_foreign_short`] = shortVol; result[`${prefix}_foreign_net`] = net; }
-      }
-    };
-
-    if (txoRows.length) {
-      parseOptByItem(txoRows, 'opt_call', '買權');
-      parseOptByItem(txoRows, 'opt_put',  '賣權');
-      console.log(`  ✅ TXO CALL：外資淨 ${result.opt_call_foreign_net} 口，自營淨 ${result.opt_call_dealer_net}`);
-      console.log(`  ✅ TXO PUT：外資淨 ${result.opt_put_foreign_net} 口，自營淨 ${result.opt_put_dealer_net}`);
-    } else {
-      console.warn(`  ⚠️  臺指選擇權無資料（商品：${optCodes.join(',')}）`);
-    }
+    if (callRows.length) { parseOptFM(callRows, 'opt_call'); console.log(`  ✅ TXO CALL：外資淨 ${result.opt_call_foreign_net} 口，自營淨 ${result.opt_call_dealer_net}`); }
+    else console.warn(`  ⚠️  TXO CALL 無資料（CP值：${[...new Set(latestOpt.map(getCP))].join(',')}）`);
+    if (putRows.length)  { parseOptFM(putRows, 'opt_put');   console.log(`  ✅ TXO PUT：外資淨 ${result.opt_put_foreign_net} 口，自營淨 ${result.opt_put_dealer_net}`);  }
+    else console.warn(`  ⚠️  TXO PUT 無資料`);
 
   } catch (e) {
-    console.error(`  ❌ TAIFEX 選擇權法人 失敗：${e.message}`);
+    console.warn(`  ⚠️  選擇權（FinMind）失敗：${e.message}，嘗試 TAIFEX OpenAPI...`);
+    // Fallback：TAIFEX OpenAPI 選擇權（無 CALL/PUT 分開，只能取整體 OI）
+    try {
+      const dateStr = tradeDate.replace(/-/g, '');
+      const toInt2  = (v) => { const n = parseInt((String(v||'')).replace(/,/g,'')); return isNaN(n) ? null : n; };
+      const optUrl  = `https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfOptionsContractsBytheDate?queryDate=${dateStr}`;
+      const optRes  = await fetch(optUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15_000) });
+      const optText = await optRes.text();
+      if (optText.includes('<!')) throw new Error('回傳 HTML');
+      const allOpt  = JSON.parse(optText);
+      const txoRows = (Array.isArray(allOpt) ? allOpt : []).filter(r => r.ContractCode === '臺指選擇權');
+      console.log(`  📊 TAIFEX 臺指選擇權：${txoRows.length} 筆，Item 樣本：${[...new Set(txoRows.map(r=>r.Item||''))].join(', ')}`);
+      // TAIFEX 選擇權 3 筆無 CALL/PUT 分開，印出整體 OI 供參考
+      for (const row of txoRows) {
+        const ident = (row.Item || '').trim();
+        const loI   = toInt2(row['OpenInterest(Long)'] || 0);
+        const soI   = toInt2(row['OpenInterest(Short)'] || 0);
+        console.log(`    ${ident}：多OI ${loI} / 空OI ${soI} / 淨 ${loI-soI}`);
+      }
+      console.log('  ℹ️  TAIFEX 選擇權無 CALL/PUT 分開，需 FinMind token 才能取得完整資料');
+    } catch(e2) { console.error(`  ❌ TAIFEX 選擇權 fallback 失敗：${e2.message}`); }
   }
 
     // ── 4. 寫入 chips_daily ──
