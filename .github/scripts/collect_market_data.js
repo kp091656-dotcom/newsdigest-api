@@ -480,21 +480,25 @@ async function collectChips() {
           const latest = data.sort((a,b) => b.date.localeCompare(a.date))[0].date.slice(0,10);
           for (const r of data.filter(r => r.date?.slice(0,10) === latest)) {
             const name = (r.name || '').trim();
-            // FinMind buy/sell 單位是千元，除以 100000 轉億元
+            // FinMind buy/sell 單位是 100,000 元（十萬元），除以 1,000 = 億元
+            // 驗算：外資 4,075,982.84 ÷ 1,000 = 4,075.98 億（官網 407,598,284,294 元 = 4,075.98 億）✅
             const buyRaw  = parseFloat(String(r.buy  ?? 0).replace(/,/g, ''));
             const sellRaw = parseFloat(String(r.sell ?? 0).replace(/,/g, ''));
             if (isNaN(buyRaw) || isNaN(sellRaw)) continue;
-            const buy  = parseFloat((buyRaw  / 100000).toFixed(2));
-            const sell = parseFloat((sellRaw / 100000).toFixed(2));
+            const buy  = parseFloat((buyRaw  / 1_000).toFixed(2));
+            const sell = parseFloat((sellRaw / 1_000).toFixed(2));
             const net  = parseFloat((buy - sell).toFixed(2));
             console.log(`    ${name}：買${buy.toFixed(2)} 賣${sell.toFixed(2)} 超${net.toFixed(2)} 億`);
-            // FinMind name 值：「自營商(自行買賣)」「自營商(避險)」「投信」「外資及陸資」
-            if (name.includes('自營商') && !name.includes('避險')) {
+            // FinMind name 值（英文，從 log 確認）：
+            // Dealer_self=自營商(自行買賣), Investment_Trust=投信, Foreign_Investor=外資及陸資(不含外資自營商)
+            if (name === 'Dealer_self') {
               result.spot_dealer_buy = buy; result.spot_dealer_sell = sell; result.spot_dealer_net = net;
-            } else if (name.includes('投信')) {
+            } else if (name === 'Investment_Trust') {
               result.spot_trust_buy  = buy; result.spot_trust_sell  = sell; result.spot_trust_net  = net;
-            } else if (name.includes('外資') && !name.includes('自營')) {
-              result.spot_foreign_buy = buy; result.spot_foreign_sell = sell; result.spot_foreign_net = net;
+            } else if (name === 'Foreign_Investor') {
+              result.spot_foreign_buy  = buy;
+              result.spot_foreign_sell = sell;
+              result.spot_foreign_net  = net;
             }
           }
           if (result.spot_dealer_net !== null && result.spot_trust_net !== null && result.spot_foreign_net !== null)
@@ -618,8 +622,9 @@ async function collectChips() {
     const parseOptFM = (rows, prefix) => {
       for (const row of rows) {
         const ident    = (row.institutional_investors || row.name || '').trim();
-        const longVol  = toInt2(row.long_open_interest_balance_volume  || row.buy_open_interest_balance_volume  || 0);
-        const shortVol = toInt2(row.short_open_interest_balance_volume || row.sell_open_interest_balance_volume || 0);
+        // 欄位從 log 確認：long_open_interest_balance_volume / short_open_interest_balance_volume
+        const longVol  = toInt2(row.long_open_interest_balance_volume  || 0);
+        const shortVol = toInt2(row.short_open_interest_balance_volume || 0);
         const net = longVol - shortVol;
         if (ident.includes('自營商') && !ident.includes('避險')) {
           result[`${prefix}_dealer_long`] = longVol; result[`${prefix}_dealer_short`] = shortVol; result[`${prefix}_dealer_net`] = net;
@@ -631,9 +636,10 @@ async function collectChips() {
       }
     };
 
-    const getCP = (r) => (r.call_put || r.CallPut || '').trim().toUpperCase();
-    const callRows = latestOpt.filter(r => { const cp = getCP(r); return cp === 'C' || cp === 'CALL'; });
-    const putRows  = latestOpt.filter(r => { const cp = getCP(r); return cp === 'P' || cp === 'PUT'; });
+    // FinMind call_put 值（從 log 確認）：'買權' 或 '賣權'（繁體中文）
+    // institutional_investors 欄位：'自營商', '投信', '外資及陸資'
+    const callRows = latestOpt.filter(r => r.call_put === '買權');
+    const putRows  = latestOpt.filter(r => r.call_put === '賣權');
 
     if (callRows.length) { parseOptFM(callRows, 'opt_call'); console.log(`  ✅ TXO CALL：外資淨 ${result.opt_call_foreign_net} 口，自營淨 ${result.opt_call_dealer_net}`); }
     else console.warn(`  ⚠️  TXO CALL 無資料（CP值：${[...new Set(latestOpt.map(getCP))].join(',')}）`);
