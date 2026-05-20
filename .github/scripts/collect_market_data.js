@@ -480,13 +480,13 @@ async function collectChips() {
           const latest = data.sort((a,b) => b.date.localeCompare(a.date))[0].date.slice(0,10);
           for (const r of data.filter(r => r.date?.slice(0,10) === latest)) {
             const name = (r.name || '').trim();
-            // FinMind buy/sell 單位是 100,000 元（十萬元），除以 1,000 = 億元
-            // 驗算：外資 4,075,982.84 ÷ 1,000 = 4,075.98 億（官網 407,598,284,294 元 = 4,075.98 億）✅
+            // FinMind buy/sell 單位是元，除以 100,000,000 = 億元
+            // 驗算：Foreign_Investor buy=407,598,284,294 元 ÷ 100,000,000 = 4,075.98 億 ✅
             const buyRaw  = parseFloat(String(r.buy  ?? 0).replace(/,/g, ''));
             const sellRaw = parseFloat(String(r.sell ?? 0).replace(/,/g, ''));
             if (isNaN(buyRaw) || isNaN(sellRaw)) continue;
-            const buy  = parseFloat((buyRaw  / 1_000).toFixed(2));
-            const sell = parseFloat((sellRaw / 1_000).toFixed(2));
+            const buy  = parseFloat((buyRaw  / 100_000_000).toFixed(2));
+            const sell = parseFloat((sellRaw / 100_000_000).toFixed(2));
             const net  = parseFloat((buy - sell).toFixed(2));
             console.log(`    ${name}：買${buy.toFixed(2)} 賣${sell.toFixed(2)} 超${net.toFixed(2)} 億`);
             // FinMind name 值（英文，從 log 確認）：
