@@ -480,8 +480,8 @@ async function collectChips() {
           const latest = data.sort((a,b) => b.date.localeCompare(a.date))[0].date.slice(0,10);
           for (const r of data.filter(r => r.date?.slice(0,10) === latest)) {
             const name = (r.name || '').trim();
-            const buy  = toB(String(r.buy  || 0));
-            const sell = toB(String(r.sell || 0));
+            const buy  = toB(r.buy  != null ? String(r.buy)  : '');
+            const sell = toB(r.sell != null ? String(r.sell) : '');
             const net  = buy !== null && sell !== null ? parseFloat((buy - sell).toFixed(2)) : null;
             if (name.includes('自營商') && name.includes('自行')) {
               result.spot_dealer_buy = buy; result.spot_dealer_sell = sell; result.spot_dealer_net = net;
@@ -521,14 +521,15 @@ async function collectChips() {
 
     // Debug：印出欄位和所有商品代碼
     console.log(`  🔍 TAIFEX 期貨欄位：${Object.keys(allFut[0]).join(', ')}`);
+    // ContractCode 是中文商品名稱（臺股期貨/小型臺指期貨/微型臺指期貨）
     const getCode  = (r) => (r.ContractCode || r.commodity_id || '').trim();
     const getIdent = (r) => (r.Item || r.institutional_traders_name || r['身份別'] || '').trim();
     const allCodes = [...new Set(allFut.map(getCode))];
-    console.log(`  📊 商品代碼：${allCodes.join(', ')}，共 ${allFut.length} 筆`);
+    console.log(`  📊 商品代碼：${allCodes.slice(0,6).join(', ')}，共 ${allFut.length} 筆`);
 
-    // 印出 TX 外資那筆原始資料確認欄位值
-    const txForeignRaw = allFut.find(r => getCode(r) === 'TX' && getIdent(r).includes('外資'));
-    if (txForeignRaw) console.log(`  🔍 TX 外資原始：${JSON.stringify(txForeignRaw)}`);
+    // 印出臺股期貨外資那筆確認欄位
+    const txForeignRaw = allFut.find(r => r.ContractCode === '臺股期貨' && getIdent(r).includes('外資'));
+    if (txForeignRaw) console.log(`  🔍 臺股期貨外資原始：${JSON.stringify(txForeignRaw)}`);
 
     const parseFut = (rows, prefix) => {
       let totalNet = 0;
@@ -561,29 +562,28 @@ async function collectChips() {
     };
 
     // TX 台指期
-    const txRows = allFut.filter(r => getCode(r) === 'TX');
+    // ContractCode 是中文名稱，用中文過濾
+    const txRows  = allFut.filter(r => r.ContractCode === '臺股期貨');
+    const mtxRows = allFut.filter(r => r.ContractCode === '小型臺指期貨');
+    const tmfRows = allFut.filter(r => r.ContractCode === '微型臺指期貨');
+
+    // TX 台指期（臺股期貨）
     if (txRows.length) {
       parseFut(txRows, 'fut_tx');
-      console.log(`  ✅ TX：外資 多${result.fut_tx_foreign_long}/空${result.fut_tx_foreign_short}/淨${result.fut_tx_foreign_net} 口，投信淨${result.fut_tx_trust_net}，自營淨${result.fut_tx_dealer_net}`);
-    } else {
-      // ContractCode 可能為空，印出 Item 唯一值幫助 debug
-      const items = [...new Set(allFut.map(getIdent))];
-      console.warn(`  ⚠️  TX 無資料（ContractCode 全為空？Item 值：${items.join(', ')}）`);
-    }
+      console.log(`  ✅ TX（臺股期貨）：外資 多${result.fut_tx_foreign_long}/空${result.fut_tx_foreign_short}/淨${result.fut_tx_foreign_net} 口，投信淨${result.fut_tx_trust_net}，自營淨${result.fut_tx_dealer_net}`);
+    } else console.warn('  ⚠️  TX（臺股期貨）無資料');
 
     // MTX 小型台指
-    const mtxRows = allFut.filter(r => getCode(r) === 'MTX');
     if (mtxRows.length) {
       parseFut(mtxRows, 'fut_mtx');
-      console.log(`  ✅ MTX：外資淨 ${result.fut_mtx_foreign_net} 口，投信淨 ${result.fut_mtx_trust_net}，自營淨 ${result.fut_mtx_dealer_net}`);
-    } else console.warn('  ⚠️  MTX 無資料');
+      console.log(`  ✅ MTX（小型臺指期貨）：外資淨 ${result.fut_mtx_foreign_net} 口，投信淨 ${result.fut_mtx_trust_net}，自營淨 ${result.fut_mtx_dealer_net}`);
+    } else console.warn('  ⚠️  MTX（小型臺指期貨）無資料');
 
     // TMF 微型台指
-    const tmfRows = allFut.filter(r => getCode(r) === 'TMF');
     if (tmfRows.length) {
       parseFut(tmfRows, 'fut_tmf');
-      console.log(`  ✅ TMF：外資淨 ${result.fut_tmf_foreign_net} 口，投信淨 ${result.fut_tmf_trust_net}，自營淨 ${result.fut_tmf_dealer_net}`);
-    } else console.warn('  ⚠️  TMF 無資料');
+      console.log(`  ✅ TMF（微型臺指期貨）：外資淨 ${result.fut_tmf_foreign_net} 口，投信淨 ${result.fut_tmf_trust_net}，自營淨 ${result.fut_tmf_dealer_net}`);
+    } else console.warn('  ⚠️  TMF（微型臺指期貨）無資料');
 
   } catch (e) {
     console.error(`  ❌ TAIFEX 期貨法人 失敗：${e.message}`);
@@ -625,15 +625,39 @@ async function collectChips() {
       }
     };
 
-    const getOptCode = (r) => (r.ContractCode || r.commodity_id || '').trim();
-    const txoRows = allOpt.filter(r => getOptCode(r) === 'TXO' || getOptCode(r) === 'TX');
-    const callRows = txoRows.filter(r => { const cp = getCP(r); return cp === 'CALL' || cp === 'C' || cp.includes('買'); });
-    const putRows  = txoRows.filter(r => { const cp = getCP(r); return cp === 'PUT'  || cp === 'P' || cp.includes('賣'); });
+    // ContractCode 是中文（臺指選擇權），CallPut 欄位為空
+    // Item 欄位格式：「身份別+買賣權」，例如：「自營商買權」「外資及陸資賣權」
+    const txoRows = allOpt.filter(r => r.ContractCode === '臺指選擇權');
+    console.log(`  📊 臺指選擇權筆數：${txoRows.length}，Item 樣本：${[...new Set(txoRows.map(r => r.Item || ''))].slice(0,6).join(', ')}`);
 
-    if (callRows.length) { parseOpt(callRows, 'opt_call'); console.log(`  ✅ TXO CALL：外資淨 ${result.opt_call_foreign_net} 口，自營淨 ${result.opt_call_dealer_net}`); }
-    if (putRows.length)  { parseOpt(putRows,  'opt_put');  console.log(`  ✅ TXO PUT：外資淨 ${result.opt_put_foreign_net} 口，自營淨 ${result.opt_put_dealer_net}`); }
-    if (!callRows.length && !putRows.length)
-      console.warn(`  ⚠️  TXO 無 CALL/PUT（${allOpt.length} 筆，CP值：${allCP.join(',')}）`);
+    // 從 Item 欄位拆分身份別和買賣權
+    const parseOptByItem = (rows, prefix, cpKeyword) => {
+      // 過濾包含 cpKeyword（買/賣）的 Item
+      const filtered = rows.filter(r => (r.Item || '').includes(cpKeyword));
+      for (const row of filtered) {
+        const item = (row.Item || '').trim();
+        // 身份別判斷
+        const isDealer  = item.includes('自營商') && !item.includes('避險');
+        const isTrust   = item.includes('投信');
+        const isForeign = item.includes('外資') && !item.includes('自營');
+        const longVol   = toInt2(row['OpenInterest(Long)']  || 0);
+        const shortVol  = toInt2(row['OpenInterest(Short)'] || 0);
+        const netVol    = toInt2(row['OpenInterest(Net)']   || null);
+        const net = netVol !== null ? netVol : (longVol - shortVol);
+        if (isDealer)  { result[`${prefix}_dealer_long`]  = longVol; result[`${prefix}_dealer_short`]  = shortVol; result[`${prefix}_dealer_net`]  = net; }
+        if (isTrust)   { result[`${prefix}_trust_long`]   = longVol; result[`${prefix}_trust_short`]   = shortVol; result[`${prefix}_trust_net`]   = net; }
+        if (isForeign) { result[`${prefix}_foreign_long`] = longVol; result[`${prefix}_foreign_short`] = shortVol; result[`${prefix}_foreign_net`] = net; }
+      }
+    };
+
+    if (txoRows.length) {
+      parseOptByItem(txoRows, 'opt_call', '買權');
+      parseOptByItem(txoRows, 'opt_put',  '賣權');
+      console.log(`  ✅ TXO CALL：外資淨 ${result.opt_call_foreign_net} 口，自營淨 ${result.opt_call_dealer_net}`);
+      console.log(`  ✅ TXO PUT：外資淨 ${result.opt_put_foreign_net} 口，自營淨 ${result.opt_put_dealer_net}`);
+    } else {
+      console.warn(`  ⚠️  臺指選擇權無資料（商品：${optCodes.join(',')}）`);
+    }
 
   } catch (e) {
     console.error(`  ❌ TAIFEX 選擇權法人 失敗：${e.message}`);
