@@ -488,7 +488,8 @@ async function collectChips() {
             const sell = parseFloat((sellRaw / 100000).toFixed(2));
             const net  = parseFloat((buy - sell).toFixed(2));
             console.log(`    ${name}：買${buy.toFixed(2)} 賣${sell.toFixed(2)} 超${net.toFixed(2)} 億`);
-            if (name.includes('自營商') && name.includes('自行')) {
+            // FinMind name 值：「自營商(自行買賣)」「自營商(避險)」「投信」「外資及陸資」
+            if (name.includes('自營商') && !name.includes('避險')) {
               result.spot_dealer_buy = buy; result.spot_dealer_sell = sell; result.spot_dealer_net = net;
             } else if (name.includes('投信')) {
               result.spot_trust_buy  = buy; result.spot_trust_sell  = sell; result.spot_trust_net  = net;
