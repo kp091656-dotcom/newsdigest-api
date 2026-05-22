@@ -4904,19 +4904,28 @@ async function loadMktSignals() {
     const instRows = document.getElementById('ms_instRows');
     const inst = opt.institution || {};
     instRows.innerHTML = ['外資','自營商','投信'].map(name => {
-      const val = inst[name];
-      if (val == null) return '';
-      const pos   = val >= 0;
-      const color = pos ? '#dc2626' : '#16a34a';
+      const v = inst[name];
+      if (!v || v.net == null) return '';
+      const net   = v.net;
+      const pos   = net >= 0;
+      const color = pos ? 'var(--up)' : 'var(--down)';
       const sign  = pos ? '+' : '';
-      const barW  = Math.min(100, Math.abs(val) / 5000 * 100);
+      const barW  = Math.min(100, Math.abs(net) / 3000 * 100);
+      const callStr = v.call != null ? `${v.call >= 0 ? '+' : ''}${v.call.toLocaleString()}` : '—';
+      const putStr  = v.put  != null ? `${v.put  >= 0 ? '+' : ''}${v.put.toLocaleString()}`  : '—';
       if (name === '外資') score += pos ? 1 : -1;
-      return `<div style="display:flex;align-items:center;gap:5px;">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);width:36px;flex-shrink:0;">${name}</span>
-        <div style="flex:1;height:6px;background:var(--bg);border-radius:2px;overflow:hidden;">
-          <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;transition:width 0.6s;"></div>
+      return `<div style="margin-bottom:0.35rem;">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);width:36px;flex-shrink:0;">${name}</span>
+          <div style="flex:1;height:5px;background:var(--bg);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;transition:width 0.6s;"></div>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:${color};font-weight:700;width:52px;text-align:right;">${sign}${net.toLocaleString()}</span>
         </div>
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:${color};font-weight:600;width:52px;text-align:right;">${sign}${val.toLocaleString()}</span>
+        <div style="display:flex;gap:0.5rem;padding-left:42px;font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);">
+          <span>C <b style="color:var(--up);">${callStr}</b></span>
+          <span>P <b style="color:var(--down);">${putStr}</b></span>
+        </div>
       </div>`;
     }).join('');
 
@@ -5109,7 +5118,7 @@ async function loadMktSignals() {
   _setSubGauge('subArcChips', 'subTxtChips', 'subLblChips', chipsRaw, 3, chipsLbl, chipsColor);
 
   // 選擇權子分數（pcOI + pcVol + 外資選擇權）
-  const optRaw   = opt ? (() => { let s = oiScore + vScore; if ((opt.institution||{})['外資'] != null) s += (opt.institution['外資'] >= 0 ? 1 : -1); return s; })() : 0;
+  const optRaw   = opt ? (() => { let s = oiScore + vScore; const fw = (opt.institution||{})['外資']; if (fw && fw.net != null) s += (fw.net >= 0 ? 1 : -1); return s; })() : 0;
   const optColor = optRaw >= 1 ? 'var(--up)' : optRaw <= -1 ? 'var(--down)' : 'var(--muted)';
   const optLbl   = optRaw >= 2 ? 'PUT偏少' : optRaw >= 1 ? '略偏多' : optRaw <= -2 ? 'PUT偏多' : optRaw <= -1 ? '略偏空' : '中性';
   _setSubGauge('subArcOpt', 'subTxtOpt', 'subLblOpt', optRaw, 4, optLbl, optColor);
@@ -5164,23 +5173,31 @@ async function loadOptions() {
     document.getElementById('pcCallOI').textContent = data.pcRatio.callOI?.toLocaleString() || '—';
     document.getElementById('pcPutOI').textContent  = data.pcRatio.putOI?.toLocaleString()  || '—';
 
-    // ── 三大法人 ──
+    // ── 三大法人（CALL淨 - PUT淨）──
     const instEl = document.getElementById('instRows');
     const inst = data.institution || {};
     instEl.innerHTML = ['外資','自營商','投信'].map(name => {
-      const val = inst[name];
-      if (val == null) return '';
-      const pos  = val >= 0;
-      const color = pos ? '#dc2626' : '#16a34a'; // 多=紅 空=綠
+      const v = inst[name];
+      if (!v || v.net == null) return '';
+      const net   = v.net;
+      const pos   = net >= 0;
+      const color = pos ? 'var(--up)' : 'var(--down)';
       const sign  = pos ? '+' : '';
-      const label = pos ? '淨多' : '淨空';
-      const barW  = Math.min(100, Math.abs(val) / 5000 * 100); // 5000口為滿格
-      return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);width:36px;flex-shrink:0;">${name}</span>
-        <div style="flex:1;height:8px;background:var(--surface);border-radius:2px;overflow:hidden;">
-          <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;transition:width 0.6s;"></div>
+      const barW  = Math.min(100, Math.abs(net) / 3000 * 100);
+      const callStr = v.call != null ? `${v.call >= 0 ? '+' : ''}${v.call.toLocaleString()}` : '—';
+      const putStr  = v.put  != null ? `${v.put  >= 0 ? '+' : ''}${v.put.toLocaleString()}`  : '—';
+      return `<div style="margin-bottom:0.5rem;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);width:36px;flex-shrink:0;">${name}</span>
+          <div style="flex:1;height:7px;background:var(--surface);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;transition:width 0.6s;"></div>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:${color};font-weight:700;width:52px;text-align:right;">${sign}${net.toLocaleString()}</span>
         </div>
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:${color};font-weight:600;width:52px;text-align:right;">${sign}${val.toLocaleString()}</span>
+        <div style="display:flex;gap:0.6rem;padding-left:42px;font-family:'IBM Plex Mono',monospace;font-size:0.57rem;color:var(--muted);">
+          <span>買權 <b style="color:var(--up);">${callStr}</b></span>
+          <span>賣權 <b style="color:var(--down);">${putStr}</b></span>
+        </div>
       </div>`;
     }).join('');
 
@@ -5222,11 +5239,11 @@ async function loadOptions() {
       pcVal.textContent = pcOI != null ? Number(pcOI).toFixed(2) : '—';
       let pcColor = 'var(--muted)', pcText = '中性';
       if (pcOI != null) {
-        if      (pcOI < 0.7)  { pcColor = 'var(--accent2)'; pcText = '偏多頭'; }
-        else if (pcOI < 1.0)  { pcColor = 'var(--accent2)'; pcText = '略偏多'; }
-        else if (pcOI < 1.3)  { pcColor = 'var(--muted)';   pcText = '中性';   }
-        else if (pcOI < 1.7)  { pcColor = '#e07020';        pcText = '略偏空'; }
-        else                  { pcColor = '#16a34a';         pcText = '偏空頭'; }
+        if      (pcOI >= 1.7)  { pcColor = 'var(--up)';    pcText = '強力偏多'; }
+        else if (pcOI >= 1.3)  { pcColor = 'var(--up)';    pcText = '略偏多';   }
+        else if (pcOI >= 1.0)  { pcColor = 'var(--muted)'; pcText = '中性';     }
+        else if (pcOI >= 0.7)  { pcColor = 'var(--down)';  pcText = '略偏空';   }
+        else                   { pcColor = 'var(--down)';   pcText = '強力偏空'; }
       }
       pcVal.style.color = pcColor;
       pcLbl.textContent = pcText;
@@ -5237,18 +5254,27 @@ async function loadOptions() {
       const inst = fallbackData.institution;
       const instEl = document.getElementById('instRows');
       instEl.innerHTML = ['外資','自營商','投信'].map(name => {
-        const val = inst[name];
-        if (val == null) return '';
-        const pos  = val >= 0;
-        const color = pos ? '#dc2626' : '#16a34a';
+        const v = inst[name];
+        if (!v || v.net == null) return '';
+        const net   = v.net;
+        const pos   = net >= 0;
+        const color = pos ? 'var(--up)' : 'var(--down)';
         const sign  = pos ? '+' : '';
-        const barW  = Math.min(100, Math.abs(val) / 5000 * 100);
-        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);width:36px;flex-shrink:0;">${name}</span>
-          <div style="flex:1;height:8px;background:var(--surface);border-radius:2px;overflow:hidden;">
-            <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;"></div>
+        const barW  = Math.min(100, Math.abs(net) / 3000 * 100);
+        const callStr = v.call != null ? `${v.call >= 0 ? '+' : ''}${v.call.toLocaleString()}` : '—';
+        const putStr  = v.put  != null ? `${v.put  >= 0 ? '+' : ''}${v.put.toLocaleString()}`  : '—';
+        return `<div style="margin-bottom:0.5rem;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);width:36px;flex-shrink:0;">${name}</span>
+            <div style="flex:1;height:7px;background:var(--surface);border-radius:2px;overflow:hidden;">
+              <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;"></div>
+            </div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:${color};font-weight:700;width:52px;text-align:right;">${sign}${net.toLocaleString()}</span>
           </div>
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:${color};font-weight:600;width:52px;text-align:right;">${sign}${Number(val).toLocaleString()}</span>
+          <div style="display:flex;gap:0.6rem;padding-left:42px;font-family:'IBM Plex Mono',monospace;font-size:0.57rem;color:var(--muted);">
+            <span>買權 <b style="color:var(--up);">${callStr}</b></span>
+            <span>賣權 <b style="color:var(--down);">${putStr}</b></span>
+          </div>
         </div>`;
       }).join('');
 
