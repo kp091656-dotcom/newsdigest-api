@@ -1427,16 +1427,36 @@ ${redditTitles || '無'}
     const pcVolRatio = callVol > 0 ? putVol / callVol : null;
     const pcOIRatio  = callOI  > 0 ? putOI  / callOI  : null;
 
-    // ── 三大法人籌碼解析 ──
-    const institution = { 外資: null, 自營商: null, 投信: null };
+    // ── 三大法人籌碼解析（CALL/PUT 分開，各自算淨部位）──
+    const instMap = {
+      '外資':   { call: null, put: null },
+      '自營商': { call: null, put: null },
+      '投信':   { call: null, put: null },
+    };
     for (const row of instData) {
-      const name = row.institutional_investors || row.name || '';
+      const name    = row.institutional_investors || row.name || '';
+      const cp      = (row.call_put || '').trim();
       const longOI  = parseInt(row.long_open_interest_balance_volume)  || 0;
       const shortOI = parseInt(row.short_open_interest_balance_volume) || 0;
       const net = longOI - shortOI;
-      if (name.includes('外資')) institution['外資'] = net;
-      else if (name.includes('自營')) institution['自營商'] = net;
-      else if (name.includes('投信')) institution['投信'] = net;
+      let key = null;
+      if (name.includes('外資')) key = '外資';
+      else if (name.includes('自營')) key = '自營商';
+      else if (name.includes('投信')) key = '投信';
+      if (!key) continue;
+      if (cp === '買權') instMap[key].call = net;
+      else if (cp === '賣權') instMap[key].put = net;
+    }
+    // net = CALL淨部位 - PUT淨部位（正=方向性偏多，負=偏空）
+    const institution = {};
+    for (const [name, v] of Object.entries(instMap)) {
+      const callNet = v.call ?? 0;
+      const putNet  = v.put  ?? 0;
+      institution[name] = {
+        call: v.call,
+        put:  v.put,
+        net:  (v.call !== null || v.put !== null) ? callNet - putNet : null,
+      };
     }
 
     // ── Max Pain 計算 ──
