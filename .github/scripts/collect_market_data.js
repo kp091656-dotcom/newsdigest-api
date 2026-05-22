@@ -393,7 +393,7 @@ async function collectChips() {
     fut_tx_foreign_long:null, fut_tx_foreign_short:null, fut_tx_foreign_net:null,
     fut_tx_total_net:   null,
     fut_mtx_dealer_net: null, fut_mtx_trust_net: null, fut_mtx_foreign_net: null, fut_mtx_total_net: null,
-    fut_tmf_dealer_net: null, fut_tmf_trust_net: null, fut_tmf_foreign_net: null, fut_tmf_total_net: null,
+    fut_tmf_dealer_net: null, fut_tmf_trust_net: null, fut_tmf_foreign_net: null, fut_tmf_total_net: null, fut_tmf_total_oi: null,
     opt_call_dealer_long: null, opt_call_dealer_short: null, opt_call_dealer_net: null,
     opt_call_trust_long:  null, opt_call_trust_short:  null, opt_call_trust_net:  null,
     opt_call_foreign_long:null, opt_call_foreign_short:null, opt_call_foreign_net:null,
@@ -594,6 +594,30 @@ async function collectChips() {
       parseFut(tmfRows, 'fut_tmf');
       console.log(`  ✅ TMF（微型臺指期貨）：外資淨 ${result.fut_tmf_foreign_net} 口，投信淨 ${result.fut_tmf_trust_net}，自營淨 ${result.fut_tmf_dealer_net}`);
     } else console.warn('  ⚠️  TMF（微型臺指期貨）無資料');
+
+    // TMF 全體未平倉量（DailyMarketWatch → 微型臺指期貨）
+    try {
+      const mwUrl = `https://openapi.taifex.com.tw/v1/DailyMarketWatch?queryDate=${dateStr}`;
+      const mwRes = await fetch(mwUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15_000) });
+      if (mwRes.ok) {
+        const mwData = await mwRes.json();
+        // 找微型臺指期貨近月合約（取最近到期的那筆加總所有月份）
+        const tmfRows2 = (Array.isArray(mwData) ? mwData : []).filter(r => {
+          const code = (r.ContractCode || r.commodity_id || r['商品代號'] || '').trim();
+          return code === 'TMF' || code === '微型臺指期貨';
+        });
+        if (tmfRows2.length) {
+          const totalOI = tmfRows2.reduce((sum, r) => {
+            const oi = parseInt((r.OpenInterest || r.open_interest || r['未沖銷契約量'] || '0').toString().replace(/,/g, '')) || 0;
+            return sum + oi;
+          }, 0);
+          result.fut_tmf_total_oi = totalOI || null;
+          console.log(`  ✅ TMF 全體未平倉：${totalOI} 口`);
+        } else {
+          console.warn(`  ⚠️  DailyMarketWatch 找不到 TMF，商品代碼：${[...new Set((Array.isArray(mwData)?mwData:[]).map(r=>r.ContractCode||r['商品代號']||'').slice(0,8))].join(',')}`);
+        }
+      }
+    } catch(e) { console.warn(`  ⚠️  TMF 全體 OI 抓取失敗：${e.message}`); }
 
   } catch (e) {
     console.error(`  ❌ TAIFEX 期貨法人 失敗：${e.message}`);
