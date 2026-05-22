@@ -596,45 +596,76 @@ async function collectChips() {
     } else console.warn('  ⚠️  TMF（微型臺指期貨）無資料');
 
     // TMF 全體未平倉量
-    // 策略1：TAIFEX OpenAPI DailyFuturesMarketReport（JSON，最穩定）
-    // 策略2：Fallback HTML 解析（取小計列最後一個數字）
+    // 策略1：TAIFEX CSV POST（繞過 openapi 防火牆，小計列欄位精準定位）
+    // 策略2：Fallback HTML（從小計列所有 td 取倒數第 3 個數字）
     try {
       let tmfOI = null;
 
-      // ── 策略1：OpenAPI ──
+      // ── 策略1：CSV POST ──
       try {
-        const mUrl = 'https://openapi.taifex.com.tw/v1/DailyFuturesMarketReport?queryDate=' + dateStr;
-        const mRes = await fetch(mUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12_000) });
-        if (mRes.ok) {
-          const mData = await mRes.json();
-          if (Array.isArray(mData)) {
-            const tmfRows2 = mData.filter(r => (r.ContractCode || r.CommodityID || '').trim() === 'TMF');
-            const sub = tmfRows2.find(r => (r.DeliveryMonth || r.ExpiryDate || '').trim().includes('小計'));
-            if (sub) {
-              const n = parseInt(String(sub.OpenInterest || sub.open_interest || '').replace(/,/g, ''));
-              if (!isNaN(n) && n > 0) { tmfOI = n; console.log('  ✅ TMF 全體未平倉（OpenAPI）：' + n + ' 口'); }
-            }
-          }
+        const csvUrl = 'https://www.taifex.com.tw/cht/3/futDailyMarketCSV';
+        const body = new URLSearchParams({
+          queryDate:    tradeDate.replace(/-/g, '/'), // 2026/05/21
+          marketType:   '0',
+          commodity_id: 'TMF'
+        });
+        const cRes = await fetch(csvUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent':   'Mozilla/5.0',
+            'Referer':      'https://www.taifex.com.tw/cht/3/futDailyMarket'
+          },
+          body,
+          signal: AbortSignal.timeout(15_000)
+        });
+        if (!cRes.ok) throw new Error('CSV HTTP ' + cRes.status);
+        const csvText = await cRes.text();
+        // 找小計列：含 TMF 且含 小計
+        const subLine = csvText.split(/?
+/).find(l => l.includes('TMF') && l.includes('小計'));
+        if (!subLine) throw new Error('CSV 找不到小計列');
+        // CSV 格式：日期,TMF,小計,,,,,,,,成交量,,OI,交易時段,
+        // OI 固定在倒數第 3 欄（尾端有空欄和交易時段）
+        const cols = subLine.split(',').map(c => c.replace(/"/g, '').trim());
+        console.log('  🔍 TMF CSV 小計列：' + cols.join('|'));
+        // 從倒數往前找第一個有效正整數 > 1000（排除交易時段文字和空欄）
+        for (let i = cols.length - 1; i >= 0; i--) {
+          const n = parseInt(cols[i].replace(/,/g, ''));
+          if (!isNaN(n) && n > 1000) { tmfOI = n; break; }
         }
-      } catch(e1) { console.log('  ℹ️  OpenAPI 策略失敗：' + e1.message + '，切換 HTML fallback'); }
+        if (tmfOI) console.log('  ✅ TMF 全體未平倉（CSV）：' + tmfOI + ' 口');
+        else throw new Error('CSV 小計列數字解析失敗');
+      } catch(e1) { console.log('  ℹ️  CSV 策略失敗：' + e1.message + '，切換 HTML fallback'); }
 
       // ── 策略2：HTML fallback ──
       if (!tmfOI) {
         const eUrl = 'https://www.taifex.com.tw/cht/3/futDailyMarketExcel?commodity_id=TMF';
-        const eRes = await fetch(eUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.taifex.com.tw/' }, signal: AbortSignal.timeout(12_000) });
+        const eRes = await fetch(eUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.taifex.com.tw/' },
+          signal: AbortSignal.timeout(12_000)
+        });
         if (!eRes.ok) throw new Error('HTML HTTP ' + eRes.status);
         const html = await eRes.text();
+        // 取小計 <tr>，把所有 <td> 內容（含空格）展開
         const rowM = html.match(/<tr[^>]*>([\s\S]*?小計[\s\S]*?)<\/tr>/);
-        if (!rowM) throw new Error('找不到小計列');
-        const nums = [];
-        let m2;
-        const tdRe2 = /<td[^>]*>\s*([\d,]+)\s*<\/td>/g;
-        while ((m2 = tdRe2.exec(rowM[1])) !== null) nums.push(parseInt(m2[1].replace(/,/g, '')));
-        // 小計列欄位順序：盤後成交量、一般成交量、合計成交量、未沖銷契約量
-        // 未沖銷契約量固定是最後一個有數字的欄位
-        const n = nums[nums.length - 1];
+        if (!rowM) throw new Error('HTML 找不到小計列');
+        // 切出所有 td 文字（含空白 td），保留欄位順序
+        const fields = rowM[1].split(/<\/td>/).map(f => f.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim());
+        console.log('  🔍 TMF HTML 小計欄位：' + fields.join('|'));
+        // OI 在小計列倒數第 3 個有數字的欄位（成交量|空|OI|交易時段|空）
+        const numFields = fields.map(f => ({ raw: f, n: parseInt(f.replace(/,/g, '')) }));
+        const validNums = numFields.filter(f => !isNaN(f.n) && f.n > 0).map(f => f.n);
+        // 小計列有效數字順序：盤後成交量、一般成交量、合計成交量、OI
+        // OI 是第 4 個，也是倒數第 1 個
+        // 但合計成交量 > OI（合計 = 盤後+一般），所以 OI 是最後一個 < 合計成交量的數字
+        const sorted = [...validNums].sort((a, b) => b - a);
+        const maxVal = sorted[0]; // 合計成交量（最大）
+        // OI 是合計成交量之後出現的數字
+        const maxIdx2 = validNums.indexOf(maxVal);
+        const n = validNums[maxIdx2 + 1];
         if (n && n > 0) { tmfOI = n; console.log('  ✅ TMF 全體未平倉（HTML）：' + n + ' 口'); }
-        else throw new Error('小計數字解析失敗：' + nums.join(','));
+        else throw new Error('HTML 數字定位失敗：' + validNums.join(','));
       }
 
       result.fut_tmf_total_oi = tmfOI;
