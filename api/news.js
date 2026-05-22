@@ -1554,6 +1554,52 @@ ${redditTitles || '無'}
   }
 
   // ── 融資融券整體市場 ──
+  // ── 微台指散戶多空比 ──
+  if (endpoint === 'tmf') {
+    const CACHE_TTL = 60 * 60 * 1000;
+    if (!global._tmfCache) global._tmfCache = { data: null, ts: 0 };
+    const now = Date.now();
+    if (global._tmfCache.data && (now - global._tmfCache.ts) < CACHE_TTL) {
+      return res.status(200).json({ ...global._tmfCache.data, cached: true });
+    }
+    try {
+      const SUPA_URL = process.env.SUPABASE_URL;
+      const SUPA_KEY = process.env.SUPABASE_SERVICE_KEY;
+      // 取最近 30 個交易日的 TMF 資料
+      const r = await fetch(
+        `${SUPA_URL}/rest/v1/chips_daily?order=date.desc&limit=30&select=date,fut_tmf_total_net,fut_tmf_total_oi,fut_tmf_foreign_net,fut_tmf_trust_net,fut_tmf_dealer_net`,
+        { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` } }
+      );
+      const rows = await r.json();
+      if (!Array.isArray(rows) || !rows.length) throw new Error('無資料');
+
+      // 計算每日散戶多空比
+      const history = rows.map(row => {
+        const totalNet = row.fut_tmf_total_net;
+        const totalOI  = row.fut_tmf_total_oi;
+        const ratio    = (totalNet != null && totalOI > 0)
+          ? parseFloat((-1 * totalNet / totalOI * 100).toFixed(2))
+          : null;
+        return {
+          date:       row.date,
+          total_net:  totalNet,   // 三大法人合計淨額（口）
+          total_oi:   totalOI,    // 全體未平倉（口）
+          foreign_net: row.fut_tmf_foreign_net,
+          trust_net:   row.fut_tmf_trust_net,
+          dealer_net:  row.fut_tmf_dealer_net,
+          retail_ratio: ratio,    // 散戶多空比（%），正=偏多，負=偏空
+        };
+      }).filter(r => r.retail_ratio !== null);
+
+      const latest = history[0] || null;
+      const payload = { latest, history, latestDate: latest?.date || null };
+      global._tmfCache = { data: payload, ts: Date.now() };
+      return res.status(200).json({ ...payload, cached: false });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (endpoint === 'margin') {
     const TOKEN = process.env.FINMIND_TOKEN;
     if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
