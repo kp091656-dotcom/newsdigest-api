@@ -1693,23 +1693,42 @@
         <div id="ms_optTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);text-align:right;margin-top:0.7rem;"></div>
       </div>
 
-      <!-- 欄②：三大法人現貨 -->
+      <!-- 欄②：微台指散戶多空比 -->
       <div style="border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 0 0 1px var(--border-dark);background:var(--surface);">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:1rem;">🏢 三大法人現貨</div>
-        <div id="ms_instLoading" style="font-size:0.72rem;color:var(--muted);">載入中…</div>
-        <div id="ms_instContent" style="display:none;">
-          <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.6rem;">
-            <div id="ms_instNet" style="font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:800;line-height:1;">—</div>
-            <div id="ms_instNetLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:var(--muted);">億元</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:1rem;">🔬 微型台指 TMF（微台）OI 口數</div>
+        <div id="ms_tmfLoading" style="font-size:0.72rem;color:var(--muted);">載入中…</div>
+        <div id="ms_tmfContent" style="display:none;">
+          <!-- 主數字：散戶多空比 -->
+          <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.25rem;">
+            <div id="ms_tmfRatio" style="font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:800;line-height:1;">—</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:var(--muted);">%</div>
           </div>
-          <div id="ms_instDetail" style="display:flex;flex-direction:column;gap:0.25rem;margin-bottom:0.5rem;"></div>
-          <div id="ms_instStreak" style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;padding:0.22rem 0.5rem;border-radius:4px;display:inline-block;margin-bottom:0.7rem;"></div>
-          <div>
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);margin-bottom:0.35rem;">近10日合計（億）</div>
-            <div id="ms_instBars" style="display:flex;align-items:flex-end;gap:3px;height:48px;"></div>
-            <div id="ms_instDates" style="display:flex;gap:3px;margin-top:3px;"></div>
+          <div id="ms_tmfLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;padding:0.22rem 0.5rem;border-radius:4px;display:inline-block;margin-bottom:0.8rem;font-weight:600;"></div>
+
+          <!-- 計算明細 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.8rem;">
+            <div style="background:var(--bg);border-radius:8px;padding:0.5rem 0.6rem;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);margin-bottom:3px;">三大法人合計淨額</div>
+              <div id="ms_tmfTotalNet" style="font-family:'IBM Plex Mono',monospace;font-size:0.88rem;font-weight:700;">—</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--muted);">口</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:0.5rem 0.6rem;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);margin-bottom:3px;">全體未平倉量</div>
+              <div id="ms_tmfTotalOI" style="font-family:'IBM Plex Mono',monospace;font-size:0.88rem;font-weight:700;">—</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--muted);">口</div>
+            </div>
           </div>
-          <div id="ms_instTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);text-align:right;margin-top:0.5rem;"></div>
+
+          <!-- 法人明細 -->
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);margin-bottom:0.35rem;">法人淨部位（口）</div>
+          <div id="ms_tmfInstRows" style="display:flex;flex-direction:column;gap:0.25rem;margin-bottom:0.6rem;"></div>
+
+          <!-- 近10日趨勢 bar -->
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);margin-bottom:0.35rem;">近期散戶多空比（%）</div>
+          <div id="ms_tmfBars" style="display:flex;align-items:flex-end;gap:3px;height:44px;"></div>
+          <div id="ms_tmfDates" style="display:flex;gap:3px;margin-top:3px;"></div>
+
+          <div id="ms_tmfTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.52rem;color:var(--muted);text-align:right;margin-top:0.6rem;"></div>
         </div>
       </div>
 
@@ -4851,7 +4870,7 @@ async function loadMktSignals() {
   // 同時抓取選擇權、三大法人現貨、融資融券
   const [optData, instData, marginData] = await Promise.allSettled([
     fetch(API_BASE + '?endpoint=options').then(r => r.json()),
-    fetch(API_BASE + '?endpoint=institutional').then(r => r.json()),
+    fetch(API_BASE + '?endpoint=institutional').then(r => r.json()), // 仍用於籌碼子分數
     fetch(API_BASE + '?endpoint=margin').then(r => r.json()),
   ]);
 
@@ -4933,69 +4952,87 @@ async function loadMktSignals() {
     document.getElementById('ms_optTs').textContent = optDate ? `資料日期：${optDate}` : '';
   }
 
-  // ── ② 填入三大法人現貨 ──
-  const inst = instData.status === 'fulfilled' ? instData.value : null;
-  document.getElementById('ms_instLoading').style.display = 'none';
-  document.getElementById('ms_instContent').style.display = inst ? 'block' : 'none';
-  if (inst && inst.data && inst.data.length) {
-    const latest = inst.data[0];
-    const netBil = Math.round(latest.net / 1e8 * 10) / 10; // 億元
-    const netEl  = document.getElementById('ms_instNet');
-    netEl.textContent = (netBil >= 0 ? '+' : '') + netBil.toFixed(1);
-    netEl.style.color = netBil >= 0 ? '#dc2626' : '#16a34a';
-    document.getElementById('ms_instNetLabel').textContent = '億元（三大法人合計）';
-    if (netBil >= 0) score += 1; else score -= 1;
+  // ── ② 填入微台指散戶多空比 ──
+  // 獨立 fetch（不在 Promise.allSettled 裡，因為是新 endpoint）
+  (async () => {
+    try {
+      const tmf = await fetch(API_BASE + '?endpoint=tmf').then(r => r.json());
+      document.getElementById('ms_tmfLoading').style.display = 'none';
+      if (!tmf || !tmf.latest) return;
+      document.getElementById('ms_tmfContent').style.display = 'block';
 
-    // 個別法人
-    const detailEl = document.getElementById('ms_instDetail');
-    detailEl.innerHTML = ['外資','投信','自營商'].map(name => {
-      const v = latest.detail?.[name];
-      if (v == null) return '';
-      const bil = Math.round(v / 1e8 * 10) / 10;
-      const color = bil >= 0 ? '#dc2626' : '#16a34a';
-      return `<div style="display:flex;justify-content:space-between;padding:0.18rem 0;">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);">${name}</span>
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;font-weight:600;color:${color};">${bil >= 0 ? '+' : ''}${bil.toFixed(1)} 億</span>
-      </div>`;
-    }).join('');
+      const l = tmf.latest;
+      const ratio = l.retail_ratio; // %，正=散戶偏多，負=散戶偏空
+      const ratioColor = ratio > 0 ? 'var(--up)' : ratio < 0 ? 'var(--down)' : 'var(--muted)';
 
-    // 連買/賣超天數
-    const streak = inst.streak || 0;
-    const streakEl = document.getElementById('ms_instStreak');
-    if (streak !== 0) {
-      const abs = Math.abs(streak);
-      const isBull = streak > 0;
-      streakEl.textContent = `外資連續${isBull ? '買超' : '賣超'} ${abs} 日`;
-      streakEl.style.background = isBull ? 'rgba(220,38,38,0.1)' : 'rgba(22,163,74,0.1)';
-      streakEl.style.color      = isBull ? '#dc2626' : '#16a34a';
-      if (isBull) score += Math.min(2, Math.floor(abs / 3));
-      else        score -= Math.min(2, Math.floor(abs / 3));
-    } else {
-      streakEl.textContent = '';
+      // 主數字
+      const ratioEl = document.getElementById('ms_tmfRatio');
+      ratioEl.textContent = (ratio >= 0 ? '+' : '') + ratio.toFixed(2);
+      ratioEl.style.color = ratioColor;
+
+      // 標籤
+      const lbl = document.getElementById('ms_tmfLabel');
+      let lblText = '中性', lblBg = 'rgba(128,128,128,0.1)';
+      if      (ratio >  20) { lblText = '散戶極度偏多 ⚠️'; lblBg = 'rgba(220,38,38,0.12)'; }
+      else if (ratio >   5) { lblText = '散戶偏多';         lblBg = 'rgba(220,38,38,0.1)'; }
+      else if (ratio >  -5) { lblText = '散戶中性';         lblBg = 'rgba(128,128,128,0.1)'; }
+      else if (ratio > -20) { lblText = '散戶偏空';         lblBg = 'rgba(22,163,74,0.1)'; }
+      else                  { lblText = '散戶極度偏空';     lblBg = 'rgba(22,163,74,0.12)'; }
+      lbl.textContent       = lblText;
+      lbl.style.color       = ratioColor;
+      lbl.style.background  = lblBg;
+
+      // 計算明細
+      const tn = l.total_net;
+      const to = l.total_oi;
+      const tnEl = document.getElementById('ms_tmfTotalNet');
+      tnEl.textContent = tn != null ? (tn >= 0 ? '+' : '') + tn.toLocaleString() : '—';
+      tnEl.style.color = tn != null ? (tn >= 0 ? 'var(--up)' : 'var(--down)') : 'var(--muted)';
+      document.getElementById('ms_tmfTotalOI').textContent = to != null ? to.toLocaleString() : '—';
+
+      // 法人明細列
+      document.getElementById('ms_tmfInstRows').innerHTML = [
+        { name: '外資', val: l.foreign_net },
+        { name: '投信', val: l.trust_net   },
+        { name: '自營商', val: l.dealer_net },
+      ].map(({ name, val }) => {
+        if (val == null) return '';
+        const pos   = val >= 0;
+        const color = pos ? 'var(--up)' : 'var(--down)';
+        const barW  = Math.min(100, Math.abs(val) / Math.max(1, Math.abs(tn || 1)) * 80);
+        return `<div style="display:flex;align-items:center;gap:5px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);width:36px;flex-shrink:0;">${name}</span>
+          <div style="flex:1;height:5px;background:var(--bg);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${barW}%;background:${color};border-radius:2px;transition:width 0.6s;"></div>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:${color};font-weight:700;width:52px;text-align:right;">${pos?'+':''}${val.toLocaleString()}</span>
+        </div>`;
+      }).join('');
+
+      // 近期 bar chart（散戶多空比）
+      const bars = (tmf.history || []).slice(0, 15).reverse();
+      const maxR = Math.max(...bars.map(d => Math.abs(d.retail_ratio || 0)), 1);
+      document.getElementById('ms_tmfBars').innerHTML = bars.map(d => {
+        const r   = d.retail_ratio || 0;
+        const h   = Math.abs(r / maxR * 36);
+        const col = r > 0 ? 'var(--up)' : 'var(--down)';
+        return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:38px;">
+          <div style="height:${h.toFixed(1)}px;background:${col};border-radius:2px 2px 0 0;"></div>
+        </div>`;
+      }).join('');
+      document.getElementById('ms_tmfDates').innerHTML = bars.map(d =>
+        `<div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.42rem;color:var(--muted);text-align:center;overflow:hidden;">${d.date.slice(5)}</div>`
+      ).join('');
+
+      document.getElementById('ms_tmfTs').textContent = `公式：-1 × ${tn != null ? tn.toLocaleString() : '?'} ÷ ${to != null ? to.toLocaleString() : '?'} = ${ratio.toFixed(2)}%`;
+
+      // 多空得分貢獻（賣方思維：散戶偏多 → 警示，不加分）
+      if (ratio > 10) score -= 1;
+      else if (ratio < -10) score += 1;
+    } catch(e) {
+      document.getElementById('ms_tmfLoading').textContent = '微台 OI 資料載入失敗';
     }
-
-    // 近10日 mini bar chart
-    const bars10 = inst.data.slice(0, 10).reverse();
-    const maxAbs = Math.max(...bars10.map(d => Math.abs(d.net / 1e8)));
-    const barsEl  = document.getElementById('ms_instBars');
-    const datesEl = document.getElementById('ms_instDates');
-    barsEl.innerHTML = bars10.map(d => {
-      const bil = d.net / 1e8;
-      const h   = maxAbs > 0 ? Math.abs(bil / maxAbs * 34) : 4;
-      const col = bil >= 0 ? '#dc2626' : '#16a34a';
-      return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:36px;">
-        <div style="height:${h.toFixed(1)}px;background:${col};border-radius:2px 2px 0 0;"></div>
-      </div>`;
-    }).join('');
-    datesEl.innerHTML = bars10.map(d =>
-      `<div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.42rem;color:var(--muted);text-align:center;overflow:hidden;">${d.date.slice(5)}</div>`
-    ).join('');
-
-    document.getElementById('ms_instTs').textContent = `資料日期：${inst.latestDate || ''}`;
-  } else if (!inst) {
-    document.getElementById('ms_instLoading').textContent = '三大法人資料載入失敗';
-    document.getElementById('ms_instLoading').style.display = 'block';
-  }
+  })();
 
   // ── ③ 填入融資融券 ──
   const margin = marginData.status === 'fulfilled' ? marginData.value : null;
