@@ -1359,15 +1359,17 @@ ${redditTitles || '無'}
       return res.status(200).json({ ...global._optionsCache.data, cached: true, cacheAgeMin: parseFloat(ageMin) });
     }
 
-    const today = new Date();
-    // 若今天是週末或非交易時間，往前找最近交易日
+    // 台灣時間（UTC+8）今天日期
+    const nowTW = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    const today = nowTW; // 統一用台灣時間
+    // 若今天是週末，往前找最近交易日
     const getTradeDate = (offset = 0) => {
-      const d = new Date(today);
-      d.setDate(d.getDate() - offset);
-      const dow = d.getDay();
-      if (dow === 0) d.setDate(d.getDate() - 2);
-      if (dow === 6) d.setDate(d.getDate() - 1);
-      return d.toISOString().slice(0, 10);
+      const d = new Date(nowTW);
+      d.setUTCDate(d.getUTCDate() - offset);
+      const dow = d.getUTCDay();
+      if (dow === 0) d.setUTCDate(d.getUTCDate() - 2); // 週日→週五
+      if (dow === 6) d.setUTCDate(d.getUTCDate() - 1); // 週六→週五
+      return d.toISOString().slice(0, 10); // YYYY-MM-DD
     };
 
     const BASE = 'https://api.finmindtrade.com/api/v4/data';
