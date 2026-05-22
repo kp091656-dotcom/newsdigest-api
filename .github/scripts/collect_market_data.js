@@ -595,40 +595,49 @@ async function collectChips() {
       console.log(`  ✅ TMF（微型臺指期貨）：外資淨 ${result.fut_tmf_foreign_net} 口，投信淨 ${result.fut_tmf_trust_net}，自營淨 ${result.fut_tmf_dealer_net}`);
     } else console.warn('  ⚠️  TMF（微型臺指期貨）無資料');
 
-    // TMF 全體未平倉量（TAIFEX futDailyMarketExcel，解析 HTML 小計列）
+    // TMF 全體未平倉量
+    // 策略1：TAIFEX OpenAPI DailyFuturesMarketReport（JSON，最穩定）
+    // 策略2：Fallback HTML 解析（取小計列最後一個數字）
     try {
-      const excelUrl = 'https://www.taifex.com.tw/cht/3/futDailyMarketExcel?commodity_id=TMF';
-      const excelRes = await fetch(excelUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.taifex.com.tw/' },
-        signal: AbortSignal.timeout(15_000)
-      });
-      if (!excelRes.ok) throw new Error('HTTP ' + excelRes.status);
-      const html = await excelRes.text();
-      // 小計列：<tr> 含「小計」文字，欄位順序固定：
-      // 契約(空)|到期月份(空)|開盤(空)|最高(空)|最低(空)|最後成交(空)|漲跌(空)|漲跌%(空)
-      // |盤後成交量|一般成交量|合計成交量|結算價(空)|未沖銷契約量|...
-      // 從截圖：小計列的未沖銷契約量是所有 td 中「合計成交量之後、且值 >0」的第一個
-      const rowRe = /<tr[^>]*>([\s\S]*?小計[\s\S]*?)<\/tr>/;
-      const rowM = html.match(rowRe);
-      if (!rowM) throw new Error('找不到小計列');
-      const tdRe = /<td[^>]*>\s*([\d,]+)\s*<\/td>/g;
-      const nums = [];
-      let m;
-      while ((m = tdRe.exec(rowM[1])) !== null) {
-        nums.push(parseInt(m[1].replace(/,/g, '')));
+      let tmfOI = null;
+
+      // ── 策略1：OpenAPI ──
+      try {
+        const mUrl = 'https://openapi.taifex.com.tw/v1/DailyFuturesMarketReport?queryDate=' + dateStr;
+        const mRes = await fetch(mUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12_000) });
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          if (Array.isArray(mData)) {
+            const tmfRows2 = mData.filter(r => (r.ContractCode || r.CommodityID || '').trim() === 'TMF');
+            const sub = tmfRows2.find(r => (r.DeliveryMonth || r.ExpiryDate || '').trim().includes('小計'));
+            if (sub) {
+              const n = parseInt(String(sub.OpenInterest || sub.open_interest || '').replace(/,/g, ''));
+              if (!isNaN(n) && n > 0) { tmfOI = n; console.log('  ✅ TMF 全體未平倉（OpenAPI）：' + n + ' 口'); }
+            }
+          }
+        }
+      } catch(e1) { console.log('  ℹ️  OpenAPI 策略失敗：' + e1.message + '，切換 HTML fallback'); }
+
+      // ── 策略2：HTML fallback ──
+      if (!tmfOI) {
+        const eUrl = 'https://www.taifex.com.tw/cht/3/futDailyMarketExcel?commodity_id=TMF';
+        const eRes = await fetch(eUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.taifex.com.tw/' }, signal: AbortSignal.timeout(12_000) });
+        if (!eRes.ok) throw new Error('HTML HTTP ' + eRes.status);
+        const html = await eRes.text();
+        const rowM = html.match(/<tr[^>]*>([\s\S]*?小計[\s\S]*?)<\/tr>/);
+        if (!rowM) throw new Error('找不到小計列');
+        const nums = [];
+        let m2;
+        const tdRe2 = /<td[^>]*>\s*([\d,]+)\s*<\/td>/g;
+        while ((m2 = tdRe2.exec(rowM[1])) !== null) nums.push(parseInt(m2[1].replace(/,/g, '')));
+        // 小計列欄位順序：盤後成交量、一般成交量、合計成交量、未沖銷契約量
+        // 未沖銷契約量固定是最後一個有數字的欄位
+        const n = nums[nums.length - 1];
+        if (n && n > 0) { tmfOI = n; console.log('  ✅ TMF 全體未平倉（HTML）：' + n + ' 口'); }
+        else throw new Error('小計數字解析失敗：' + nums.join(','));
       }
-      // nums 應為：[盤後成交量, 一般成交量, 合計成交量, 未沖銷契約量]
-      // 未沖銷契約量排在合計成交量後面（index 3，或取最後一個）
-      console.log('  🔍 TMF 小計列數字：' + nums.join(', '));
-      // 合計成交量是 nums 裡最大的那個；未沖銷緊接其後
-      const maxIdx = nums.indexOf(Math.max(...nums));
-      const totalOI = nums[maxIdx + 1] || nums[nums.length - 1] || null;
-      if (totalOI && totalOI > 0) {
-        result.fut_tmf_total_oi = totalOI;
-        console.log('  ✅ TMF 全體未平倉：' + totalOI + ' 口');
-      } else {
-        throw new Error('小計數字解析失敗：' + nums.join(','));
-      }
+
+      result.fut_tmf_total_oi = tmfOI;
     } catch(e) { console.warn('  ⚠️  TMF 全體 OI 抓取失敗：' + e.message); }
 
   } catch (e) {
