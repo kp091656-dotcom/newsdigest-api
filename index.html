@@ -1272,7 +1272,7 @@
     border-radius: var(--r-md); padding: 0.75rem 0.9rem;
     margin-bottom: 1rem; display: none;
   }
-  .wl-item { display: grid; grid-template-columns: 4rem 1fr 3.5rem 3.5rem auto; gap: 0.35rem; align-items: center; padding: 0.32rem 0; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono',monospace; font-size: 0.72rem; }
+  .wl-item { display: grid; grid-template-columns: 4rem 1fr 3.5rem 3.5rem 52px auto; gap: 0.35rem; align-items: center; padding: 0.32rem 0; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono',monospace; font-size: 0.72rem; }
   .wl-item:last-child { border-bottom: none; }
 
   /* ── 法人籌碼警示條 ── */
@@ -6785,35 +6785,71 @@ async function wlRender() {
 
   el.innerHTML = `
     <div class="wl-item" style="font-size:0.58rem;color:var(--muted);border-bottom:1px solid var(--border);">
-      <span>代號</span><span>名稱</span><span>收盤</span><span>漲跌</span><span></span>
+      <span>代號</span><span>名稱</span><span>收盤</span><span>漲跌</span><span>5日走勢</span><span></span>
     </div>`;
 
   try {
-    const dateRes = await sbFetch('stock_daily_twse', 'order=date.desc&limit=1&select=date');
-    const latestDate = dateRes[0]?.date;
-    if (latestDate) {
-      const rows = await sbFetch('stock_daily_twse',
-        `date=eq.${latestDate}&stock_id=in.(${list.join(',')})&select=stock_id,name,close,chg_pct`);
-      const map = {};
-      (rows || []).forEach(r => { map[r.stock_id] = r; });
+    // 取最新 5 個交易日日期
+    const dateRes = await sbFetch('stock_daily_twse', 'order=date.desc&limit=5&select=date&stock_id=eq.TAIEX');
+    const dates = (dateRes || []).map(r => r.date);
+    const latestDate = dates[0];
+    if (!latestDate) return;
 
-      for (const id of list) {
-        const r = map[id];
-        const clr = r ? (r.chg_pct >= 0 ? '#dc2626' : '#16a34a') : 'var(--muted)';
-        const pct  = r ? `${r.chg_pct >= 0 ? '+' : ''}${(r.chg_pct*100).toFixed(2)}%` : '—';
-        const row = document.createElement('div');
-        row.className = 'wl-item';
-        row.innerHTML = `
-          <span style="font-weight:700;">${id}</span>
-          <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r?.name || '—'}</span>
-          <span>${r?.close ?? '—'}</span>
-          <span style="color:${clr};font-weight:600;">${pct}</span>
-          <button onclick="wlRemove('${id}')" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0 0.2rem;">✕</button>`;
-        row.querySelector('span').addEventListener('click', () => {
-          if (r) openStockModal({ id, name: r.name, price: r.close, chgPct: r.chg_pct, prev: r.close, sector: '', mcap: 0 });
-        });
-        el.appendChild(row);
+    // 一次抓 5 日 × 所有自選股資料
+    const rows = await sbFetch('stock_daily_twse',
+      `date=in.(${dates.join(',')})&stock_id=in.(${list.join(',')})&select=stock_id,name,close,chg_pct,date&order=stock_id.asc,date.asc`);
+
+    // 整理成 { stockId: { latest, history:[close...] } }
+    const dataMap = {};
+    (rows || []).forEach(r => {
+      if (!dataMap[r.stock_id]) dataMap[r.stock_id] = { name: r.name, history: [] };
+      dataMap[r.stock_id].history.push({ date: r.date, close: r.close, chg_pct: r.chg_pct });
+    });
+
+    // 輔助：產生迷你 SVG 折線
+    function makeSparkline(history, color) {
+      if (!history || history.length < 2) {
+        return `<svg width="52" height="24" viewBox="0 0 52 24"><line x1="2" y1="12" x2="50" y2="12" stroke="var(--border)" stroke-width="1.5"/></svg>`;
       }
+      const prices = history.map(h => h.close);
+      const minP = Math.min(...prices);
+      const maxP = Math.max(...prices);
+      const range = maxP - minP || 1;
+      const W = 52, H = 24, pad = 3;
+      const pts = prices.map((p, i) => {
+        const x = pad + (i / (prices.length - 1)) * (W - pad * 2);
+        const y = H - pad - ((p - minP) / range) * (H - pad * 2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+      // 最後一個點座標
+      const lastPts = pts.split(' ');
+      const [lx, ly] = lastPts[lastPts.length - 1].split(',');
+      return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+        <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${lx}" cy="${ly}" r="2.5" fill="${color}"/>
+      </svg>`;
+    }
+
+    for (const id of list) {
+      const d = dataMap[id];
+      const latest = d?.history?.find(h => h.date === latestDate) || d?.history?.[d.history.length - 1];
+      const clr  = latest ? (latest.chg_pct >= 0 ? '#dc2626' : '#16a34a') : 'var(--muted)';
+      const pct  = latest ? `${latest.chg_pct >= 0 ? '+' : ''}${(latest.chg_pct * 100).toFixed(2)}%` : '—';
+      const spark = makeSparkline(d?.history, clr);
+
+      const row = document.createElement('div');
+      row.className = 'wl-item';
+      row.innerHTML = `
+        <span style="font-weight:700;cursor:pointer;">${id}</span>
+        <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d?.name || '—'}</span>
+        <span>${latest?.close ?? '—'}</span>
+        <span style="color:${clr};font-weight:600;">${pct}</span>
+        <span style="line-height:0;">${spark}</span>
+        <button onclick="wlRemove('${id}')" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0 0.2rem;">✕</button>`;
+      row.querySelector('span').addEventListener('click', () => {
+        if (latest) openStockModal({ id, name: d.name, price: latest.close, chgPct: latest.chg_pct, prev: latest.close, sector: '', mcap: 0 });
+      });
+      el.appendChild(row);
     }
   } catch { /* 靜默 */ }
 }
