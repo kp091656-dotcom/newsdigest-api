@@ -206,7 +206,11 @@
   <div>
     <h2>🔐 後台認證</h2>
     <p>請輸入管理員金鑰（ADMIN_KEY）</p>
-    <input id="adminKeyInput" type="password" placeholder="輸入 Admin Key…" onkeydown="if(e.key==='Enter')doLogin(event)">
+    <input id="apiUrlInput" type="text" placeholder="API 網址（e.g. https://yourapp.vercel.app）" style="margin-bottom:0.5rem">
+    <div class="hint" style="font-size:0.6rem;color:var(--muted);margin-bottom:1rem;text-align:left">
+      本機開啟時必填；部署後直接使用可留空
+    </div>
+    <input id="adminKeyInput" type="password" placeholder="輸入 Admin Key…" onkeydown="if(event.key==='Enter')doLogin()">
     <button id="loginBtn" onclick="doLogin()">登入 →</button>
     <div id="loginErr"></div>
   </div>
@@ -405,7 +409,14 @@
 // ══════════════════════════════════
 // Constants
 // ══════════════════════════════════
-const API_BASE = '/api/news';
+const API_BASE = (() => {
+  // 部署後：直接用當前 origin（e.g. https://yourapp.vercel.app/api/news）
+  // 本機開啟：從登入表單的 API URL 欄位取得
+  if (location.protocol !== 'file:') return '/api/news';
+  return null; // 登入時動態決定
+})();
+
+let _apiBase = API_BASE;
 const CAT_LABEL = { food:'🍱 食品', goods:'🧴 日用品', voucher:'🎫 儲值卡', cash:'💵 現金等值', '3c':'📱 3C', other:'其他' };
 const SQL_CREATE = `-- ① 主資料表（紀念品）
 CREATE TABLE IF NOT EXISTS shareholder_gifts (
@@ -489,9 +500,19 @@ async function doLogin(e) {
   if (e) e.preventDefault();
   const key = document.getElementById('adminKeyInput').value.trim();
   if (!key) return;
+
+  // 本機開啟時從欄位取得 API URL
+  const apiUrlEl = document.getElementById('apiUrlInput');
+  if (apiUrlEl?.value.trim()) {
+    _apiBase = apiUrlEl.value.trim().replace(/\/$/, '') + '/api/news';
+  } else if (!_apiBase) {
+    document.getElementById('loginErr').textContent = '本機開啟時請填入 API 網址';
+    return;
+  }
+
   document.getElementById('loginBtn').textContent = '驗證中…';
   try {
-    const r = await fetch(`${API_BASE}?endpoint=gifts_admin`, {
+    const r = await fetch(`${_apiBase}?endpoint=gifts_admin`, {
       headers: { 'x-admin-key': key }, signal: AbortSignal.timeout(6000)
     });
     if (r.status === 401) throw new Error('金鑰錯誤');
@@ -688,7 +709,7 @@ async function saveGift() {
 
   document.getElementById('saveBtn').textContent = '儲存中…';
   try {
-    const r = await fetch(`${API_BASE}?endpoint=gifts_admin`, {
+    const r = await fetch(`${_apiBase}?endpoint=gifts_admin`, {
       method: 'POST',
       headers: { 'x-admin-key': _adminKey, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -716,7 +737,7 @@ async function saveGift() {
 async function deleteGift(id, name) {
   if (!confirm(`確定要刪除「${name}」嗎？`)) return;
   try {
-    const r = await fetch(`${API_BASE}?endpoint=gifts_admin&id=${encodeURIComponent(id)}`, {
+    const r = await fetch(`${_apiBase}?endpoint=gifts_admin&id=${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: { 'x-admin-key': _adminKey },
       signal: AbortSignal.timeout(6000),
@@ -750,7 +771,7 @@ async function runImport() {
   let ok=0, fail=0;
   for (const row of rows) {
     try {
-      const r = await fetch(`${API_BASE}?endpoint=gifts_admin`, {
+      const r = await fetch(`${_apiBase}?endpoint=gifts_admin`, {
         method: 'POST',
         headers: { 'x-admin-key': _adminKey, 'Content-Type': 'application/json' },
         body: JSON.stringify(row), signal: AbortSignal.timeout(8000),
@@ -768,7 +789,7 @@ async function runImport() {
 
   // Refresh data
   if (ok > 0) {
-    const r = await fetch(`${API_BASE}?endpoint=gifts_admin`, { headers: { 'x-admin-key': _adminKey } });
+    const r = await fetch(`${_apiBase}?endpoint=gifts_admin`, { headers: { 'x-admin-key': _adminKey } });
     if (r.ok) { _allData = await r.json(); updateStats(); renderTable(); }
   }
   showToast(`匯入完成：${ok} 成功 / ${fail} 失敗`);
