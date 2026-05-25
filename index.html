@@ -1284,6 +1284,263 @@
   .inst-alert-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.85rem; font-size: 0.75rem; border-bottom: 1px solid var(--border); }
   .inst-alert-item:last-child { border-bottom: none; }
 
+  /* ══ 深色模式 ══════════════════════════════════════════════════════════ */
+  [data-theme="dark"] {
+    --bg:          #0d0d11;
+    --surface:     #16161e;
+    --border:      #24243080;
+    --border-dark: #303040;
+    --text:        #e4e3dd;
+    --muted:       #7a7a8a;
+    --card-bg:     #16161e;
+    --tag-bg:      #1e1e2a;
+    --shadow-lg:   0 8px 32px rgba(0,0,0,0.55);
+  }
+  [data-theme="dark"] body { background: var(--bg); }
+  [data-theme="dark"] header { background: #070710; }
+  [data-theme="dark"] .api-config-bar { background: #0f0f18; border-color: var(--border-dark); }
+  [data-theme="dark"] .category-bar { background: var(--surface); border-color: var(--border-dark); }
+  [data-theme="dark"] .cat-tab { color: var(--muted); }
+  [data-theme="dark"] .card { background: var(--surface); }
+  [data-theme="dark"] #marketSummaryBox { background: var(--surface) !important; }
+  [data-theme="dark"] #sentAiSummary { background: var(--surface) !important; color: var(--text) !important; }
+  [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea {
+    background: var(--surface) !important; color: var(--text) !important; border-color: var(--border-dark) !important;
+  }
+  [data-theme="dark"] #stockModalBox,
+  [data-theme="dark"] #screenerBox { background: #13131a; border-color: var(--border-dark); }
+  [data-theme="dark"] #stockModal,
+  [data-theme="dark"] #screenerModal { background: rgba(0,0,0,0.88); }
+  [data-theme="dark"] .wl-item,
+  [data-theme="dark"] .inst-alert-item { border-color: var(--border-dark); }
+  [data-theme="dark"] #dailySummaryBanner { background: var(--surface); border-color: var(--border-dark); }
+  [data-theme="dark"] #watchlistPanel { background: var(--surface); border-color: var(--border-dark); }
+  [data-theme="dark"] .skel-line {
+    background: linear-gradient(90deg,var(--border-dark) 25%,#3a3a50 50%,var(--border-dark) 75%);
+    background-size: 200% 100%;
+  }
+  /* smooth theme transition */
+  *, *::before, *::after {
+    transition-property: background-color, border-color, color;
+    transition-duration: 0.18s;
+    transition-timing-function: ease;
+  }
+  /* but NOT for animations/transforms */
+  .spinner, .live-dot, #signalGaugeArc, [style*="transition"] { transition: inherit !important; }
+
+  /* ── 深色模式切換按鈕 ──────────────────────────────────────────────── */
+  #darkToggle {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: transparent; color: rgba(255,255,255,0.55);
+    cursor: pointer; font-size: 0.9rem; display: flex;
+    align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s !important;
+    flex-shrink: 0;
+  }
+  #darkToggle:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+  /* ── 回到頂部按鈕 ──────────────────────────────────────────────────── */
+  #scrollTopBtn {
+    position: fixed; bottom: 5rem; right: 1.25rem; z-index: 900;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    border: none; cursor: pointer; font-size: 1rem; font-weight: 700;
+    box-shadow: 0 2px 14px rgba(109,86,245,0.4);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.22s, transform 0.22s !important;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
+  #scrollTopBtn.vis { opacity: 1; pointer-events: auto; }
+  #scrollTopBtn:hover { transform: translateY(-3px); box-shadow: 0 4px 18px rgba(109,86,245,0.5); }
+
+  /* ── 手機底部導航欄 ────────────────────────────────────────────────── */
+  #mobileBottomNav {
+    display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 800;
+    background: var(--surface); border-top: 1px solid var(--border-dark);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    padding: 0 0 env(safe-area-inset-bottom);
+    height: 56px;
+  }
+  @media (max-width: 960px) {
+    #mobileBottomNav { display: flex; }
+    body { padding-bottom: 60px; }
+    #scrollTopBtn { bottom: 4.5rem; right: 0.9rem; }
+  }
+  .mbn-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; padding: 0.3rem 0.2rem;
+    border: none; background: transparent; cursor: pointer;
+    color: var(--muted); transition: color 0.12s !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mbn-icon { font-size: 1.15rem; line-height: 1; transition: transform 0.15s !important; }
+  .mbn-label { font-family: 'IBM Plex Mono',monospace; font-size: 0.44rem; letter-spacing: 0.04em; text-transform: uppercase; }
+  .mbn-btn.mbn-active { color: var(--accent); }
+  .mbn-btn.mbn-active .mbn-icon { transform: scale(1.12) translateY(-1px); }
+
+  /* ── 快捷鍵 Toast ──────────────────────────────────────────────────── */
+  #kbdToast {
+    position: fixed; bottom: 4.5rem; left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    background: var(--text); color: var(--bg);
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.62rem;
+    padding: 0.3rem 0.85rem; border-radius: 20px;
+    opacity: 0; pointer-events: none; z-index: 1000;
+    transition: opacity 0.18s, transform 0.18s !important;
+    white-space: nowrap; box-shadow: 0 2px 14px rgba(0,0,0,0.18);
+  }
+  #kbdToast.kshow { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (max-width: 960px) { #kbdToast { bottom: 4rem; } }
+
+  /* ── Category bar 滾動漸層（手機） ────────────────────────────────── */
+  @media (max-width: 960px) {
+    .category-bar {
+      -webkit-mask-image: linear-gradient(to right,transparent,black 5%,black 95%,transparent);
+      mask-image: linear-gradient(to right,transparent,black 5%,black 95%,transparent);
+    }
+  }
+
+  /* ── 統一骨架屏 ───────────────────────────────────────────────────── */
+  .skel-block { padding: 1rem; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+  .skel-line { height: 9px; border-radius: 4px; margin-bottom: 9px; width: 100%;
+    background: linear-gradient(90deg,var(--border) 25%,var(--border-dark) 50%,var(--border) 75%);
+    background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+  .skel-line.w80 { width: 80%; }
+  .skel-line.w60 { width: 60%; }
+  .skel-line.w40 { width: 40%; }
+  .skel-h { height: 14px; }
+
+  /* ══ 股東紀念品 ══════════════════════════════════════════════════════ */
+  #giftsPanel { padding: 0; }
+  .gifts-topbar {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    padding: 0.85rem 1rem 0.6rem; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .gifts-stat-pill {
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.62rem;
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 20px; padding: 0.18rem 0.65rem; color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  .gifts-stat-pill strong { color: var(--text); }
+  .gifts-filter-bar {
+    display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+    padding: 0.6rem 1rem; border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .gifts-filter-label { font-size: 0.63rem; color: var(--muted); font-family: 'IBM Plex Mono',monospace; flex-shrink:0; }
+  .gift-cat-btn {
+    font-size: 0.62rem; padding: 0.18rem 0.6rem; border-radius: 20px;
+    border: 1px solid var(--border); background: transparent; cursor: pointer;
+    color: var(--muted); font-family: 'IBM Plex Mono',monospace;
+    transition: all 0.12s; letter-spacing: 0.02em;
+  }
+  .gift-cat-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .gift-cat-btn.gc-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .gifts-sort-btn {
+    font-size: 0.6rem; padding: 0.18rem 0.6rem; border-radius: 4px;
+    border: 1px solid var(--border); background: transparent; cursor: pointer;
+    color: var(--muted); font-family: 'IBM Plex Mono',monospace;
+    margin-left: auto; transition: all 0.12s;
+  }
+  .gifts-sort-btn:hover { color: var(--text); }
+  .gifts-sort-btn.gs-active { color: var(--text); border-color: var(--border-dark); }
+  .gifts-sort-btn .sort-arr { opacity: 0.4; margin-left: 2px; }
+  .gifts-past-toggle { font-size: 0.62rem; cursor: pointer; color: var(--muted); display:flex; align-items:center; gap:0.3rem; }
+  .gifts-past-toggle input { accent-color: var(--accent); cursor:pointer; }
+
+  .gifts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.85rem; padding: 1rem;
+  }
+  @media (max-width: 600px) { .gifts-grid { grid-template-columns: 1fr; padding: 0.65rem; gap: 0.65rem; } }
+
+  .gift-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    transition: box-shadow 0.18s, transform 0.18s;
+    cursor: default;
+  }
+  .gift-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+  .gift-card.gc-urgent { border-color: #dc262640; }
+  .gift-card.gc-soon   { border-color: #d9770640; }
+  .gift-card.gc-past   { opacity: 0.55; }
+
+  .gift-card-head {
+    padding: 0.65rem 0.85rem 0.5rem;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;
+  }
+  .gift-stock-id {
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.65rem;
+    color: var(--muted); letter-spacing: 0.05em;
+  }
+  .gift-stock-name {
+    font-size: 0.92rem; font-weight: 600; color: var(--text); line-height: 1.2;
+    margin-top: 1px;
+  }
+  .gift-sector-tag {
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.54rem;
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.12rem 0.45rem; color: var(--muted);
+    white-space: nowrap; flex-shrink:0;
+  }
+  .gift-cp-badge {
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.68rem; font-weight: 700;
+    background: #6d56f515; border: 1px solid #6d56f540;
+    border-radius: 20px; padding: 0.15rem 0.55rem; color: var(--accent);
+    white-space: nowrap;
+  }
+  .gift-cp-badge.cp-high { background: #16a34a15; border-color: #16a34a40; color: #16a34a; }
+  .gift-cp-badge.cp-low  { background: var(--tag-bg); border-color: var(--border); color: var(--muted); }
+
+  .gift-card-body { padding: 0 0.85rem 0.6rem; }
+  .gift-desc {
+    font-size: 0.8rem; color: var(--text); line-height: 1.5;
+    display: flex; align-items: flex-start; gap: 0.4rem;
+    border-top: 1px solid var(--border); padding-top: 0.55rem; margin-top: 0.05rem;
+  }
+  .gift-desc-icon { font-size: 0.95rem; flex-shrink:0; margin-top: 1px; }
+
+  .gift-card-foot {
+    padding: 0.5rem 0.85rem; background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.6rem;
+    font-size: 0.65rem;
+  }
+  .gift-foot-item { display: flex; flex-direction: column; gap: 1px; }
+  .gift-foot-label { color: var(--muted); font-family: 'IBM Plex Mono',monospace; font-size: 0.57rem; letter-spacing: 0.04em; }
+  .gift-foot-val { color: var(--text); font-weight: 500; }
+
+  .gift-deadline-badge {
+    display: inline-flex; align-items: center; gap: 0.2rem;
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.58rem;
+    border-radius: 20px; padding: 0.12rem 0.5rem; font-weight: 600;
+    margin-top: 0.3rem;
+  }
+  .gdl-urgent { background: #dc262615; color: #dc2626; border: 1px solid #dc262630; }
+  .gdl-soon   { background: #d9770615; color: #d97706; border: 1px solid #d9770630; }
+  .gdl-ok     { background: #16a34a15; color: #16a34a; border: 1px solid #16a34a30; }
+  .gdl-past   { background: var(--tag-bg); color: var(--muted); border: 1px solid var(--border); }
+
+  .gift-note { font-size: 0.68rem; color: var(--muted); padding: 0.4rem 0.85rem 0.6rem; font-style: italic; }
+
+  .gifts-empty {
+    padding: 3rem 1rem; text-align: center;
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.78rem; color: var(--muted);
+  }
+  .gifts-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+
+  .cat-icon-food    { background: #d9770615; color: #d97706; border-color: #d9770630; }
+  .cat-icon-goods   { background: #2563eb15; color: #2563eb; border-color: #2563eb30; }
+  .cat-icon-voucher { background: #16a34a15; color: #16a34a; border-color: #16a34a30; }
+  .cat-icon-cash    { background: #dc262615; color: #dc2626; border-color: #dc262630; }
+  .cat-icon-3c      { background: #6d56f515; color: var(--accent); border-color: #6d56f530; }
+  .cat-icon-other   { background: var(--tag-bg); color: var(--muted); border-color: var(--border); }
+
 </style>
 </head>
 <body>
@@ -1300,6 +1557,7 @@
       <button class="font-size-btn md active" onclick="setFontSize('medium')" id="fsMedium">A</button>
       <button class="font-size-btn lg" onclick="setFontSize('large')" id="fsLarge">A</button>
     </div>
+    <button id="darkToggle" onclick="toggleDark()" title="切換深色模式（快捷鍵 D）">☀</button>
     <button id="ownerBadge" title="點擊解鎖 Owner 模式"
       style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;padding:0.22rem 0.65rem;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.45);cursor:pointer;transition:all 0.15s;white-space:nowrap;">
       🔐 <span class="hide-mobile">登入</span>
@@ -1313,6 +1571,12 @@
 
 <!-- API Config -->
 <div class="api-config-bar">
+
+<!-- 回到頂部 -->
+<button id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到頂部（快捷鍵 T）">↑</button>
+
+<!-- 快捷鍵 Toast -->
+<div id="kbdToast"></div>
   <div class="api-row">
     <button class="api-fetch-btn" id="fetchBtn" onclick="loadCachedNews()">載入財經新聞</button>
     <button class="api-fetch-btn" id="fetchLiveBtn" onclick="fetchMarketaux()" title="即時從 RSS 抓取最新新聞" style="margin-left:6px;opacity:0.75;font-size:0.78rem;padding:0.3rem 0.7rem;">即時拉取</button>
@@ -1335,6 +1599,7 @@
   <button class="cat-tab cat-tab-tools" id="heatmapTab" onclick="showHeatmap()">🇹🇼 台股熱圖</button>
   <button class="cat-tab cat-tab-tools" id="signalTab" onclick="showSignal()">📡 多空訊號</button>
   <button class="cat-tab cat-tab-tools" id="screenerTab" onclick="openScreener()">🔍 選股篩選</button>
+  <button class="cat-tab cat-tab-tools" id="giftsTab" onclick="showGifts()">🎁 紀念品</button>
 </div>
 
 <main>
@@ -2047,6 +2312,10 @@
       </div>
       <!-- 市場摘要 -->
       <div id="alphaMarketText" style="font-size:0.85rem;color:var(--text);line-height:1.65;white-space:pre-line;"></div>
+      <!-- 主導者 / 散戶訊號 / 融資警示 -->
+      <div id="alphaMetaBar" style="display:none;flex-wrap:wrap;gap:0.4rem;margin-top:0.6rem;"></div>
+      <!-- 空手建議橫幅 -->
+      <div id="alphaCashBar" style="display:none;align-items:center;gap:0.4rem;margin-top:0.5rem;padding:0.4rem 0.7rem;background:rgba(217,119,6,0.08);border-left:3px solid #d97706;border-radius:0 6px 6px 0;"></div>
       <!-- Alpha 警語 -->
       <div id="alphaNote" style="font-size:0.78rem;color:var(--accent);margin-top:0.6rem;padding:0.45rem 0.7rem;background:rgba(99,102,241,0.07);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;line-height:1.5;display:none;"></div>
     </div>
@@ -2099,6 +2368,36 @@
   </div>
 
     </div><!-- end signalPanel -->
+
+    <!-- 股東紀念品面板 -->
+    <div id="giftsPanel" style="display:none;">
+      <div class="gifts-topbar">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.04em;">🎁 股東紀念品</span>
+        <div class="gifts-stat-pill" id="giftStatTotal">—</div>
+        <div class="gifts-stat-pill" id="giftStatSoon">—</div>
+        <div class="gifts-stat-pill" id="giftStatAvgCP">—</div>
+        <a href="/gifts-admin.html" target="_blank" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:0.15rem 0.55rem;border-radius:4px;">管理後台 →</a>
+      </div>
+      <div class="gifts-filter-bar">
+        <span class="gifts-filter-label">類別：</span>
+        <button class="gift-cat-btn gc-active" data-gcat="" onclick="setGiftCat(this,'')">全部</button>
+        <button class="gift-cat-btn" data-gcat="food"    onclick="setGiftCat(this,'food')">🍱 食品</button>
+        <button class="gift-cat-btn" data-gcat="goods"   onclick="setGiftCat(this,'goods')">🧴 日用品</button>
+        <button class="gift-cat-btn" data-gcat="voucher" onclick="setGiftCat(this,'voucher')">🎫 儲值卡</button>
+        <button class="gift-cat-btn" data-gcat="cash"    onclick="setGiftCat(this,'cash')">💵 現金等值</button>
+        <button class="gift-cat-btn" data-gcat="3c"      onclick="setGiftCat(this,'3c')">📱 3C</button>
+        <button class="gift-cat-btn" data-gcat="other"   onclick="setGiftCat(this,'other')">其他</button>
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;flex-wrap:wrap;">
+          <label class="gifts-past-toggle"><input type="checkbox" id="giftShowPast" onchange="reRenderGifts()"> 顯示已截止</label>
+          <button class="gifts-sort-btn gs-active" id="gsortDeadline" onclick="setGiftSort('deadline')">截止日 <span class="sort-arr">↑</span></button>
+          <button class="gifts-sort-btn" id="gsortCP" onclick="setGiftSort('cp')">CP值 <span class="sort-arr">↓</span></button>
+          <button class="gifts-sort-btn" id="gsortVal" onclick="setGiftSort('val')">估值 <span class="sort-arr">↓</span></button>
+        </div>
+      </div>
+      <div class="gifts-grid" id="giftsGrid">
+        <div class="gifts-empty"><div class="gifts-empty-icon">⏳</div>載入中…</div>
+      </div>
+    </div><!-- end giftsPanel -->
 
     <button class="load-more" id="loadMoreBtn" style="display:none" onclick="loadMore()">載入更多 ↓</button>
   </div><!-- end left column -->
@@ -3120,6 +3419,7 @@ document.querySelectorAll('.cat-tab[data-cat]').forEach(tab => {
     if (nf) nf.style.display = 'block';
     if (fh) fh.style.display = 'flex';
     renderFeed(getFiltered());
+    mbnSetActive('news');
   });
 });
 
@@ -3423,6 +3723,7 @@ function showSentiment() {
   document.getElementById('heatmapPanel').style.display = 'none';
   document.getElementById('signalPanel').style.display = 'none';
   document.getElementById('sentimentPanel').style.display = 'block';
+  mbnSetActive('news'); // 社群情緒歸類在新聞區
 }
 
 function hideSentiment() {
@@ -3855,6 +4156,7 @@ function showHeatmap() {
   }
   // 只在有快取資料時刷新 bar（避免與 loadHeatmap 入口重複發請求）
   if (heatmapData.length) loadSectorIndexBar();
+  mbnSetActive('heatmap');
 }
 
 function showSignal() {
@@ -3870,6 +4172,7 @@ function showSignal() {
   loadMktSignals();
   initAlphaIfNeeded();
   loadChipsPanel();  // 籌碼面板
+  mbnSetActive('signal');
 }
 
 function hideHeatmap() {
@@ -4823,12 +5126,166 @@ function showFutures() {
   document.getElementById('signalPanel').style.display = 'none';
   document.getElementById('futuresPanel').style.display = 'block';
   if (!futuresData.length) loadFutures();
+  mbnSetActive('futures');
 }
 
 function hideFutures() {
   document.getElementById('futuresPanel').style.display = 'none';
   document.getElementById('newsFeed').style.display = 'block';
   document.querySelector('.feed-header').style.display = 'flex';
+}
+
+// ══════════════════════════════════════════════════════════════
+// 股東紀念品
+// ══════════════════════════════════════════════════════════════
+let _giftsData = null;
+let _giftCat   = '';
+let _giftSort  = 'deadline'; // deadline | cp | val
+
+function showGifts() {
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('giftsTab').classList.add('active');
+  ['newsFeed','loadMoreBtn','sentimentPanel','futuresPanel','heatmapPanel','signalPanel'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  const fh = document.querySelector('.feed-header'); if (fh) fh.style.display = 'none';
+  document.getElementById('giftsPanel').style.display = 'block';
+  mbnSetActive('news');
+  if (!_giftsData) loadGifts();
+  else reRenderGifts();
+}
+
+async function loadGifts() {
+  try {
+    const r = await fetch('/api/news?endpoint=gifts&show_past=1', { signal: AbortSignal.timeout(8000) });
+    _giftsData = r.ok ? await r.json() : [];
+    reRenderGifts();
+  } catch(e) {
+    document.getElementById('giftsGrid').innerHTML = `<div class="gifts-empty"><div class="gifts-empty-icon">⚠️</div>無法載入紀念品資料<br><span style="font-size:0.65rem">${e.message}</span></div>`;
+  }
+}
+
+function reRenderGifts() {
+  if (!_giftsData) return;
+  const showPast = document.getElementById('giftShowPast')?.checked;
+  const today = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
+
+  let data = _giftsData
+    .filter(g => _giftCat ? g.gift_category === _giftCat : true)
+    .filter(g => showPast ? true : g.record_date >= today);
+
+  // Sort
+  if (_giftSort === 'deadline') data.sort((a,b) => (a.record_date||'') < (b.record_date||'') ? -1 : 1);
+  if (_giftSort === 'cp')       data.sort((a,b) => (b.cp_ratio||0) - (a.cp_ratio||0));
+  if (_giftSort === 'val')      data.sort((a,b) => (b.gift_value_est||0) - (a.gift_value_est||0));
+
+  // Stats
+  const total    = data.length;
+  const upcoming = data.filter(g => g.record_date >= today).length;
+  const soonList = data.filter(g => { const d = daysUntilDate(g.record_date); return d >= 0 && d <= 14; });
+  const avgCP    = data.filter(g=>g.cp_ratio>0).reduce((s,g,_,a)=>s+g.cp_ratio/a.length,0);
+  document.getElementById('giftStatTotal').innerHTML = `共 <strong>${total}</strong> 筆`;
+  document.getElementById('giftStatSoon').innerHTML  = `本月截止 <strong>${soonList.length}</strong> 筆`;
+  document.getElementById('giftStatAvgCP').innerHTML = avgCP>0 ? `平均CP <strong>${avgCP.toFixed(2)}%</strong>` : `平均CP <strong>—</strong>`;
+
+  if (!data.length) {
+    document.getElementById('giftsGrid').innerHTML = `<div class="gifts-empty"><div class="gifts-empty-icon">🎁</div>目前無符合條件的紀念品</div>`;
+    return;
+  }
+  document.getElementById('giftsGrid').innerHTML = data.map(giftCard).join('');
+}
+
+function daysUntilDate(dateStr) {
+  if (!dateStr) return -999;
+  const today = new Date(Date.now() + 8*3600000);
+  today.setUTCHours(0,0,0,0);
+  const target = new Date(dateStr + 'T00:00:00Z');
+  return Math.round((target - today) / 86400000);
+}
+
+// 持股門檻顯示：以股為單位，整千股顯示為張
+function fmtShares(n) {
+  const s = parseInt(n) || 1000;
+  if (s >= 1000 && s % 1000 === 0) return `${s/1000}張（${s.toLocaleString()}股）以上`;
+  return `${s.toLocaleString()}股以上`;
+}
+
+const CAT_META = {
+  food:    { icon:'🍱', label:'食品',     cls:'cat-icon-food'    },
+  goods:   { icon:'🧴', label:'日用品',   cls:'cat-icon-goods'   },
+  voucher: { icon:'🎫', label:'儲值卡',   cls:'cat-icon-voucher' },
+  cash:    { icon:'💵', label:'現金等值', cls:'cat-icon-cash'    },
+  '3c':    { icon:'📱', label:'3C',       cls:'cat-icon-3c'      },
+  other:   { icon:'🎁', label:'其他',     cls:'cat-icon-other'   },
+};
+function catMeta(c) { return CAT_META[c] || CAT_META.other; }
+
+function giftCard(g) {
+  const days   = daysUntilDate(g.record_date);
+  const isPast = days < 0;
+  const meta   = catMeta(g.gift_category);
+  const cp     = g.cp_ratio ? parseFloat(g.cp_ratio) : null;
+  const cpCls  = cp == null ? '' : cp >= 2 ? 'cp-high' : cp < 0.5 ? 'cp-low' : '';
+  const cpStr  = cp != null ? `CP ${cp.toFixed(2)}%` : 'CP —';
+
+  let urgency = '', deadlineBadge = '';
+  if (isPast) {
+    urgency = 'gc-past';
+    deadlineBadge = `<span class="gift-deadline-badge gdl-past">● 已截止</span>`;
+  } else if (days <= 7) {
+    urgency = 'gc-urgent';
+    deadlineBadge = `<span class="gift-deadline-badge gdl-urgent">● ${days === 0 ? '今天截止！' : days + '天後截止'}</span>`;
+  } else if (days <= 30) {
+    urgency = 'gc-soon';
+    deadlineBadge = `<span class="gift-deadline-badge gdl-soon">● ${days}天後截止</span>`;
+  } else {
+    deadlineBadge = `<span class="gift-deadline-badge gdl-ok">● ${days}天後截止</span>`;
+  }
+
+  const valStr = g.gift_value_est ? `NT$${Number(g.gift_value_est).toLocaleString()}` : '—';
+  const refStr = g.share_price_ref ? `NT$${Number(g.share_price_ref).toFixed(1)}` : '—';
+
+  return `
+<div class="gift-card ${urgency}">
+  <div class="gift-card-head">
+    <div>
+      <div class="gift-stock-id">${g.stock_id || '—'}</div>
+      <div class="gift-stock-name">${g.stock_name || '—'}</div>
+      ${deadlineBadge}
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;">
+      <span class="gift-cp-badge ${cpCls}">${cpStr}</span>
+      <span class="gift-sector-tag ${meta.cls}">${meta.icon} ${meta.label}</span>
+      ${g.sector ? `<span class="gift-sector-tag">${g.sector}</span>` : ''}
+    </div>
+  </div>
+  <div class="gift-card-body">
+    <div class="gift-desc"><span class="gift-desc-icon">${meta.icon}</span><span>${g.gift_desc || '—'}</span></div>
+  </div>
+  <div class="gift-card-foot">
+    <div class="gift-foot-item"><span class="gift-foot-label">停止過戶</span><span class="gift-foot-val">${g.record_date || '—'}</span></div>
+    <div class="gift-foot-item"><span class="gift-foot-label">股東會日期</span><span class="gift-foot-val">${g.meeting_date || '—'}</span></div>
+    <div class="gift-foot-item"><span class="gift-foot-label">禮品估值</span><span class="gift-foot-val">${valStr}</span></div>
+    <div class="gift-foot-item"><span class="gift-foot-label">持有門檻</span><span class="gift-foot-val">${fmtShares(g.share_required)}</span></div>
+    <div class="gift-foot-item"><span class="gift-foot-label">參考股價</span><span class="gift-foot-val">${refStr}</span></div>
+    ${g.source_url ? `<div class="gift-foot-item"><a href="${g.source_url}" target="_blank" style="font-size:0.6rem;color:var(--accent);text-decoration:none;">來源 →</a></div>` : '<div></div>'}
+  </div>
+  ${g.note ? `<div class="gift-note">※ ${g.note}</div>` : ''}
+</div>`;
+}
+
+function setGiftCat(btn, cat) {
+  document.querySelectorAll('.gift-cat-btn').forEach(b => b.classList.remove('gc-active'));
+  btn.classList.add('gc-active');
+  _giftCat = cat;
+  reRenderGifts();
+}
+
+function setGiftSort(s) {
+  _giftSort = s;
+  document.querySelectorAll('.gifts-sort-btn').forEach(b => b.classList.remove('gs-active'));
+  document.getElementById('gsort' + s.charAt(0).toUpperCase() + s.slice(1))?.classList.add('gs-active');
+  reRenderGifts();
 }
 
 function setGroqStatus(msg, type) {
@@ -5736,6 +6193,38 @@ async function renderAlphaResult(data) {
   // 市場摘要（支援段落換行）
   document.getElementById('alphaMarketText').textContent = data.market_summary || '';
 
+  // ── 新增：主導者 / 散戶訊號 / 空手建議 / 融資警示 ──
+  const metaBar = document.getElementById('alphaMetaBar');
+  if (metaBar) {
+    const dominant = data.dominant_player || '';
+    const retail   = data.retail_signal  || '';
+    const margin   = data.margin_alert   || '';
+    const cashSug  = data.suggest_cash;
+    const cashRsn  = data.cash_reason    || '';
+
+    const dominantColor = dominant.includes('外資') ? 'var(--up)' : dominant.includes('散戶') ? 'var(--down)' : 'var(--accent)';
+    const retailColor   = retail.includes('警戒') ? 'var(--down)' : retail.includes('機會') ? 'var(--up)' : 'var(--muted)';
+    const marginColor   = margin.includes('危機') ? 'var(--down)' : margin.includes('注意') ? '#d97706' : 'var(--muted)';
+
+    metaBar.innerHTML = [
+      dominant ? `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:rgba(128,128,128,0.1);color:${dominantColor};font-weight:600;">👤 ${dominant}</span>` : '',
+      retail   ? `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:rgba(128,128,128,0.1);color:${retailColor};font-weight:600;">散戶：${retail}</span>` : '',
+      margin   ? `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:rgba(128,128,128,0.1);color:${marginColor};font-weight:600;">融資：${margin}</span>` : '',
+    ].filter(Boolean).join('');
+    metaBar.style.display = metaBar.innerHTML ? 'flex' : 'none';
+
+    // 空手建議橫幅
+    const cashBar = document.getElementById('alphaCashBar');
+    if (cashBar) {
+      if (cashSug) {
+        cashBar.innerHTML = `<span style="font-size:0.75rem;font-weight:700;color:#d97706;">💰 今日建議空手觀望</span><span style="font-size:0.65rem;color:var(--muted);margin-left:0.5rem;">${cashRsn}</span>`;
+        cashBar.style.display = 'flex';
+      } else {
+        cashBar.style.display = 'none';
+      }
+    }
+  }
+
   // Alpha 警語
   const noteEl = document.getElementById('alphaNote');
   if (data.alpha_note) {
@@ -5808,6 +6297,7 @@ async function renderAlphaResult(data) {
         <span style="font-weight:700;font-size:0.95rem;color:var(--text);">${rec.stock_id} ${rec.stock_name || ''}</span>
         <span style="font-size:0.68rem;padding:2px 8px;border-radius:99px;background:${as.bg};color:${as.color};border:1px solid ${as.border};font-weight:600;">${rec.action}</span>
         <span style="font-size:0.68rem;padding:2px 7px;border-radius:99px;background:var(--bg);color:var(--muted);border:1px solid var(--border);">${rec.style || ''}</span>
+        <span style="font-size:0.55rem;padding:1px 5px;border-radius:3px;background:rgba(99,102,241,0.1);color:var(--accent);font-weight:500;">${rec.signal_source || ''}</span>
         ${(()=>{
           const confMap = { '高': { score: 9, color: 'var(--up)', label: '高' }, '中': { score: 6, color: '#d97706', label: '中' }, '低': { score: 3, color: 'var(--down)', label: '低' } };
           const c = confMap[rec.confidence] || { score: 5, color: 'var(--muted)', label: rec.confidence || '-' };
@@ -7235,12 +7725,162 @@ async function runAlphaBacktest() {
 // ── 在頁面初始化時啟動今日總結 ──
 document.addEventListener('DOMContentLoaded', () => {
   loadDailySummary();
+  initDark();
+  initScrollTop();
+  initMobileNav();
 });
 // 若 DOMContentLoaded 已過（script defer），直接執行
 if (document.readyState !== 'loading') loadDailySummary();
 
-// ESC 關閉選股 Modal
+// ══════════════════════════════════════════
+// 深色模式
+// ══════════════════════════════════════════
+function initDark() {
+  const saved = localStorage.getItem('alphascope-theme');
+  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme:dark)').matches)) {
+    document.documentElement.setAttribute('data-theme','dark');
+    document.getElementById('darkToggle').textContent = '☾';
+  }
+}
+function toggleDark() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  localStorage.setItem('alphascope-theme', isDark ? 'light' : 'dark');
+  document.getElementById('darkToggle').textContent = isDark ? '☀' : '☾';
+  showToast(isDark ? '☀ 淺色模式' : '☾ 深色模式');
+}
+
+// ══════════════════════════════════════════
+// 回到頂部
+// ══════════════════════════════════════════
+function initScrollTop() {
+  const btn = document.getElementById('scrollTopBtn');
+  if (!btn) return;
+  window.addEventListener('scroll', () => {
+    btn.classList.toggle('vis', window.scrollY > 400);
+  }, { passive: true });
+}
+
+// ══════════════════════════════════════════
+// Toast 通知
+// ══════════════════════════════════════════
+let _toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('kbdToast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('kshow');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('kshow'), 1800);
+}
+
+// ══════════════════════════════════════════
+// 手機底部導航
+// ══════════════════════════════════════════
+function initMobileNav() {
+  // 初始化：新聞 tab 設為 active
+  mbnSetActive('news');
+}
+function mbnSetActive(id) {
+  document.querySelectorAll('.mbn-btn').forEach(b => b.classList.toggle('mbn-active', b.dataset.tab === id));
+}
+function mbnSelect(tab) {
+  mbnSetActive(tab);
+  switch(tab) {
+    case 'news':
+      // 隱藏其他面板，回到新聞
+      ['futuresPanel','sentimentPanel','heatmapPanel','signalPanel'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.style.display = 'none';
+      });
+      ['newsFeed','dailySummaryBanner','instAlertBar'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.style.display = '';
+      });
+      break;
+    case 'alpha':
+      showSignal();
+      break;
+    case 'signal':
+      showSignal();
+      break;
+    case 'heatmap':
+      showHeatmap();
+      break;
+    case 'futures':
+      showFutures();
+      break;
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ══════════════════════════════════════════
+// 鍵盤快捷鍵（擴充版）
+// ══════════════════════════════════════════
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeScreener();
+  // 若焦點在輸入框就跳過
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+    if (e.key === 'Escape') { e.target.blur(); closeScreener(); }
+    return;
+  }
+  switch (e.key) {
+    case 'Escape':
+      closeScreener();
+      break;
+    case 'd': case 'D':
+      toggleDark(); break;
+    case 't': case 'T':
+      window.scrollTo({top:0,behavior:'smooth'});
+      showToast('↑ 回到頂部');
+      break;
+    case '1':
+      // 全部新聞
+      document.querySelector('.cat-tab[data-cat="general"]')?.click();
+      showToast('📰 全部新聞');
+      break;
+    case '2':
+      document.querySelector('.cat-tab[data-cat="tech"]')?.click();
+      showToast('💻 科技');
+      break;
+    case '3':
+      document.querySelector('.cat-tab[data-cat="economy"]')?.click();
+      showToast('📈 經濟');
+      break;
+    case '4':
+      document.querySelector('.cat-tab[data-cat="geopolitics"]')?.click();
+      showToast('🌐 地緣政治');
+      break;
+    case '5':
+      showFutures(); showToast('📊 全球商品'); break;
+    case '6':
+      showSentiment(); showToast('🌐 社群情緒'); break;
+    case '7':
+      showHeatmap(); showToast('🇹🇼 台股熱圖'); break;
+    case '8':
+      showSignal(); showToast('📡 多空訊號'); break;
+    case '9':
+      showGifts(); showToast('🎁 股東紀念品'); break;
+    case '?':
+      showToast('D=深色 T=頂部 1-4=新聞類別 5-9=功能面板');
+      setTimeout(() => showToast('D=深色 T=頂部 1-4=新聞類別 5-9=功能面板'), 0);
+      break;
+  }
 });
 </script>
+
+<!-- ── 手機底部導航欄 ── -->
+<nav id="mobileBottomNav" aria-label="主要導航">
+  <button class="mbn-btn mbn-active" data-tab="news" onclick="mbnSelect('news')">
+    <span class="mbn-icon">📰</span><span class="mbn-label">新聞</span>
+  </button>
+  <button class="mbn-btn" data-tab="futures" onclick="mbnSelect('futures')">
+    <span class="mbn-icon">📊</span><span class="mbn-label">商品</span>
+  </button>
+  <button class="mbn-btn" data-tab="heatmap" onclick="mbnSelect('heatmap')">
+    <span class="mbn-icon">🇹🇼</span><span class="mbn-label">熱圖</span>
+  </button>
+  <button class="mbn-btn" data-tab="signal" onclick="mbnSelect('signal')">
+    <span class="mbn-icon">📡</span><span class="mbn-label">訊號</span>
+  </button>
+  <button class="mbn-btn" data-tab="alpha" onclick="mbnSelect('alpha')">
+    <span class="mbn-icon">⚡</span><span class="mbn-label">Alpha</span>
+  </button>
+</nav>
