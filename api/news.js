@@ -1865,6 +1865,10 @@ ${redditTitles || '無'}
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
     const ADMIN_KEY    = process.env.ADMIN_KEY || 'alphascope-admin-2026';
+
+    if (!SUPABASE_URL || !SUPABASE_KEY)
+      return res.status(500).json({ error: 'SUPABASE_URL 或 SUPABASE_SERVICE_KEY 未設定，請確認 Vercel 環境變數' });
+
     if (req.headers['x-admin-key'] !== ADMIN_KEY)
       return res.status(401).json({ error: 'Unauthorized' });
 
@@ -1872,10 +1876,23 @@ ${redditTitles || '無'}
 
     // LIST
     if (method === 'GET') {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/shareholder_gifts?order=record_date.asc&limit=1000&select=*`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(6000) });
-      const data = await r.json();
-      return res.status(r.status).json(data);
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/shareholder_gifts?order=record_date.asc&limit=1000&select=*`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(6000) });
+        if (!r.ok) {
+          const errText = await r.text();
+          // 資料表尚未建立時回空陣列，讓登入仍可成功
+          if (r.status === 400 || r.status === 404) {
+            console.warn('[gifts_admin] Supabase', r.status, errText.slice(0,120));
+            return res.status(200).json([]);
+          }
+          return res.status(r.status).json({ error: errText.slice(0, 200) });
+        }
+        const data = await r.json();
+        return res.status(200).json(data);
+      } catch(e) {
+        return res.status(500).json({ error: e.message });
+      }
     }
 
     // UPSERT (POST)
