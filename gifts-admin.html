@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎁 紀念品管理後台 — AlphaScope</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg:       #f5f3ee; --surface: #fff; --border: #e5e0d8;
+    --border-dark: #ccc6bb; --text: #1a1916; --muted: #7a7570;
+    --accent: #6d56f5; --card-bg: #fff; --tag-bg: #f0ede8;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --green: #16a34a; --red: #dc2626; --orange: #d97706;
+  }
+  [data-theme="dark"] {
+    --bg: #0d0d11; --surface: #16161e; --border: #242430;
+    --border-dark: #303040; --text: #e4e3dd; --muted: #7a7a8a;
+    --card-bg: #16161e; --tag-bg: #1e1e2a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+  a { color: var(--accent); }
+
+  /* ── Header ── */
+  header {
+    background: #0a0916; color: #fff; padding: 0.75rem 1.25rem;
+    display: flex; align-items: center; gap: 1rem;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .h-logo { font-family: 'IBM Plex Mono',monospace; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.06em; }
+  .h-logo span { color: #818cf8; }
+  .h-sub { font-family: 'IBM Plex Mono',monospace; font-size: 0.62rem; color: rgba(255,255,255,0.4); }
+  .h-right { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
+  .h-badge { font-family: 'IBM Plex Mono',monospace; font-size: 0.58rem; background: rgba(109,86,245,0.2); border: 1px solid rgba(109,86,245,0.4); color: #818cf8; border-radius: 20px; padding: 0.12rem 0.55rem; }
+  #darkBtn { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.5); border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 0.85rem; }
+
+  /* ── Login gate ── */
+  #loginGate {
+    max-width: 360px; margin: 5rem auto; padding: 2rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: var(--shadow); text-align: center;
+  }
+  #loginGate h2 { font-family: 'IBM Plex Mono',monospace; font-size: 1rem; margin-bottom: 0.5rem; }
+  #loginGate p { font-size: 0.75rem; color: var(--muted); margin-bottom: 1.5rem; }
+  #adminKeyInput {
+    width: 100%; padding: 0.6rem 0.85rem; border: 1px solid var(--border);
+    border-radius: 8px; font-family: 'IBM Plex Mono',monospace; font-size: 0.8rem;
+    background: var(--bg); color: var(--text); margin-bottom: 0.75rem; outline: none;
+  }
+  #adminKeyInput:focus { border-color: var(--accent); }
+  #loginBtn {
+    width: 100%; padding: 0.65rem; background: var(--accent); color: #fff;
+    border: none; border-radius: 8px; cursor: pointer;
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.8rem; font-weight: 700;
+  }
+  #loginBtn:hover { opacity: 0.9; }
+  #loginErr { color: var(--red); font-size: 0.7rem; margin-top: 0.5rem; min-height: 1em; }
+
+  /* ── Main layout ── */
+  #app { display: none; }
+  .app-wrap { max-width: 1200px; margin: 0 auto; padding: 1.25rem; }
+
+  /* ── Stats bar ── */
+  .stats-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.75rem 1rem; flex: 1; min-width: 140px;
+  }
+  .stat-label { font-family: 'IBM Plex Mono',monospace; font-size: 0.58rem; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; }
+  .stat-val { font-family: 'IBM Plex Mono',monospace; font-size: 1.4rem; font-weight: 700; color: var(--text); margin-top: 2px; }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .btn {
+    padding: 0.45rem 1rem; border-radius: 7px; border: 1px solid var(--border);
+    cursor: pointer; font-family: 'IBM Plex Mono',monospace; font-size: 0.7rem;
+    background: var(--surface); color: var(--text); transition: all 0.12s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
+  .btn.btn-primary:hover { opacity: 0.88; color: #fff; }
+  .btn.btn-danger { border-color: #dc262640; color: var(--red); }
+  .btn.btn-danger:hover { background: #dc262610; }
+  .btn.btn-sm { padding: 0.25rem 0.65rem; font-size: 0.62rem; }
+  .toolbar-right { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+  .search-input {
+    padding: 0.4rem 0.75rem; border: 1px solid var(--border); border-radius: 7px;
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.7rem;
+    background: var(--surface); color: var(--text); outline: none; width: 200px;
+  }
+  .search-input:focus { border-color: var(--accent); }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  thead tr { background: var(--tag-bg); }
+  th { padding: 0.6rem 0.75rem; text-align: left; font-family: 'IBM Plex Mono',monospace; font-size: 0.6rem; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; border-bottom: 1px solid var(--border); font-weight: 600; cursor: pointer; user-select: none; }
+  th:hover { color: var(--text); }
+  th .sort-ind { opacity: 0.4; margin-left: 3px; }
+  th.sorted .sort-ind { opacity: 1; }
+  td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--tag-bg); }
+  .tr-urgent td:first-child { border-left: 3px solid var(--red); }
+  .tr-soon   td:first-child { border-left: 3px solid var(--orange); }
+  .tr-past   { opacity: 0.5; }
+  .deadline-pill {
+    display: inline-block; font-family: 'IBM Plex Mono',monospace; font-size: 0.58rem;
+    border-radius: 20px; padding: 0.1rem 0.45rem; font-weight: 600;
+  }
+  .dl-urgent { background: #dc262615; color: var(--red); }
+  .dl-soon   { background: #d9770615; color: var(--orange); }
+  .dl-ok     { background: #16a34a15; color: var(--green); }
+  .dl-past   { background: var(--tag-bg); color: var(--muted); }
+  .cp-badge { font-family: 'IBM Plex Mono',monospace; font-size: 0.65rem; font-weight: 700; }
+  .cp-high { color: var(--green); } .cp-low { color: var(--muted); }
+  .cat-chip {
+    display: inline-block; font-size: 0.6rem; border-radius: 4px;
+    padding: 0.1rem 0.4rem; background: var(--tag-bg); color: var(--muted);
+    font-family: 'IBM Plex Mono',monospace;
+  }
+  .empty-row td { text-align: center; padding: 2.5rem; color: var(--muted); font-family: 'IBM Plex Mono',monospace; font-size: 0.75rem; }
+
+  /* ── Modal ── */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500;
+    display: none; align-items: flex-start; justify-content: center;
+    padding: 2rem 1rem; overflow-y: auto;
+  }
+  .modal-bg.open { display: flex; }
+  .modal-box {
+    background: var(--surface); border: 1px solid var(--border-dark);
+    border-radius: 16px; padding: 1.75rem; width: 100%; max-width: 600px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.25); position: relative; flex-shrink: 0;
+  }
+  .modal-title { font-family: 'IBM Plex Mono',monospace; font-size: 0.9rem; font-weight: 700; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+  .modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--muted); line-height: 1; }
+  .modal-close:hover { color: var(--text); }
+
+  /* ── Form ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+  @media (max-width: 500px) { .form-grid { grid-template-columns: 1fr; } }
+  .form-grid .span2 { grid-column: 1 / -1; }
+  .field { display: flex; flex-direction: column; gap: 0.3rem; }
+  .field label { font-family: 'IBM Plex Mono',monospace; font-size: 0.6rem; color: var(--muted); letter-spacing: 0.04em; }
+  .field label .req { color: var(--red); margin-left: 2px; }
+  .field input, .field select, .field textarea {
+    padding: 0.5rem 0.7rem; border: 1px solid var(--border); border-radius: 7px;
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.75rem;
+    background: var(--bg); color: var(--text); outline: none;
+    transition: border-color 0.12s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 64px; font-family: 'Noto Sans TC',sans-serif; font-size: 0.8rem; }
+  .field .hint { font-size: 0.6rem; color: var(--muted); }
+  .cp-preview { font-family: 'IBM Plex Mono',monospace; font-size: 0.72rem; color: var(--accent); font-weight: 700; padding: 0.35rem 0; }
+  .form-actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+  /* ── Import modal ── */
+  .import-box textarea {
+    width: 100%; min-height: 220px; font-family: 'IBM Plex Mono',monospace;
+    font-size: 0.65rem; padding: 0.75rem; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--text); outline: none;
+    resize: vertical;
+  }
+  .import-schema { margin-top: 0.75rem; padding: 0.75rem; background: var(--tag-bg); border-radius: 8px; font-family: 'IBM Plex Mono',monospace; font-size: 0.62rem; color: var(--muted); overflow-x: auto; white-space: pre; line-height: 1.6; }
+  .import-log { margin-top: 0.75rem; font-family: 'IBM Plex Mono',monospace; font-size: 0.65rem; max-height: 120px; overflow-y: auto; padding: 0.5rem; background: var(--tag-bg); border-radius: 6px; line-height: 1.7; }
+
+  /* ── SQL modal ── */
+  .sql-block { background: #0a0916; color: #a5b4fc; font-family: 'IBM Plex Mono',monospace; font-size: 0.65rem; padding: 1rem; border-radius: 8px; overflow-x: auto; white-space: pre; line-height: 1.7; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(8px);
+    background: var(--text); color: var(--bg); font-family: 'IBM Plex Mono',monospace;
+    font-size: 0.65rem; padding: 0.3rem 1rem; border-radius: 20px;
+    opacity: 0; pointer-events: none; z-index: 900;
+    transition: opacity 0.2s, transform 0.2s; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="h-logo">Alpha<span>Scope</span></div>
+    <div class="h-sub">🎁 股東紀念品 · 管理後台</div>
+  </div>
+  <div class="h-right">
+    <span class="h-badge" id="authBadge" style="display:none">● 已認證</span>
+    <button id="darkBtn" onclick="toggleDark()">☀</button>
+  </div>
+</header>
+
+<!-- Login Gate -->
+<div id="loginGate" class="app-wrap">
+  <div>
+    <h2>🔐 後台認證</h2>
+    <p>請輸入管理員金鑰（ADMIN_KEY）</p>
+    <input id="adminKeyInput" type="password" placeholder="輸入 Admin Key…" onkeydown="if(e.key==='Enter')doLogin(event)">
+    <button id="loginBtn" onclick="doLogin()">登入 →</button>
+    <div id="loginErr"></div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+  <div class="app-wrap">
+
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-card"><div class="stat-label">總筆數</div><div class="stat-val" id="statTotal">—</div></div>
+      <div class="stat-card"><div class="stat-label">即將截止（14天內）</div><div class="stat-val" id="statSoon" style="color:var(--orange)">—</div></div>
+      <div class="stat-card"><div class="stat-label">已截止</div><div class="stat-val" id="statPast" style="color:var(--muted)">—</div></div>
+      <div class="stat-card"><div class="stat-label">平均 CP 值</div><div class="stat-val" id="statAvgCP" style="color:var(--accent)">—</div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openAdd()">＋ 新增紀念品</button>
+      <button class="btn" onclick="openImport()">📥 批次匯入 JSON</button>
+      <button class="btn" onclick="exportJSON()">📤 匯出 JSON</button>
+      <button class="btn" onclick="openSQL()">🗄 建表 SQL</button>
+      <div class="toolbar-right">
+        <input class="search-input" id="searchInput" placeholder="搜尋股號/名稱/禮品…" oninput="renderTable()">
+        <select class="search-input" id="filterCat" onchange="renderTable()" style="width:auto">
+          <option value="">全部類別</option>
+          <option value="food">🍱 食品</option>
+          <option value="goods">🧴 日用品</option>
+          <option value="voucher">🎫 儲值卡</option>
+          <option value="cash">💵 現金等值</option>
+          <option value="3c">📱 3C</option>
+          <option value="other">其他</option>
+        </select>
+        <select class="search-input" id="filterStatus" onchange="renderTable()" style="width:auto">
+          <option value="active">未截止</option>
+          <option value="all">全部</option>
+          <option value="past">已截止</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table id="giftsTable">
+        <thead>
+          <tr>
+            <th onclick="sortBy('stock_id')">股號 <span class="sort-ind">↕</span></th>
+            <th onclick="sortBy('stock_name')">公司 <span class="sort-ind">↕</span></th>
+            <th onclick="sortBy('record_date')">停止過戶 <span class="sort-ind">↕</span></th>
+            <th onclick="sortBy('meeting_date')">股東會 <span class="sort-ind">↕</span></th>
+            <th>禮品</th>
+            <th onclick="sortBy('gift_category')">類別 <span class="sort-ind">↕</span></th>
+            <th onclick="sortBy('gift_value_est')">估值 <span class="sort-ind">↕</span></th>
+            <th onclick="sortBy('cp_ratio')">CP% <span class="sort-ind">↕</span></th>
+            <th onclick="sortBy('share_required')">持股 <span class="sort-ind">↕</span></th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="giftsBody">
+          <tr><td colspan="10" class="empty-row">載入中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="tableFooter" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);padding:0.5rem 0.25rem;"></div>
+
+  </div><!-- .app-wrap -->
+</div><!-- #app -->
+
+<!-- ── Add/Edit Modal ── -->
+<div class="modal-bg" id="editModal">
+  <div class="modal-box">
+    <div class="modal-title" id="editModalTitle">＋ 新增紀念品</div>
+    <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+    <input type="hidden" id="editId">
+    <div class="form-grid">
+      <div class="field">
+        <label>股票代號 <span class="req">*</span></label>
+        <input id="fStockId" placeholder="e.g. 2330" maxlength="10">
+      </div>
+      <div class="field">
+        <label>公司名稱 <span class="req">*</span></label>
+        <input id="fStockName" placeholder="e.g. 台積電">
+      </div>
+      <div class="field">
+        <label>停止過戶日 <span class="req">*</span></label>
+        <input id="fRecordDate" type="date">
+      </div>
+      <div class="field">
+        <label>股東會日期</label>
+        <input id="fMeetingDate" type="date">
+      </div>
+      <div class="field span2">
+        <label>禮品描述 <span class="req">*</span></label>
+        <textarea id="fGiftDesc" placeholder="e.g. 統一布丁×4 + 麥香飲料×2"></textarea>
+      </div>
+      <div class="field">
+        <label>禮品類別</label>
+        <select id="fGiftCat">
+          <option value="food">🍱 食品</option>
+          <option value="goods">🧴 日用品</option>
+          <option value="voucher">🎫 儲值卡</option>
+          <option value="cash">💵 現金等值</option>
+          <option value="3c">📱 3C</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>禮品估值（元）</label>
+        <input id="fGiftValue" type="number" min="0" placeholder="e.g. 150" oninput="updateCPPreview()">
+      </div>
+      <div class="field">
+        <label>持股門檻（股）<span class="hint">　1張 = 1,000股</span></label>
+        <input id="fShareReq" type="number" min="1" step="1" value="1000" placeholder="e.g. 1000" oninput="updateShareHint()">
+        <div class="hint" id="shareReqHint" style="color:var(--accent);margin-top:2px"></div>
+      </div>
+      <div class="field">
+        <label>參考股價（元）<span class="hint">（用於計算 CP 值）</span></label>
+        <input id="fSharePrice" type="number" step="0.1" min="0" placeholder="e.g. 850.0" oninput="updateCPPreview()">
+      </div>
+      <div class="field">
+        <label>手動覆寫 CP%<span class="hint">（留空自動計算）</span></label>
+        <input id="fCPRatio" type="number" step="0.01" min="0" placeholder="自動" oninput="updateCPPreview()">
+        <div class="cp-preview" id="cpPreview"></div>
+      </div>
+      <div class="field">
+        <label>產業別</label>
+        <input id="fSector" placeholder="e.g. 半導體">
+      </div>
+      <div class="field">
+        <label>來源連結</label>
+        <input id="fSourceUrl" type="url" placeholder="https://…">
+      </div>
+      <div class="field span2">
+        <label>備注</label>
+        <textarea id="fNote" rows="2" placeholder="補充說明…"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('editModal')">取消</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveGift()">💾 儲存</button>
+    </div>
+    <div id="formErr" style="font-size:0.68rem;color:var(--red);margin-top:0.5rem;min-height:1em;text-align:right;"></div>
+  </div>
+</div>
+
+<!-- ── Import Modal ── -->
+<div class="modal-bg" id="importModal">
+  <div class="modal-box">
+    <div class="modal-title">📥 批次匯入 JSON</div>
+    <button class="modal-close" onclick="closeModal('importModal')">✕</button>
+    <p style="font-size:0.72rem;color:var(--muted);margin-bottom:0.75rem;">貼上 JSON 陣列（每筆至少需有 stock_id、stock_name、record_date、gift_desc）</p>
+    <div class="import-box">
+      <textarea id="importJson" placeholder='[{"stock_id":"2330","stock_name":"台積電","record_date":"2026-05-15","gift_desc":"紀念品說明","gift_category":"food","gift_value_est":150,"share_price_ref":850,"share_required":1}]'></textarea>
+    </div>
+    <div class="import-schema">// 完整欄位參考
+{ "stock_id": "2330",         // 必填
+  "stock_name": "台積電",      // 必填
+  "record_date": "2026-05-15", // 必填 (YYYY-MM-DD)
+  "gift_desc": "說明",         // 必填
+  "meeting_date": "2026-06-20",// 選填
+  "gift_category": "food",     // food|goods|voucher|cash|3c|other
+  "gift_value_est": 150,       // 估值（元）
+  "share_price_ref": 850,      // 參考股價（用於算CP值）
+  "share_required": 1,         // 持股張數
+  "sector": "半導體",          // 產業
+  "source_url": "https://…",  // 來源
+  "note": "備注"
+}</div>
+    <div id="importLog" class="import-log" style="display:none"></div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('importModal')">取消</button>
+      <button class="btn btn-primary" onclick="runImport()">▶ 開始匯入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SQL Modal ── -->
+<div class="modal-bg" id="sqlModal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-title">🗄 Supabase 建表 SQL</div>
+    <button class="modal-close" onclick="closeModal('sqlModal')">✕</button>
+    <p style="font-size:0.72rem;color:var(--muted);margin-bottom:0.75rem;">在 Supabase SQL Editor 執行以下語句，建立 <code>shareholder_gifts</code>（紀念品）與 <code>gift_scrape_log</code>（爬蟲進度）兩張資料表。</p>
+    <div class="sql-block" id="sqlBlock"></div>
+    <div class="form-actions">
+      <button class="btn" onclick="copySql()">📋 複製 SQL</button>
+      <button class="btn btn-primary" onclick="closeModal('sqlModal')">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════
+// Constants
+// ══════════════════════════════════
+const API_BASE = '/api/news';
+const CAT_LABEL = { food:'🍱 食品', goods:'🧴 日用品', voucher:'🎫 儲值卡', cash:'💵 現金等值', '3c':'📱 3C', other:'其他' };
+const SQL_CREATE = `-- ① 主資料表（紀念品）
+CREATE TABLE IF NOT EXISTS shareholder_gifts (
+  id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  stock_id        VARCHAR(10)    NOT NULL,
+  stock_name      VARCHAR(50)    NOT NULL,
+  sector          VARCHAR(30),
+  record_date     DATE           NOT NULL,
+  meeting_date    DATE,
+  gift_desc       TEXT           NOT NULL,
+  gift_category   VARCHAR(20)    DEFAULT 'other'
+                  CHECK (gift_category IN ('food','goods','voucher','cash','3c','other')),
+  gift_value_est  INTEGER        DEFAULT 0,
+  share_required  INTEGER        DEFAULT 1000,  -- 單位：股（1張=1000股）
+  share_price_ref NUMERIC(10,2),
+  cp_ratio        NUMERIC(6,2),
+  source_url      TEXT,
+  note            TEXT,
+  year            INTEGER        DEFAULT EXTRACT(YEAR FROM CURRENT_DATE),
+  created_at      TIMESTAMPTZ    DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ    DEFAULT NOW(),
+  UNIQUE (stock_id, year)
+);
+
+-- ② 爬蟲進度追蹤表（每支股票的查詢狀態）
+CREATE TABLE IF NOT EXISTS gift_scrape_log (
+  stock_id   VARCHAR(10)  NOT NULL,
+  stock_name VARCHAR(50),
+  year       INTEGER      NOT NULL,
+  status     VARCHAR(20)  NOT NULL
+             CHECK (status IN ('found','not_found','no_pdf','scanned_pdf','error')),
+  checked_at TIMESTAMPTZ  DEFAULT NOW(),
+  PRIMARY KEY (stock_id, year)
+);
+
+-- ③ 索引
+CREATE INDEX IF NOT EXISTS idx_gifts_record_date ON shareholder_gifts (record_date);
+CREATE INDEX IF NOT EXISTS idx_gifts_category    ON shareholder_gifts (gift_category);
+CREATE INDEX IF NOT EXISTS idx_scrape_log_year   ON gift_scrape_log (year, status);
+
+-- ④ RLS
+ALTER TABLE shareholder_gifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gift_scrape_log   ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read gifts"   ON shareholder_gifts FOR SELECT TO anon USING (true);
+CREATE POLICY "Service write gifts" ON shareholder_gifts FOR ALL TO service_role USING (true);
+CREATE POLICY "Service write log"   ON gift_scrape_log   FOR ALL TO service_role USING (true);
+
+-- ⑤ 進度查詢（Debug 用）
+-- SELECT status, COUNT(*) FROM gift_scrape_log
+-- WHERE year = EXTRACT(YEAR FROM NOW()) GROUP BY status;`;
+
+// ══════════════════════════════════
+// State
+// ══════════════════════════════════
+let _adminKey = '';
+let _allData  = [];
+let _sortCol  = 'record_date';
+let _sortAsc  = true;
+
+// ══════════════════════════════════
+// Dark mode
+// ══════════════════════════════════
+(function(){
+  const s = localStorage.getItem('alphascope-theme');
+  if (s === 'dark' || (!s && window.matchMedia('(prefers-color-scheme:dark)').matches)) {
+    document.documentElement.setAttribute('data-theme','dark');
+    document.getElementById('darkBtn').textContent = '☾';
+  }
+})();
+function toggleDark() {
+  const d = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', d ? 'light' : 'dark');
+  localStorage.setItem('alphascope-theme', d ? 'light' : 'dark');
+  document.getElementById('darkBtn').textContent = d ? '☀' : '☾';
+}
+
+// ══════════════════════════════════
+// Login
+// ══════════════════════════════════
+async function doLogin(e) {
+  if (e) e.preventDefault();
+  const key = document.getElementById('adminKeyInput').value.trim();
+  if (!key) return;
+  document.getElementById('loginBtn').textContent = '驗證中…';
+  try {
+    const r = await fetch(`${API_BASE}?endpoint=gifts_admin`, {
+      headers: { 'x-admin-key': key }, signal: AbortSignal.timeout(6000)
+    });
+    if (r.status === 401) throw new Error('金鑰錯誤');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    _adminKey = key;
+    _allData = await r.json();
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('authBadge').style.display = '';
+    updateStats();
+    renderTable();
+    showToast('✅ 登入成功');
+  } catch(err) {
+    document.getElementById('loginErr').textContent = err.message;
+    document.getElementById('loginBtn').textContent = '登入 →';
+  }
+}
+
+// ══════════════════════════════════
+// Stats
+// ══════════════════════════════════
+function updateStats() {
+  const today = new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+  const total = _allData.length;
+  const past  = _allData.filter(g => g.record_date < today).length;
+  const soon  = _allData.filter(g => { const d = daysDiff(g.record_date); return d>=0&&d<=14; }).length;
+  const cps   = _allData.filter(g=>g.cp_ratio>0).map(g=>+g.cp_ratio);
+  const avg   = cps.length ? (cps.reduce((a,b)=>a+b,0)/cps.length).toFixed(2) : '—';
+  document.getElementById('statTotal').textContent  = total;
+  document.getElementById('statPast').textContent   = past;
+  document.getElementById('statSoon').textContent   = soon;
+  document.getElementById('statAvgCP').textContent  = avg !== '—' ? avg+'%' : '—';
+}
+
+function daysDiff(dateStr) {
+  if (!dateStr) return -999;
+  const t = new Date(Date.now()+8*3600000); t.setUTCHours(0,0,0,0);
+  return Math.round((new Date(dateStr+'T00:00:00Z') - t) / 86400000);
+}
+
+// ══════════════════════════════════
+// Table render
+// ══════════════════════════════════
+function sortBy(col) {
+  if (_sortCol === col) _sortAsc = !_sortAsc; else { _sortCol = col; _sortAsc = true; }
+  document.querySelectorAll('th .sort-ind').forEach(el => el.textContent = '↕');
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+  const ths = document.querySelectorAll('#giftsTable th');
+  const cols = ['stock_id','stock_name','record_date','meeting_date',null,'gift_category','gift_value_est','cp_ratio','share_required',null];
+  const idx  = cols.indexOf(col);
+  if (idx>=0 && ths[idx]) {
+    ths[idx].classList.add('sorted');
+    ths[idx].querySelector('.sort-ind').textContent = _sortAsc ? '↑' : '↓';
+  }
+  renderTable();
+}
+
+function renderTable() {
+  const q   = document.getElementById('searchInput').value.trim().toLowerCase();
+  const cat = document.getElementById('filterCat').value;
+  const st  = document.getElementById('filterStatus').value;
+  const today = new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+
+  let data = _allData
+    .filter(g => !cat || g.gift_category === cat)
+    .filter(g => {
+      if (st === 'active') return g.record_date >= today;
+      if (st === 'past')   return g.record_date < today;
+      return true;
+    })
+    .filter(g => !q || [g.stock_id,g.stock_name,g.gift_desc,g.sector].join(' ').toLowerCase().includes(q));
+
+  data.sort((a,b) => {
+    let av = a[_sortCol]??'', bv = b[_sortCol]??'';
+    if (typeof av === 'string') return _sortAsc ? av.localeCompare(bv,'zh') : bv.localeCompare(av,'zh');
+    return _sortAsc ? av-bv : bv-av;
+  });
+
+  const tbody = document.getElementById('giftsBody');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-row">⚙ 無符合條件的資料</td></tr>`;
+    document.getElementById('tableFooter').textContent = '共 0 筆';
+    return;
+  }
+  tbody.innerHTML = data.map(g => {
+    const days = daysDiff(g.record_date);
+    const isPast = days < 0;
+    let trCls='', dlCls='dl-ok', dlTxt=`${days}天`;
+    if (isPast)       { trCls='tr-past';   dlCls='dl-past';   dlTxt='已截止'; }
+    else if (days<=7) { trCls='tr-urgent'; dlCls='dl-urgent'; dlTxt=`${days}天！`; }
+    else if (days<=14){ trCls='tr-soon';   dlCls='dl-soon';   dlTxt=`${days}天`; }
+    const cp = g.cp_ratio ? `<span class="cp-badge ${+g.cp_ratio>=2?'cp-high':+g.cp_ratio<0.5?'cp-low':''}">${(+g.cp_ratio).toFixed(2)}%</span>` : '—';
+    return `<tr class="${trCls}">
+      <td><b style="font-family:'IBM Plex Mono',monospace">${g.stock_id}</b></td>
+      <td>${g.stock_name}${g.sector?`<br><span style="font-size:0.58rem;color:var(--muted)">${g.sector}</span>`:''}</td>
+      <td>${g.record_date||'—'}<br><span class="deadline-pill ${dlCls}">${dlTxt}</span></td>
+      <td style="font-size:0.72rem">${g.meeting_date||'—'}</td>
+      <td style="max-width:180px;font-size:0.72rem">${g.gift_desc||'—'}</td>
+      <td><span class="cat-chip">${CAT_LABEL[g.gift_category]||g.gift_category||'—'}</span></td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem">${g.gift_value_est?'NT$'+Number(g.gift_value_est).toLocaleString():'—'}</td>
+      <td>${cp}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem">${fmtSharesAdmin(g.share_required)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="openEdit('${g.id}')">✏</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteGift('${g.id}','${g.stock_name}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tableFooter').textContent = `顯示 ${data.length} / ${_allData.length} 筆`;
+}
+
+// ══════════════════════════════════
+// Add / Edit Modal
+// ══════════════════════════════════
+function openAdd() {
+  document.getElementById('editModalTitle').textContent = '＋ 新增紀念品';
+  document.getElementById('editId').value = '';
+  ['fStockId','fStockName','fGiftDesc','fNote','fSector','fSourceUrl'].forEach(id => document.getElementById(id).value='');
+  ['fRecordDate','fMeetingDate'].forEach(id => document.getElementById(id).value='');
+  ['fGiftValue','fSharePrice','fCPRatio'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('fShareReq').value = '1000';
+  document.getElementById('fGiftCat').value = 'food';
+  document.getElementById('cpPreview').textContent = '';
+  document.getElementById('formErr').textContent = '';
+  openModal('editModal');
+}
+
+function openEdit(id) {
+  const g = _allData.find(x => x.id === id);
+  if (!g) return;
+  document.getElementById('editModalTitle').textContent = `✏ 編輯 ${g.stock_name}`;
+  document.getElementById('editId').value = g.id;
+  document.getElementById('fStockId').value   = g.stock_id||'';
+  document.getElementById('fStockName').value = g.stock_name||'';
+  document.getElementById('fRecordDate').value  = g.record_date||'';
+  document.getElementById('fMeetingDate').value = g.meeting_date||'';
+  document.getElementById('fGiftDesc').value  = g.gift_desc||'';
+  document.getElementById('fGiftCat').value   = g.gift_category||'other';
+  document.getElementById('fGiftValue').value = g.gift_value_est||'';
+  document.getElementById('fShareReq').value  = g.share_required||1000;
+  updateShareHint();
+  document.getElementById('fSharePrice').value = g.share_price_ref||'';
+  document.getElementById('fCPRatio').value   = g.cp_ratio||'';
+  document.getElementById('fSector').value    = g.sector||'';
+  document.getElementById('fSourceUrl').value = g.source_url||'';
+  document.getElementById('fNote').value      = g.note||'';
+  document.getElementById('formErr').textContent = '';
+  updateCPPreview();
+  openModal('editModal');
+}
+
+function updateCPPreview() {
+  const val   = parseFloat(document.getElementById('fGiftValue').value);
+  const price = parseFloat(document.getElementById('fSharePrice').value);
+  const manual= parseFloat(document.getElementById('fCPRatio').value);
+  if (!isNaN(manual)) {
+    document.getElementById('cpPreview').textContent = `CP 值：${manual.toFixed(2)}%（手動）`;
+  } else if (val>0 && price>0) {
+    document.getElementById('cpPreview').textContent = `CP 值：${(val/price*100).toFixed(2)}%（自動計算）`;
+  } else {
+    document.getElementById('cpPreview').textContent = '';
+  }
+}
+
+async function saveGift() {
+  const id         = document.getElementById('editId').value;
+  const stock_id   = document.getElementById('fStockId').value.trim();
+  const stock_name = document.getElementById('fStockName').value.trim();
+  const record_date = document.getElementById('fRecordDate').value;
+  const gift_desc  = document.getElementById('fGiftDesc').value.trim();
+  if (!stock_id || !stock_name || !record_date || !gift_desc) {
+    document.getElementById('formErr').textContent = '請填寫所有必填欄位（*）';
+    return;
+  }
+  const val   = parseFloat(document.getElementById('fGiftValue').value)||0;
+  const price = parseFloat(document.getElementById('fSharePrice').value)||null;
+  const cpMan = parseFloat(document.getElementById('fCPRatio').value);
+  const body = {
+    stock_id, stock_name,
+    record_date,
+    meeting_date:    document.getElementById('fMeetingDate').value || null,
+    gift_desc,
+    gift_category:   document.getElementById('fGiftCat').value,
+    gift_value_est:  val||null,
+    share_required:  parseInt(document.getElementById('fShareReq').value)||1000,
+    share_price_ref: price,
+    cp_ratio:        !isNaN(cpMan) ? cpMan : (val&&price ? parseFloat((val/price*100).toFixed(2)) : null),
+    sector:   document.getElementById('fSector').value.trim()||null,
+    source_url: document.getElementById('fSourceUrl').value.trim()||null,
+    note:       document.getElementById('fNote').value.trim()||null,
+    year:       new Date(record_date).getFullYear(),
+  };
+  if (id) body.id = id;
+
+  document.getElementById('saveBtn').textContent = '儲存中…';
+  try {
+    const r = await fetch(`${API_BASE}?endpoint=gifts_admin`, {
+      method: 'POST',
+      headers: { 'x-admin-key': _adminKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const saved = await r.json();
+    const savedItem = Array.isArray(saved) ? saved[0] : saved;
+    if (id) {
+      const idx = _allData.findIndex(x => x.id === id);
+      if (idx>=0) _allData[idx] = { ..._allData[idx], ...savedItem };
+    } else {
+      _allData.push(savedItem);
+    }
+    closeModal('editModal');
+    updateStats(); renderTable();
+    showToast(id ? `✅ ${stock_name} 已更新` : `✅ ${stock_name} 已新增`);
+  } catch(e) {
+    document.getElementById('formErr').textContent = '儲存失敗：' + e.message;
+  } finally {
+    document.getElementById('saveBtn').textContent = '💾 儲存';
+  }
+}
+
+async function deleteGift(id, name) {
+  if (!confirm(`確定要刪除「${name}」嗎？`)) return;
+  try {
+    const r = await fetch(`${API_BASE}?endpoint=gifts_admin&id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-key': _adminKey },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    _allData = _allData.filter(x => x.id !== id);
+    updateStats(); renderTable();
+    showToast(`🗑 ${name} 已刪除`);
+  } catch(e) { showToast('❌ 刪除失敗：' + e.message); }
+}
+
+// ══════════════════════════════════
+// Bulk Import
+// ══════════════════════════════════
+function openImport() {
+  document.getElementById('importJson').value = '';
+  document.getElementById('importLog').style.display = 'none';
+  document.getElementById('importLog').innerHTML = '';
+  openModal('importModal');
+}
+
+async function runImport() {
+  const raw = document.getElementById('importJson').value.trim();
+  let rows;
+  try { rows = JSON.parse(raw); } catch(e) { showToast('❌ JSON 格式錯誤：' + e.message); return; }
+  if (!Array.isArray(rows)) { showToast('❌ 需要 JSON 陣列 [...]'); return; }
+
+  const log = document.getElementById('importLog');
+  log.style.display = 'block'; log.innerHTML = `準備匯入 ${rows.length} 筆…\n`;
+
+  let ok=0, fail=0;
+  for (const row of rows) {
+    try {
+      const r = await fetch(`${API_BASE}?endpoint=gifts_admin`, {
+        method: 'POST',
+        headers: { 'x-admin-key': _adminKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify(row), signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      log.innerHTML += `<span style="color:var(--green)">✓ ${row.stock_id} ${row.stock_name}</span>\n`;
+      ok++;
+    } catch(e) {
+      log.innerHTML += `<span style="color:var(--red)">✗ ${row.stock_id||'?'} — ${e.message}</span>\n`;
+      fail++;
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+  log.innerHTML += `\n完成：${ok} 成功 / ${fail} 失敗`;
+
+  // Refresh data
+  if (ok > 0) {
+    const r = await fetch(`${API_BASE}?endpoint=gifts_admin`, { headers: { 'x-admin-key': _adminKey } });
+    if (r.ok) { _allData = await r.json(); updateStats(); renderTable(); }
+  }
+  showToast(`匯入完成：${ok} 成功 / ${fail} 失敗`);
+}
+
+// ══════════════════════════════════
+// Export JSON
+// ══════════════════════════════════
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(_allData, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `shareholder_gifts_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('📤 已匯出 JSON');
+}
+
+// ══════════════════════════════════
+// SQL Modal
+// ══════════════════════════════════
+function openSQL() {
+  document.getElementById('sqlBlock').textContent = SQL_CREATE;
+  openModal('sqlModal');
+}
+async function copySql() {
+  await navigator.clipboard.writeText(SQL_CREATE);
+  showToast('📋 SQL 已複製');
+}
+
+// ══════════════════════════════════
+// Modal helpers
+// ══════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+// ══════════════════════════════════
+// Toast
+// ══════════════════════════════════
+let _t;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(_t); _t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── 持股顯示（股 → 張換算）──
+function fmtSharesAdmin(n) {
+  const s = parseInt(n) || 1000;
+  if (s >= 1000 && s % 1000 === 0) return `${s/1000}張 (${s.toLocaleString()}股)`;
+  return `${s.toLocaleString()}股`;
+}
+function updateShareHint() {
+  const s = parseInt(document.getElementById('fShareReq').value) || 0;
+  const hint = document.getElementById('shareReqHint');
+  if (!hint) return;
+  if (s >= 1000 && s % 1000 === 0) hint.textContent = `= ${s/1000}張`;
+  else if (s > 0 && s < 1000)      hint.textContent = `不足1張（${s}股）`;
+  else if (s > 1000)               hint.textContent = `= ${(s/1000).toFixed(1)}張`;
+  else hint.textContent = '';
+}
+
+// ── Enter key on login ──
+document.getElementById('adminKeyInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>
