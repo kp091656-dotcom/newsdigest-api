@@ -388,6 +388,10 @@ async function collectChips() {
     spot_trust_buy:  null, spot_trust_sell:  null, spot_trust_net:  null,
     spot_foreign_buy:null, spot_foreign_sell:null, spot_foreign_net:null,
     spot_total_net:  null,
+    // inst_* 是 spot_*_net 的別名（前端與 Alpha 報告使用）
+    inst_foreign_net: null, inst_trust_net: null, inst_dealer_net: null,
+    // 融資資料（FinMind 抓取，填入 chips_daily 供 Alpha 使用）
+    margin_balance: null, margin_change: null,
     fut_tx_dealer_long: null, fut_tx_dealer_short: null, fut_tx_dealer_net: null,
     fut_tx_trust_long:  null, fut_tx_trust_short:  null, fut_tx_trust_net:  null,
     fut_tx_foreign_long:null, fut_tx_foreign_short:null, fut_tx_foreign_net:null,
@@ -514,6 +518,30 @@ async function collectChips() {
     console.error(`  ❌ 現貨三大法人 失敗：${e.message}`);
   }
 
+  // ── 現貨 inst_* 別名（spot_*_net 的同步）──
+  result.inst_foreign_net = result.spot_foreign_net;
+  result.inst_trust_net   = result.spot_trust_net;
+  result.inst_dealer_net  = result.spot_dealer_net;
+
+  // ── 融資資料（從 FinMind 抓，寫入 chips_daily 供 Alpha report 使用）──
+  if (FM_TOKEN) {
+    try {
+      const marginData = await fmFetch('TaiwanStockTotalMarginPurchaseShortSale',
+        { start_date: daysAgo(3), end_date: todayTW() });
+      const latestMarginDate = marginData.map(r => r.date?.slice(0,10)).filter(Boolean).sort().reverse()[0];
+      if (latestMarginDate) {
+        for (const r of marginData.filter(d => d.date?.slice(0,10) === latestMarginDate)) {
+          if (r.name === 'MarginPurchase') {
+            result.margin_balance = parseInt(r.TodayBalance) || null;
+            result.margin_change  = (parseInt(r.TodayBalance) || 0) - (parseInt(r.YesBalance) || 0);
+          }
+        }
+        if (result.margin_balance != null)
+          console.log(`  ✅ 融資餘額（chips）：${result.margin_balance.toLocaleString()} 張（變化 ${result.margin_change >= 0 ? '+' : ''}${result.margin_change}）`);
+      }
+    } catch(e) { console.warn('  ⚠️  chips 融資資料抓取失敗：' + e.message); }
+  }
+
   // ── 2. TAIFEX 期貨三大法人（TX / MTX / TMF）──
   // 策略：一次取全部資料，記憶體內 filter 各商品（contractCode 參數無效）
   // 真實欄位（log 確認）：Date, ContractCode, Item（身份別）
@@ -621,21 +649,21 @@ async function collectChips() {
         });
         if (!cRes.ok) throw new Error('CSV HTTP ' + cRes.status);
         const csvText = await cRes.text();
-        // 找小計列：含 TMF 且含 小計
-        const subLine = csvText.split(/?
-/).find(l => l.includes('TMF') && l.includes('小計'));
+        const csvLines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        if (!csvLines.length) throw new Error('CSV 空回傳');
+        // 標題列自動對位：找「未沖銷契約量」欄位 index
+        const headerCols = csvLines[0].split(',').map(c => c.replace(/"/g, '').trim());
+        const oiIndex = headerCols.findIndex(c => c.includes('未沖銷契約量'));
+        console.log('  🔍 CSV 標題：' + headerCols.join('|'));
+        console.log('  🔍 未沖銷契約量 index：' + oiIndex);
+        if (oiIndex === -1) throw new Error('CSV 標題找不到未沖銷契約量');
+        const subLine = csvLines.find(l => l.includes('TMF') && l.includes('小計'));
         if (!subLine) throw new Error('CSV 找不到小計列');
-        // CSV 格式：日期,TMF,小計,,,,,,,,成交量,,OI,交易時段,
-        // OI 固定在倒數第 3 欄（尾端有空欄和交易時段）
         const cols = subLine.split(',').map(c => c.replace(/"/g, '').trim());
         console.log('  🔍 TMF CSV 小計列：' + cols.join('|'));
-        // 從倒數往前找第一個有效正整數 > 1000（排除交易時段文字和空欄）
-        for (let i = cols.length - 1; i >= 0; i--) {
-          const n = parseInt(cols[i].replace(/,/g, ''));
-          if (!isNaN(n) && n > 1000) { tmfOI = n; break; }
-        }
-        if (tmfOI) console.log('  ✅ TMF 全體未平倉（CSV）：' + tmfOI + ' 口');
-        else throw new Error('CSV 小計列數字解析失敗');
+        const n = parseInt(cols[oiIndex]);
+        if (!isNaN(n) && n > 0) { tmfOI = n; console.log('  ✅ TMF 全體未平倉（CSV 標題對位）：' + n + ' 口'); }
+        else throw new Error('CSV 標題對位解析失敗，傀：' + cols[oiIndex]);
       } catch(e1) { console.log('  ℹ️  CSV 策略失敗：' + e1.message + '，切換 HTML fallback'); }
 
       // ── 策略2：HTML fallback ──
@@ -695,6 +723,7 @@ async function collectChips() {
 
     // FinMind 欄位：call_put（C/P）, institutional_investors（身份別）
     //   long_open_interest_balance_volume, short_open_interest_balance_volume
+    const getCP = (r) => (r.call_put || '').trim(); // Bug fix: was undefined before
     const parseOptFM = (rows, prefix) => {
       for (const row of rows) {
         const ident    = (row.institutional_investors || row.name || '').trim();
@@ -1044,7 +1073,24 @@ async function collectAlphaReport() {
       } catch { pttTitles = '無法取得'; }
     }
 
-    // ── 4. 整理資料 ──
+    // ── 4. 抓最新籌碼資料（chips_daily）──
+    let chips = null;
+    try {
+      const chipsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/chips_daily?order=date.desc&limit=1&select=date,inst_foreign_net,inst_trust_net,inst_dealer_net,margin_balance,margin_change,fut_tmf_total_net,fut_tmf_total_oi,fut_tmf_foreign_net,fut_tmf_dealer_net`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      );
+      const chipsJson = await chipsRes.json();
+      chips = Array.isArray(chipsJson) && chipsJson[0] ? chipsJson[0] : null;
+    } catch(e) { console.warn('  ⚠️  chips_daily 抓取失敗：' + e.message); }
+
+    // 計算散戶多空比
+    let retailRatio = null;
+    if (chips && chips.fut_tmf_total_net != null && chips.fut_tmf_total_oi > 0) {
+      retailRatio = (-1 * chips.fut_tmf_total_net / chips.fut_tmf_total_oi * 100).toFixed(2);
+    }
+
+    // ── 5. 整理資料 ──
     const valMap = {};
     for (const v of valuation) valMap[v.stock_id] = v;
 
@@ -1057,11 +1103,44 @@ async function collectAlphaReport() {
       .map(n => `[${n.source}] ${n.title}`).join('\n');
 
     // ── 5. 呼叫 Groq ──
-    const systemPrompt = `你是 Alpha，一位經驗豐富的台股交易員。
+    const systemPrompt = `你是 Alpha，一位台股專業交易員，思維框架來自機構級交易邏輯。
 今天是 ${today}，台股將於 09:00 開盤。
-你的分析風格：冷靜、數據導向、不隨波逐流。
-根據：技術面（量價）、基本面（PE/PB/殖利率）、市場情緒、新聞催化劑，綜合判斷操作方向。
-依市場狀況自行決定操作風格（短線波段 3-10 天 / 中線趨勢 1-4 週 / 價值布局）。
+
+【核心分析框架】
+1. 全觀研究（Research Everything）：不迷信單一指標。必須綜合評估：
+   - 籌碼面：三大法人方向、融資增減、散戶多空比
+   - 基本面：PE/PB/殖利率是否合理
+   - 事件面：新聞催化劑、產業鏈邏輯
+   - 供需邏輯：誰在買？誰在賣？市場有需求嗎？
+
+2. 找出今日主導者（Who Took My Money）：
+   - 每一個市場現象都要問：「是誰在主導這個方向？」
+   - 外資大買 → 外資主導；散戶偏多 + 外資賣 → 小心散戶接刀
+   - 明確指出今日誰是主導力量（外資/自營商/投信/散戶）
+
+3. 供需邏輯選股（Business Mindset）：
+   - 成交量爆量 → 誰是直接受惠方？（如成交量大 → 券商手續費收入增）
+   - 融資大減 + 維持率低 → 籌碼危機，逆向機會
+   - 找事件驅動的供需失衡點
+
+4. 賣方思維的市場情緒判讀：
+   - 散戶多空比 > +10% → 散戶過度偏多 → 賣方警戒，市場可能反轉
+   - 散戶多空比 < -10% → 散戶極度悲觀 → 賣方有利，可能反彈
+   - 融資大增 → 散戶加槓桿 → 風險累積
+
+5. 空手也是一種策略（Cash is a Position）：
+   - 若市場方向不明、籌碼混亂、新聞無明確催化劑 → 建議空手等待
+   - 不為交易而交易，正期望值才進場
+
+【信心來源標記】
+每個推薦必須標明信心主要來源：
+- "籌碼面"：三大法人方向明確
+- "基本面"：PE/PB/殖利率有優勢  
+- "事件面"：有明確新聞催化劑
+- "供需面"：成交量/融資/產業鏈邏輯支撐
+
+【融資危機訊號】
+若某股融資大幅減少（變化 < -5000張）且走勢已跌一段，標記為逆向機會。
 
 【價格規則 — 嚴格遵守】
 - entry_price 必須在收盤價的 ±5% 範圍內
@@ -1069,11 +1148,60 @@ async function collectAlphaReport() {
 - stop_loss 必須在 entry_price 的 -3% ~ -10% 範圍內
 - 禁止使用訓練資料的歷史股價，只能用表格提供的收盤價
 
-只能回傳純 JSON 物件，不含 markdown、不含任何說明文字。所有字串值必須用英文半形雙引號，數字不加引號。
-格式：{"market_summary":"...","market_mood":"樂觀或中性或謹慎或悲觀","recommendations":[{"stock_id":"4碼","stock_name":"名稱","style":"短線或中線或價值","action":"買進或觀察或避開","entry_price":數字,"target_price":數字,"stop_loss":數字,"expected_return_pct":數字,"holding_days":數字,"confidence":"高或中或低","reason":"操作理由","risk":"風險"}],"alpha_note":"一句話警語"}
-recommendations 包含 3-5 檔，action=買進 至少 2 檔。`;
+只能回傳純 JSON，不含 markdown、不含任何說明文字。所有字串值必須用英文半形雙引號，數字不加引號。
+格式：
+{
+  "market_summary": "市場總結（含主導力量分析）",
+  "market_mood": "樂觀或中性或謹慎或悲觀",
+  "dominant_player": "今日主導者：外資或自營商或投信或散戶或混沌",
+  "retail_signal": "散戶訊號：偏多警戒或偏空機會或中性",
+  "suggest_cash": true或false（若市場方向不明建議空手則為true）,
+  "cash_reason": "空手理由（suggest_cash=true時填寫，否則空字串）",
+  "margin_alert": "融資警示：正常或偏高注意或危機（根據融資餘額變化判斷）",
+  "recommendations": [
+    {
+      "stock_id": "4碼",
+      "stock_name": "名稱",
+      "style": "短線或中線或價值",
+      "action": "買進或觀察或避開",
+      "entry_price": 數字,
+      "target_price": 數字,
+      "stop_loss": 數字,
+      "expected_return_pct": 數字,
+      "holding_days": 數字,
+      "confidence": "高或中或低",
+      "signal_source": "籌碼面或基本面或事件面或供需面",
+      "reason": "操作理由（含供需邏輯）",
+      "risk": "風險提示"
+    }
+  ],
+  "alpha_note": "今日一句話警語（巨人傑風格：直接、不廢話）"
+}
+若 suggest_cash=true，recommendations 可以只有 0-2 檔觀察標的。
+若 suggest_cash=false，recommendations 包含 3-5 檔，action=買進 至少 2 檔。`;
+
+    // 整理籌碼摘要給 AI
+    let chipsBlock = '【今日籌碼面板】\n（資料暫無）';
+    if (chips) {
+      const fNet = chips.inst_foreign_net != null ? (chips.inst_foreign_net / 1e8).toFixed(1) : '—';
+      const tNet = chips.inst_trust_net   != null ? (chips.inst_trust_net   / 1e8).toFixed(1) : '—';
+      const dNet = chips.inst_dealer_net  != null ? (chips.inst_dealer_net  / 1e8).toFixed(1) : '—';
+      const mChg = chips.margin_change    != null ? chips.margin_change.toLocaleString() : '—';
+      const mBal = chips.margin_balance   != null ? chips.margin_balance.toLocaleString() : '—';
+      const tmfNet = chips.fut_tmf_total_net != null ? chips.fut_tmf_total_net.toLocaleString() : '—';
+      const tmfOI  = chips.fut_tmf_total_oi  != null ? chips.fut_tmf_total_oi.toLocaleString()  : '—';
+      const tmfFor = chips.fut_tmf_foreign_net != null ? chips.fut_tmf_foreign_net.toLocaleString() : '—';
+      const tmfDlr = chips.fut_tmf_dealer_net  != null ? chips.fut_tmf_dealer_net.toLocaleString()  : '—';
+      chipsBlock = `【今日籌碼面板（${chips.date}）】
+三大法人現貨：外資 ${fNet} 億 ／ 投信 ${tNet} 億 ／ 自營商 ${dNet} 億
+融資餘額：${mBal} 張（變化 ${mChg} 張）
+微台指 TMF：三大法人淨額 ${tmfNet} 口（外資 ${tmfFor} ／自營 ${tmfDlr}） ／ 全體 OI ${tmfOI} 口
+散戶多空比：${retailRatio != null ? retailRatio + '%（正=散戶偏多，負=散戶偏空）' : '資料不足'}`;
+    }
 
     const userPrompt = `【今日日期】${today}（09:00 開盤）
+
+${chipsBlock}
 
 【台股最新收盤（${latestDate}）前50大成交量】
 ${stockTable}
@@ -1084,7 +1212,7 @@ ${newsTitles}
 【PTT Stock 板熱門】
 ${pttTitles}
 
-請給出今日開盤操作建議。`;
+請依照你的分析框架，給出今日開盤操作建議。`;
 
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -1146,10 +1274,15 @@ ${pttTitles}
         Prefer: 'resolution=merge-duplicates',
       },
       body: JSON.stringify({
-        report_date:    today,
-        market_mood:    result.market_mood || '中性',
-        market_summary: result.market_summary || '',
-        alpha_note:     result.alpha_note || '',
+        report_date:     today,
+        market_mood:     result.market_mood    || '中性',
+        market_summary:  result.market_summary || '',
+        alpha_note:      result.alpha_note     || '',
+        dominant_player: result.dominant_player || '',
+        retail_signal:   result.retail_signal  || '中性',
+        suggest_cash:    result.suggest_cash   ?? false,
+        cash_reason:     result.cash_reason    || '',
+        margin_alert:    result.margin_alert   || '正常',
         recommendations: result.recommendations || [],
         data_sources:   { stocks: stocks.length, news: Array.isArray(news) ? news.length : 0, ptt: (pttTitles && pttTitles !== '無法取得') ? pttTitles.split('\n').filter(l => l.trim()).length : 0 },
         generated_at:   new Date().toISOString(),
