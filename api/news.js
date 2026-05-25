@@ -1359,23 +1359,23 @@ ${redditTitles || '無'}
       return res.status(200).json({ ...global._optionsCache.data, cached: true, cacheAgeMin: parseFloat(ageMin) });
     }
 
-    // 台灣時間（UTC+8）今天日期
+    const today = new Date();
+    // ⚠️ 使用台灣時間（UTC+8）避免凌晨 00:00-07:59 取到前一天日期
     const nowTW = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    const today = nowTW; // 統一用台灣時間
-    // 若今天是週末，往前找最近交易日
+    // 若今天是週末或非交易時間，往前找最近交易日
     const getTradeDate = (offset = 0) => {
       const d = new Date(nowTW);
       d.setUTCDate(d.getUTCDate() - offset);
       const dow = d.getUTCDay();
-      if (dow === 0) d.setUTCDate(d.getUTCDate() - 2); // 週日→週五
-      if (dow === 6) d.setUTCDate(d.getUTCDate() - 1); // 週六→週五
-      return d.toISOString().slice(0, 10); // YYYY-MM-DD
+      if (dow === 0) d.setUTCDate(d.getUTCDate() - 2);
+      if (dow === 6) d.setUTCDate(d.getUTCDate() - 1);
+      return d.toISOString().slice(0, 10);
     };
 
     const BASE = 'https://api.finmindtrade.com/api/v4/data';
     const fetchFM = async (params) => {
       const url = BASE + '?' + new URLSearchParams(params);
-      const r = await fetch(url, { signal: (new AbortController()).signal, headers: { Authorization: `Bearer ${TOKEN}` } });
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` }, signal: AbortSignal.timeout(8000) });
       const d = await r.json();
       return d.data || [];
     };
@@ -1429,36 +1429,16 @@ ${redditTitles || '無'}
     const pcVolRatio = callVol > 0 ? putVol / callVol : null;
     const pcOIRatio  = callOI  > 0 ? putOI  / callOI  : null;
 
-    // ── 三大法人籌碼解析（CALL/PUT 分開，各自算淨部位）──
-    const instMap = {
-      '外資':   { call: null, put: null },
-      '自營商': { call: null, put: null },
-      '投信':   { call: null, put: null },
-    };
+    // ── 三大法人籌碼解析 ──
+    const institution = { 外資: null, 自營商: null, 投信: null };
     for (const row of instData) {
-      const name    = row.institutional_investors || row.name || '';
-      const cp      = (row.call_put || '').trim();
+      const name = row.institutional_investors || row.name || '';
       const longOI  = parseInt(row.long_open_interest_balance_volume)  || 0;
       const shortOI = parseInt(row.short_open_interest_balance_volume) || 0;
       const net = longOI - shortOI;
-      let key = null;
-      if (name.includes('外資')) key = '外資';
-      else if (name.includes('自營')) key = '自營商';
-      else if (name.includes('投信')) key = '投信';
-      if (!key) continue;
-      if (cp === '買權') instMap[key].call = net;
-      else if (cp === '賣權') instMap[key].put = net;
-    }
-    // net = CALL淨部位 - PUT淨部位（正=方向性偏多，負=偏空）
-    const institution = {};
-    for (const [name, v] of Object.entries(instMap)) {
-      const callNet = v.call ?? 0;
-      const putNet  = v.put  ?? 0;
-      institution[name] = {
-        call: v.call,
-        put:  v.put,
-        net:  (v.call !== null || v.put !== null) ? callNet - putNet : null,
-      };
+      if (name.includes('外資')) institution['外資'] = net;
+      else if (name.includes('自營')) institution['自營商'] = net;
+      else if (name.includes('投信')) institution['投信'] = net;
     }
 
     // ── Max Pain 計算 ──
@@ -1554,52 +1534,6 @@ ${redditTitles || '無'}
   }
 
   // ── 融資融券整體市場 ──
-  // ── 微台指散戶多空比 ──
-  if (endpoint === 'tmf') {
-    const CACHE_TTL = 60 * 60 * 1000;
-    if (!global._tmfCache) global._tmfCache = { data: null, ts: 0 };
-    const now = Date.now();
-    if (global._tmfCache.data && (now - global._tmfCache.ts) < CACHE_TTL) {
-      return res.status(200).json({ ...global._tmfCache.data, cached: true });
-    }
-    try {
-      const SUPA_URL = process.env.SUPABASE_URL;
-      const SUPA_KEY = process.env.SUPABASE_SERVICE_KEY;
-      // 取最近 30 個交易日的 TMF 資料
-      const r = await fetch(
-        `${SUPA_URL}/rest/v1/chips_daily?order=date.desc&limit=30&select=date,fut_tmf_total_net,fut_tmf_total_oi,fut_tmf_foreign_net,fut_tmf_trust_net,fut_tmf_dealer_net`,
-        { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` } }
-      );
-      const rows = await r.json();
-      if (!Array.isArray(rows) || !rows.length) throw new Error('無資料');
-
-      // 計算每日散戶多空比
-      const history = rows.map(row => {
-        const totalNet = row.fut_tmf_total_net;
-        const totalOI  = row.fut_tmf_total_oi;
-        const ratio    = (totalNet != null && totalOI > 0)
-          ? parseFloat((-1 * totalNet / totalOI * 100).toFixed(2))
-          : null;
-        return {
-          date:       row.date,
-          total_net:  totalNet,   // 三大法人合計淨額（口）
-          total_oi:   totalOI,    // 全體未平倉（口）
-          foreign_net: row.fut_tmf_foreign_net,
-          trust_net:   row.fut_tmf_trust_net,
-          dealer_net:  row.fut_tmf_dealer_net,
-          retail_ratio: ratio,    // 散戶多空比（%），正=偏多，負=偏空
-        };
-      }).filter(r => r.retail_ratio !== null);
-
-      const latest = history[0] || null;
-      const payload = { latest, history, latestDate: latest?.date || null };
-      global._tmfCache = { data: payload, ts: Date.now() };
-      return res.status(200).json({ ...payload, cached: false });
-    } catch(e) {
-      return res.status(500).json({ error: e.message });
-    }
-  }
-
   if (endpoint === 'margin') {
     const TOKEN = process.env.FINMIND_TOKEN;
     if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
@@ -1705,11 +1639,11 @@ ${redditTitles || '無'}
       { id:'3034', name:'聯詠',      sector:'IC設計',   mcap:1200 },
       { id:'2379', name:'瑞昱',      sector:'IC設計',   mcap:1150 },
       { id:'6415', name:'矽力-KY',   sector:'IC設計',   mcap:500 },
-      { id:'3231', name:'緯創',      sector:'IC設計',   mcap:480 },
       { id:'4967', name:'十銓',      sector:'IC設計',   mcap:300 },
       { id:'6547', name:'高端疫苗',  sector:'IC設計',   mcap:280 },
-      { id:'2207', name:'和泰車',    sector:'IC設計',   mcap:840 },
-      { id:'3533', name:'嘉澤',      sector:'IC設計',   mcap:560 },
+      { id:'6770', name:'力積電',    sector:'IC設計',   mcap:400 },
+      { id:'2454', name:'聯發科',    sector:'IC設計',   mcap:5800 },
+      { id:'5347', name:'世界',      sector:'IC設計',   mcap:320 },
       // ── 記憶體（4）──
       { id:'2408', name:'南亞科',    sector:'記憶體',   mcap:820 },
       { id:'2337', name:'旺宏',      sector:'記憶體',   mcap:520 },
@@ -1741,7 +1675,6 @@ ${redditTitles || '無'}
       { id:'2376', name:'技嘉',      sector:'電腦',     mcap:540 },
       { id:'3017', name:'奇鋐',      sector:'電腦',     mcap:480 },
       { id:'2364', name:'倫飛',      sector:'電腦',     mcap:160 },
-      { id:'3考', name:'微星',       sector:'電腦',     mcap:420 },
       { id:'2377', name:'微星',      sector:'電腦',     mcap:420 },
       // ── 工業電腦（4）──
       { id:'2395', name:'研華',      sector:'工業電腦', mcap:1050 },
@@ -1828,7 +1761,7 @@ ${redditTitles || '無'}
       { id:'6446', name:'藥華藥',    sector:'生技醫療', mcap:680 },
       { id:'4105', name:'台灣東洋',  sector:'生技醫療', mcap:220 },
       // ── 建材營造（5）──
-      { id:'2882', name:'國建',      sector:'建材營造', mcap:300 },
+      { id:'2501', name:'國建',      sector:'建材營造', mcap:300 },
       { id:'2515', name:'中工',      sector:'建材營造', mcap:180 },
       { id:'2504', name:'國產',      sector:'建材營造', mcap:200 },
       { id:'1101', name:'台泥',      sector:'建材營造', mcap:580 },
@@ -1904,6 +1837,107 @@ ${redditTitles || '無'}
     global._hmCache = { data: payload, ts: Date.now() };
     res.status(200).json({ ...payload, cached: false });
     return;
+  }
+
+  // ── 股東紀念品：讀取 ──────────────────────────────────────────────
+  if (endpoint === 'gifts') {
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' });
+    try {
+      const showPast = req.query.show_past === '1';
+      const cat      = req.query.category || '';
+      const today    = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
+      let qs = `order=record_date.asc&limit=500&select=*`;
+      if (!showPast) qs += `&record_date=gte.${today}`;
+      if (cat)       qs += `&gift_category=eq.${encodeURIComponent(cat)}`;
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/shareholder_gifts?${qs}`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(6000) });
+      if (!r.ok) throw new Error(`Supabase ${r.status}`);
+      const data = await r.json();
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+      return res.status(200).json(data);
+    } catch(e) { return res.status(500).json({ error: e.message }); }
+  }
+
+  // ── 股東紀念品：後台管理 CRUD（需 x-admin-key）──────────────────
+  if (endpoint === 'gifts_admin') {
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+    const ADMIN_KEY    = process.env.ADMIN_KEY || 'alphascope-admin-2026';
+    if (req.headers['x-admin-key'] !== ADMIN_KEY)
+      return res.status(401).json({ error: 'Unauthorized' });
+
+    const method = req.method || 'GET';
+
+    // LIST
+    if (method === 'GET') {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/shareholder_gifts?order=record_date.asc&limit=1000&select=*`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(6000) });
+      const data = await r.json();
+      return res.status(r.status).json(data);
+    }
+
+    // UPSERT (POST)
+    if (method === 'POST') {
+      const body = req.body;
+      if (!body.stock_id || !body.stock_name || !body.record_date || !body.gift_desc)
+        return res.status(400).json({ error: '缺少必要欄位：stock_id, stock_name, record_date, gift_desc' });
+      // Auto-compute cp_ratio if value + ref price present and ratio not set
+      if (body.gift_value_est && body.share_price_ref && !body.cp_ratio) {
+        body.cp_ratio = parseFloat((body.gift_value_est / body.share_price_ref * 100).toFixed(2));
+      }
+      body.updated_at = new Date().toISOString();
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/shareholder_gifts`,
+        { method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=representation' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(6000) });
+      const data = await r.json();
+      return res.status(r.ok ? 200 : r.status).json(data);
+    }
+
+    // DELETE
+    if (method === 'DELETE') {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ error: 'missing id' });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/shareholder_gifts?id=eq.${encodeURIComponent(id)}`,
+        { method: 'DELETE',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          signal: AbortSignal.timeout(6000) });
+      return res.status(r.ok ? 200 : r.status).json({ ok: r.ok });
+    }
+
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // ── 微台指散戶多空比（近 30 日）──  if (endpoint === 'tmf') {
+    const SUPABASE_URL = process.env.SUPABASE_URL  || 'https://fdxedcwtmlurumfjmlys.supabase.co';
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
+    try {
+      const limit = Math.min(parseInt(req.query.limit) || 30, 60);
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/chips_daily?order=date.desc&limit=${limit}&select=date,fut_tmf_total_net,fut_tmf_total_oi,fut_tmf_foreign_net,fut_tmf_dealer_net,fut_tmf_trust_net`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(5000) }
+      );
+      if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
+      const rows = await r.json();
+      // 計算每日散戶多空比 = -1 × fut_tmf_total_net / fut_tmf_total_oi × 100
+      const data = rows.map(row => {
+        const { date, fut_tmf_total_net, fut_tmf_total_oi, fut_tmf_foreign_net, fut_tmf_dealer_net, fut_tmf_trust_net } = row;
+        const retailRatio = (fut_tmf_total_net != null && fut_tmf_total_oi > 0)
+          ? parseFloat((-1 * fut_tmf_total_net / fut_tmf_total_oi * 100).toFixed(2))
+          : null;
+        return { date, retailRatio, fut_tmf_total_net, fut_tmf_total_oi, fut_tmf_foreign_net, fut_tmf_dealer_net, fut_tmf_trust_net };
+      });
+      const latest = data[0] || {};
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+      return res.status(200).json({ data, count: data.length, latestDate: latest.date || null, latestRatio: latest.retailRatio ?? null });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
   }
 
   // RSS news feeds
