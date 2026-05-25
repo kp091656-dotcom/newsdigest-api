@@ -1,0 +1,54 @@
+name: Shareholder Gifts Scraper
+
+on:
+  schedule:
+    # 每週一至週五 09:00 台灣時間（UTC 01:00），3-6 月股東會季自動執行
+    - cron: '0 1 * 3-6 1-5'
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: '每批處理幾家（預設 100）'
+        required: false
+        default: '100'
+      reset_year:
+        description: '重置本年進度（清空 gift_scrape_log 重新跑）'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+jobs:
+  scrape-gifts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install pdf-parse
+        run: npm install pdf-parse@1.1.1
+
+      - name: Reset progress（若手動觸發並選擇重置）
+        if: github.event.inputs.reset_year == 'true'
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          YEAR=$(date -d "+8 hours" +%Y)
+          echo "🗑 清除 gift_scrape_log year=${YEAR}…"
+          curl -sf -X DELETE \
+            "${SUPABASE_URL}/rest/v1/gift_scrape_log?year=eq.${YEAR}" \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            && echo "✅ 重置完成" || echo "⚠️ 重置失敗（表可能不存在）"
+
+      - name: Run gift scraper
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GROQ_API_KEY:         ${{ secrets.GROQ_API_KEY }}
+          BATCH_SIZE:           ${{ github.event.inputs.batch_size || '100' }}
+        run: node .github/scripts/scrape_gifts.js
