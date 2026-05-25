@@ -1913,7 +1913,8 @@ ${redditTitles || '無'}
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // ── 微台指散戶多空比（近 30 日）──  if (endpoint === 'tmf') {
+  // ── 微台指散戶多空比（近 30 日）──
+  if (endpoint === 'tmf') {
     const SUPABASE_URL = process.env.SUPABASE_URL  || 'https://fdxedcwtmlurumfjmlys.supabase.co';
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || 'sb_publishable_BAaZB86ibYZSvTFkFGkeQA_GspDNdf0';
     try {
