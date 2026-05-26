@@ -142,8 +142,11 @@ function sanitizeDate(raw) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Phase 1：MOPS opendata → 本年度所有有股東會的公司
-// 優先 mopsfin.twse.com.tw CSV，fallback 舊 mops.twse.com.tw JSON
+// Phase 1：取得本年度所有有股東會的公司清單
+// 策略：
+//   ① openapi.twse.com.tw / tpex.org.tw（公司名稱，無日期）→ 取得代碼清單
+//   ② mopsfin t187ap39 股利表（含股東會日期）→ 補齊日期
+//   ③ 若完全失敗，回傳空 map 並印警告
 // ═══════════════════════════════════════════════════════════════════════
 
 // CSV 解析（處理 MOPS quoted CSV 格式）
@@ -159,83 +162,79 @@ function parseMopsCsv(txt) {
 
 async function fetchAllMeetingCompanies() {
   const map = {};   // { stockId: { name, meetingDate, recordDate } }
+  const UA  = { 'User-Agent': 'Mozilla/5.0 (compatible; AlphaScope/1.0)' };
 
-  const SOURCES = [
-    // ① 新域名 mopsfin（CSV 格式）
-    { label: '上市(mopsfin)', url: 'https://mopsfin.twse.com.tw/opendata/t187ap01_L.csv', fmt: 'csv' },
-    { label: '上櫃(mopsfin)', url: 'https://mopsfin.twse.com.tw/opendata/t187ap01_O.csv', fmt: 'csv' },
-    // ② 舊域名 fallback
-    { label: '上市(mops)',    url: 'https://mops.twse.com.tw/opendata/t187ap01_L',         fmt: 'json' },
-    { label: '上櫃(mops)',    url: 'https://mops.twse.com.tw/opendata/t187ap01_O',         fmt: 'json' },
+  // ── Step A：取公司清單（優先新 OpenAPI，有名稱無日期）──────────────────
+  const LIST_SOURCES = [
+    { label: '上市(TWSE OpenAPI)', url: 'https://openapi.twse.com.tw/v1/opendata/t187ap03_L', fmt: 'json' },
+    { label: '上櫃(TPEx OpenAPI)', url: 'https://www.tpex.org.tw/openapi/v1/t187ap03_O',    fmt: 'json' },
+    { label: '上市(mopsfin)',      url: 'https://mopsfin.twse.com.tw/opendata/t187ap03_L.csv', fmt: 'csv' },
+    { label: '上櫃(mopsfin)',      url: 'https://mopsfin.twse.com.tw/opendata/t187ap03_O.csv', fmt: 'csv' },
   ];
 
-  let gotData = false;
-  for (const { label, url, fmt } of SOURCES) {
-    if (gotData && url.includes('mops.twse.com.tw/opendata')) continue;
+  for (const { label, url, fmt } of LIST_SOURCES) {
     try {
       console.log(`  → ${label}…`);
-      const r = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AlphaScope/1.0)' },
-        signal: AbortSignal.timeout(20000),
-      });
+      const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(20000) });
       if (!r.ok) { console.warn(`  ⚠️  ${label} HTTP ${r.status}`); continue; }
       const txt = await r.text();
       if (!txt || txt.length < 100) { console.warn(`  ⚠️  ${label} 回應過短`); continue; }
-
       let rows = [];
-      if (fmt === 'csv') {
-        rows = parseMopsCsv(txt);
-      } else {
-        try { rows = JSON.parse(txt); } catch { rows = parseMopsCsv(txt); }
-      }
-
+      if (fmt === 'csv') { rows = parseMopsCsv(txt); }
+      else { try { rows = JSON.parse(txt); } catch { rows = parseMopsCsv(txt); } }
       let added = 0;
       for (const row of rows) {
-        const id = row['公司代號'] || row['companyCode'] || '';
+        const id = (row['公司代號'] || row['SecuritiesCompanyCode'] || '').trim();
         if (!id || !/^\d{4,6}$/.test(id)) continue;
         if (!map[id]) {
           map[id] = {
-            name:        row['公司名稱'] || row['company_name'] || '',
-            meetingDate: row['股東會日期'] || row['meeting_date'] || '',
-            recordDate:  row['停止過戶日期'] || row['record_date'] || '',
+            name:        (row['公司名稱'] || row['CompanyName'] || row['公司簡稱'] || '').trim(),
+            meetingDate: row['股東會日期'] || '',
+            recordDate:  row['停止過戶日期'] || '',
           };
           added++;
         }
       }
       console.log(`  ✅ ${label}：新增 ${added} 家，累計 ${Object.keys(map).length} 家`);
-      if (added > 0) gotData = true;
-    } catch(e) {
-      console.warn(`  ⚠️  ${label} 失敗：${e.message}`);
-    }
+    } catch(e) { console.warn(`  ⚠️  ${label} 失敗：${e.message}`); }
+    await sleep(500);
+  }
+
+  // ── Step B：補股東會日期（t187ap39 股利表，含 meetingDate）────────────
+  console.log('  → 補充股東會日期（t187ap39）…');
+  const DATE_SOURCES = [
+    { label: '上市(股利表)', url: 'https://mopsfin.twse.com.tw/opendata/t187ap39_L.csv' },
+    { label: '上櫃(股利表)', url: 'https://mopsfin.twse.com.tw/opendata/t187ap39_O.csv' },
+  ];
+  for (const { label, url } of DATE_SOURCES) {
+    try {
+      const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(20000) });
+      if (!r.ok) { console.warn(`  ⚠️  ${label} HTTP ${r.status}`); continue; }
+      const rows = parseMopsCsv(await r.text());
+      let patched = 0;
+      for (const row of rows) {
+        const id = (row['公司代號'] || '').trim();
+        if (!id) continue;
+        const md = sanitizeDate(row['股東會日期'] || '');
+        if (!md || !md.startsWith(String(AD_YEAR))) continue;
+        if (map[id]) {
+          if (!map[id].meetingDate) { map[id].meetingDate = row['股東會日期']; patched++; }
+        } else {
+          // 股利表有但公司清單沒有 → 也補進去
+          map[id] = { name: (row['公司名稱']||'').trim(), meetingDate: row['股東會日期']||'', recordDate: '' };
+          patched++;
+        }
+      }
+      console.log(`  ✅ ${label}：補充/新增 ${patched} 筆日期`);
+    } catch(e) { console.warn(`  ⚠️  ${label} 失敗：${e.message}`); }
     await sleep(MOPS_DELAY_MS);
   }
 
-  // ③ 最終 fallback：t187ap39 股利表（含股東會日期）
-  if (Object.keys(map).length === 0) {
-    console.log('  → 主要來源全失敗，嘗試 t187ap39 股利表…');
-    for (const [label, url] of [
-      ['上市(股利表)', 'https://mopsfin.twse.com.tw/opendata/t187ap39_L.csv'],
-      ['上櫃(股利表)', 'https://mopsfin.twse.com.tw/opendata/t187ap39_O.csv'],
-    ]) {
-      try {
-        const r = await fetch(url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AlphaScope/1.0)' },
-          signal: AbortSignal.timeout(20000),
-        });
-        if (!r.ok) { console.warn(`  ⚠️  ${label} HTTP ${r.status}`); continue; }
-        const rows = parseMopsCsv(await r.text());
-        let added = 0;
-        for (const row of rows) {
-          const id = row['公司代號'] || '';
-          if (!id || !/^\d{4,6}$/.test(id)) continue;
-          const mdFull = sanitizeDate(row['股東會日期'] || '');
-          if (!mdFull || !mdFull.startsWith(String(AD_YEAR))) continue;
-          if (!map[id]) { map[id] = { name: row['公司名稱']||'', meetingDate: row['股東會日期']||'', recordDate: '' }; added++; }
-        }
-        console.log(`  ✅ ${label}：新增 ${added} 家，累計 ${Object.keys(map).length} 家`);
-      } catch(e) { console.warn(`  ⚠️  ${label} 失敗：${e.message}`); }
-      await sleep(MOPS_DELAY_MS);
-    }
+  // 過濾：只保留有股東會日期（本年度）或無日期（讓後續爬蟲自己查）的
+  const total = Object.keys(map).length;
+  console.log(`  📊 公司清單合計：${total} 家（含有/無股東會日期）`);
+  if (total === 0) {
+    console.warn('  ⚠️  所有來源均失敗，公司清單為空，本次跳過。');
   }
 
   return map;
