@@ -5626,8 +5626,10 @@ async function loadMktSignals() {
   }
 
   // 法人籌碼子分數（instScore = netBil 方向 + 連買天數）
-  const chipsRaw   = (inst && inst.data && inst.data[0])
-    ? (() => { const nb = Math.round(inst.data[0].net / 1e8 * 10) / 10; let s = nb >= 0 ? 1 : -1; const st = inst.streak || 0; s += st > 0 ? Math.min(2, Math.floor(Math.abs(st)/3)) : -Math.min(2, Math.floor(Math.abs(st)/3)); return s; })()
+  // inst 可能未定義（若 opt 無 pcRatio 時 block 未執行）
+  const instSafe = (typeof inst !== 'undefined') ? inst : (instData.status === 'fulfilled' ? instData.value : null);
+  const chipsRaw   = (instSafe && instSafe.data && instSafe.data[0])
+    ? (() => { const nb = Math.round(instSafe.data[0].net / 1e8 * 10) / 10; let s = nb >= 0 ? 1 : -1; const st = instSafe.streak || 0; s += st > 0 ? Math.min(2, Math.floor(Math.abs(st)/3)) : -Math.min(2, Math.floor(Math.abs(st)/3)); return s; })()
     : 0;
   const chipsColor = chipsRaw >= 1 ? 'var(--up)' : chipsRaw <= -1 ? 'var(--down)' : 'var(--muted)';
   const chipsLbl   = chipsRaw >= 2 ? '強力買超' : chipsRaw >= 1 ? '小幅買超' : chipsRaw <= -2 ? '強力賣超' : chipsRaw <= -1 ? '小幅賣超' : '中性';
