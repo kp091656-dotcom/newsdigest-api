@@ -294,7 +294,7 @@ async function fetchHandbookUrl(stockId) {
 // Phase 4：下載 PDF → 抽文字（只解析前 10 頁）
 // ═══════════════════════════════════════════════════════════════════════
 async function extractPdfText(pdfUrl) {
-  const pdfParse = require('pdf-parse');
+  const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
   const r = await fetch(pdfUrl, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AlphaScope/1.0)' },
     signal: AbortSignal.timeout(PDF_TIMEOUT),
@@ -452,7 +452,7 @@ async function main() {
   // 寫入 GitHub Actions Step Summary（若在 CI 中執行）
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
   if (summaryFile) {
-    const { appendFileSync } = require('fs');
+    const { appendFileSync } = await import('fs');
     appendFileSync(summaryFile, [
       `## 🎁 本批次結果`,
       `| 項目 | 數量 |`,
