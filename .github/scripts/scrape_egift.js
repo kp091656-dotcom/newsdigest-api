@@ -180,8 +180,12 @@ async function enrichWithRecordDates(companies) {
   companies.forEach(c => { map[c.stock_id] = c; });
 
   const SOURCES = [
+    // 上市：t187ap08_L = 上市公司股東會及停止過戶日期
+    'https://openapi.twse.com.tw/v1/opendata/t187ap08_L',
+    // 上市 fallback：t187ap03_L 有產業別，但無停止過戶日
     'https://openapi.twse.com.tw/v1/opendata/t187ap03_L',
-    'https://www.tpex.org.tw/openapi/v1/t187ap03_O',
+    // 上櫃：TPEx openapi
+    'https://openapi.tpex.org.tw/v1/opendata/t187ap08_O',
   ];
 
   for (const url of SOURCES) {
@@ -193,7 +197,7 @@ async function enrichWithRecordDates(companies) {
       for (const row of rows) {
         const id = (row['公司代號'] || '').trim();
         if (!map[id]) continue;
-        const rd = row['停止過戶日期'] || row['record_date'] || '';
+        const rd = row['停止過戶起日'] || row['停止過戶日期'] || row['record_date'] || '';
         if (rd && !map[id].record_date) {
           map[id].record_date = rocToAd(rd) || rd;
           patched++;
