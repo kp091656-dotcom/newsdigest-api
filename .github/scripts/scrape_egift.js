@@ -172,6 +172,17 @@ function parseEgiftList(text) {
   });
 }
 
+// CSV 解析 helper
+function parseMopsCsv(txt) {
+  const lines = txt.trim().split('\n');
+  if (lines.length < 2) return [];
+  const hdrs = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.replace(/"/g,'').trim());
+  return lines.slice(1).map(l => {
+    const v = l.split(',').map(c => c.replace(/"/g,'').trim());
+    return Object.fromEntries(hdrs.map((h,i) => [h, v[i]||'']));
+  });
+}
+
 // ── Step 4：從 TWSE/TPEx API 補齊停止過戶日 ──────────────────────────
 async function enrichWithRecordDates(companies) {
   console.log('  → 從 TWSE/TPEx API 補齊停止過戶日…');
@@ -180,26 +191,24 @@ async function enrichWithRecordDates(companies) {
   companies.forEach(c => { map[c.stock_id] = c; });
 
   const SOURCES = [
-    // 上市：t187ap08_L = 上市公司股東會及停止過戶日期
-    'https://openapi.twse.com.tw/v1/opendata/t187ap08_L',
-    // 上市 fallback：t187ap03_L 有產業別，但無停止過戶日
-    'https://openapi.twse.com.tw/v1/opendata/t187ap03_L',
-    // 上櫃：TPEx openapi
-    'https://openapi.tpex.org.tw/v1/opendata/t187ap08_O',
+    // 上市：t187ap39_L = 上市公司除權除息暨停止過戶日期（含股東會日期）
+    'https://openapi.twse.com.tw/v1/opendata/t187ap39_L',
+    // 上櫃：mopsfin CSV（因 TPEx openapi 不穩定）
+    'https://mopsfin.twse.com.tw/opendata/t187ap39_O.csv',
   ];
 
   for (const url of SOURCES) {
     try {
       const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) continue;
-      const rows = await r.json();
+      const txt = await r.text();
+      let rows;
+      try { rows = JSON.parse(txt); } catch { rows = parseMopsCsv(txt); }
       let patched = 0;
       for (const row of rows) {
         const id = (row['公司代號'] || '').trim();
         if (!map[id]) continue;
-        // debug 第一筆印出所有欄位名
-        if (patched === 0) console.log('  [debug keys]', Object.keys(row).slice(0,8).join(' | '));
-        const rd = row['停止過戶起日'] || row['停止過戶日期'] || row['RecordDate'] || row['record_date'] || row['停止轉讓起日'] || '';
+        const rd = row['停止過戶起日'] || row['停止過戶日期'] || row['停止轉讓起日'] || row['RecordDate'] || row['record_date'] || '';
         if (rd && !map[id].record_date) {
           map[id].record_date = rocToAd(rd) || rd;
           patched++;
