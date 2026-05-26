@@ -191,15 +191,15 @@ async function enrichWithRecordDates(companies) {
   companies.forEach(c => { map[c.stock_id] = c; });
 
   const SOURCES = [
-    // 上市：t187ap39_L = 上市公司除權除息暨停止過戶日期（含股東會日期）
-    'https://openapi.twse.com.tw/v1/opendata/t187ap39_L',
-    // 上櫃：mopsfin CSV（因 TPEx openapi 不穩定）
-    'https://mopsfin.twse.com.tw/opendata/t187ap39_O.csv',
+    // 上市：TWT48U = 近期除權息及停止過戶預告表（精簡，速度快）
+    'https://openapi.twse.com.tw/v1/exchangeReport/TWT48U',
+    // 上櫃：TPEx 對應版本
+    'https://www.tpex.org.tw/openapi/v1/twt48u',
   ];
 
   for (const url of SOURCES) {
     try {
-      const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
+      const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) });
       if (!r.ok) continue;
       const txt = await r.text();
       let rows;
@@ -208,7 +208,7 @@ async function enrichWithRecordDates(companies) {
       for (const row of rows) {
         const id = (row['公司代號'] || '').trim();
         if (!map[id]) continue;
-        const rd = row['停止過戶起日'] || row['停止過戶日期'] || row['停止轉讓起日'] || row['RecordDate'] || row['record_date'] || '';
+        const rd = row['停止過戶起日'] || row['停止過戶日期'] || row['停止轉讓起日'] || row['BookClosureStartDate'] || row['RecordDate'] || row['record_date'] || '';
         if (rd && !map[id].record_date) {
           map[id].record_date = rocToAd(rd) || rd;
           patched++;
@@ -236,7 +236,7 @@ async function upsertToSupabase(companies) {
     stock_id:        c.stock_id,
     stock_name:      c.stock_name,
     sector:          c.sector || null,
-    record_date:     c.record_date || c.meeting_date,  // 若無停戶日，暫用股東會日期
+    record_date:     c.meeting_date,
     meeting_date:    c.meeting_date || null,
     gift_desc:       'eGift 電子紀念品',
     gift_category:   'voucher',
@@ -317,15 +317,11 @@ async function main() {
   }
   companies.forEach((c, i) => console.log(`  [${i+1}] ${c.stock_id} ${c.stock_name} 股東會:${c.meeting_date}`));
 
-  // 4. 補齊停止過戶日
-  console.log('');
-  companies = await enrichWithRecordDates(companies);
-
-  // 5. Upsert
+  // 4. Upsert
   console.log('');
   const upserted = await upsertToSupabase(companies);
 
-  // 6. 清理撤回
+  // 5. 清理撤回
   console.log('');
   await clearRemovedEgifts(companies.map(c => c.stock_id));
 
