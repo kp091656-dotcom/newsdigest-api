@@ -122,28 +122,45 @@ async function fetchAndParsePdf(pdfUrl) {
 }
 
 // ── Step 3：從文字解析公司清單 ────────────────────────────────────────
-// PDF 格式：序號 代號 公司名稱 股東會日期
-// 例：1  1338  廣華-KY  115/05/22
+// PDF 實際格式：代號與名稱在同一行，日期在下一行
+// 例：
+//   1 1338 廣華-KY
+//   115/05/22
 function parseEgiftList(text) {
   const companies = [];
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-  for (const line of lines) {
-    // 匹配：數字序號? 4-5碼代號 中文/英文公司名 ROC日期
-    const m = line.match(/(\d{4,5})\s+([^\d\/\*]+?)\s+(1\d{2}\/\d{1,2}\/\d{1,2})/);
-    if (!m) continue;
-    const [, code, name, rocDate] = m;
-    const meetingDate = rocToAd(rocDate);
-    if (!meetingDate || !meetingDate.startsWith(String(AD_YEAR))) continue;
-
-    // 排除非股票代號（太長或太短）
-    if (code.length < 4 || code.length > 6) continue;
-
-    companies.push({
-      stock_id:    code.trim(),
-      stock_name:  name.replace(/[\*＊]/g, '').trim(),  // 移除星號
-      meeting_date: meetingDate,
-    });
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // 匹配：序號(可選) 4-5碼代號 公司名稱（剩餘部分）
+    const m = line.match(/^(?:\d+\s+)?(\d{4,5})\s+(.+)$/);
+    if (m) {
+      const code = m[1];
+      const name = m[2].replace(/[\*＊]/g, '').trim();
+      // 看下一行是否是 ROC 日期
+      let meetingDate = null;
+      if (i + 1 < lines.length) {
+        const dm = lines[i + 1].match(/^(1\d{2})\/(\d{1,2})\/(\d{1,2})$/);
+        if (dm) {
+          const [, y, mo, d] = dm;
+          meetingDate = `${parseInt(y) + 1911}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+          i++;  // 跳過日期行
+        }
+      }
+      // 若日期在同一行也接受（兼容未來格式）
+      if (!meetingDate) {
+        const inlineDm = line.match(/(1\d{2})\/(\d{1,2})\/(\d{1,2})/);
+        if (inlineDm) {
+          const [, y, mo, d] = inlineDm;
+          meetingDate = `${parseInt(y) + 1911}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        }
+      }
+      if (meetingDate && meetingDate.startsWith(String(AD_YEAR)) && code.length >= 4 && code.length <= 6) {
+        companies.push({ stock_id: code, stock_name: name, meeting_date: meetingDate });
+      }
+    }
+    i++;
   }
 
   // 去重（同代號只保留一筆）
