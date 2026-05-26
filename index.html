@@ -5345,6 +5345,7 @@ window.addEventListener('resize', updateStickyOffsets);
 async function loadMktSignals() {
   if (loadMktSignals._busy) return;
   loadMktSignals._busy = true;
+  try {
   // 同時抓取選擇權、三大法人現貨、融資融券
   const [optData, instData, marginData] = await Promise.allSettled([
     fetch(API_BASE + '?endpoint=options').then(r => r.json()),
@@ -5656,7 +5657,11 @@ async function loadMktSignals() {
   loadSignalBacktest();
   loadValuationSignal();   // ② 估值分布
   loadBetaSignal();        // ③ CAPM β 值
-  loadMktSignals._busy = false;  // 解鎖，允許重新載入
+  } catch(e) {
+    console.error('[loadMktSignals]', e);
+  } finally {
+    loadMktSignals._busy = false;  // 無論成敗都解鎖
+  }
 }
 
 // ── 台指選擇權：P/C Ratio + 三大法人 + Max Pain ──
