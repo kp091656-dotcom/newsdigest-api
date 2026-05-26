@@ -3626,6 +3626,8 @@ async function loadFutures() {
     renderFuturesChart(futuresSortKey);
   } catch(e) {
     document.getElementById('futuresLoading').textContent = '載入失敗：' + e.message;
+  } finally {
+    loadFutures._busy = false;  // 解鎖，允許重試
   }
 }
 
@@ -5654,6 +5656,7 @@ async function loadMktSignals() {
   loadSignalBacktest();
   loadValuationSignal();   // ② 估值分布
   loadBetaSignal();        // ③ CAPM β 值
+  loadMktSignals._busy = false;  // 解鎖，允許重新載入
 }
 
 // ── 台指選擇權：P/C Ratio + 三大法人 + Max Pain ──
