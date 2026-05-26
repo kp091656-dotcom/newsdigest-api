@@ -35,7 +35,7 @@ const KNOWN_PDF_URL   = 'https://m.tdcc.com.tw/TDCCWEB/upload/4028c0b49dd8fc3b01
 const UA = 'Mozilla/5.0 (compatible; AlphaScope-eGift/1.0)';
 const SB = {
   get:    (q) => fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbHeaders() }),
-  upsert: (t, body) => fetch(`${SUPABASE_URL}/rest/v1/${t}`, {
+  upsert: (t, body, onConflict='') => fetch(`${SUPABASE_URL}/rest/v1/${t}?${onConflict ? 'on_conflict='+onConflict : ''}`, {
     method: 'POST',
     headers: { ...sbHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify(body),
@@ -197,7 +197,9 @@ async function enrichWithRecordDates(companies) {
       for (const row of rows) {
         const id = (row['公司代號'] || '').trim();
         if (!map[id]) continue;
-        const rd = row['停止過戶起日'] || row['停止過戶日期'] || row['record_date'] || '';
+        // debug 第一筆印出所有欄位名
+        if (patched === 0) console.log('  [debug keys]', Object.keys(row).slice(0,8).join(' | '));
+        const rd = row['停止過戶起日'] || row['停止過戶日期'] || row['RecordDate'] || row['record_date'] || row['停止轉讓起日'] || '';
         if (rd && !map[id].record_date) {
           map[id].record_date = rocToAd(rd) || rd;
           patched++;
@@ -239,7 +241,7 @@ async function upsertToSupabase(companies) {
   let ok = 0;
   for (let i = 0; i < rows.length; i += 20) {
     const batch = rows.slice(i, i + 20);
-    const r = await SB.upsert('shareholder_gifts', batch);
+    const r = await SB.upsert('shareholder_gifts', batch, 'stock_id,year');
     if (r.ok) {
       ok += batch.length;
     } else {
