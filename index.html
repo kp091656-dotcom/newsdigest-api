@@ -3428,6 +3428,8 @@ document.querySelectorAll('.cat-tab[data-cat]').forEach(tab => {
     if (hp) hp.style.display = 'none';
     const sgp = document.getElementById('signalPanel');
     if (sgp) sgp.style.display = 'none';
+    const gfp = document.getElementById('giftsPanel');
+    if (gfp) gfp.style.display = 'none';
     if (nf) nf.style.display = 'block';
     if (fh) fh.style.display = 'flex';
     renderFeed(getFiltered());
