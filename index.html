@@ -1527,6 +1527,14 @@
   .gdl-past   { background: var(--tag-bg); color: var(--muted); border: 1px solid var(--border); }
 
   .gift-note { font-size: 0.68rem; color: var(--muted); padding: 0.4rem 0.85rem 0.6rem; font-style: italic; }
+  .gift-egift-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: linear-gradient(135deg,#6366f115,#818cf815);
+    border: 1px solid #6366f140; border-radius: 4px;
+    padding: 0.1rem 0.45rem; font-size: 0.58rem; font-weight: 700;
+    color: #6366f1; letter-spacing: 0.03em; white-space: nowrap;
+  }
+  .gift-card.gc-egift { border-left: 3px solid #6366f1; }
 
   .gifts-empty {
     padding: 3rem 1rem; text-align: center;
@@ -2375,6 +2383,7 @@
         <span style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.04em;">🎁 股東紀念品</span>
         <div class="gifts-stat-pill" id="giftStatTotal">—</div>
         <div class="gifts-stat-pill" id="giftStatSoon">—</div>
+        <div class="gifts-stat-pill" id="giftStatEgift">—</div>
         <div class="gifts-stat-pill" id="giftStatAvgCP">—</div>
         <a href="/gifts-admin.html" target="_blank" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:0.15rem 0.55rem;border-radius:4px;">管理後台 →</a>
       </div>
@@ -2388,6 +2397,9 @@
         <button class="gift-cat-btn" data-gcat="3c"      onclick="setGiftCat(this,'3c')">📱 3C</button>
         <button class="gift-cat-btn" data-gcat="other"   onclick="setGiftCat(this,'other')">其他</button>
         <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;flex-wrap:wrap;">
+          <label class="gifts-past-toggle"><input type="checkbox" id="giftShowEgift" onchange="reRenderGifts()">
+            <span style="color:#6366f1;font-weight:600;">⚡ 僅 eGift</span>
+          </label>
           <label class="gifts-past-toggle"><input type="checkbox" id="giftShowPast" onchange="reRenderGifts()"> 顯示已截止</label>
           <button class="gifts-sort-btn gs-active" id="gsortDeadline" onclick="setGiftSort('deadline')">截止日 <span class="sort-arr">↑</span></button>
           <button class="gifts-sort-btn" id="gsortCP" onclick="setGiftSort('cp')">CP值 <span class="sort-arr">↓</span></button>
@@ -5170,8 +5182,10 @@ function reRenderGifts() {
   const showPast = document.getElementById('giftShowPast')?.checked;
   const today = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
 
+  const showEgift = document.getElementById('giftShowEgift')?.checked;
   let data = _giftsData
     .filter(g => _giftCat ? g.gift_category === _giftCat : true)
+    .filter(g => showEgift ? g.is_egift : true)
     .filter(g => showPast ? true : g.record_date >= today);
 
   // Sort
@@ -5184,9 +5198,11 @@ function reRenderGifts() {
   const upcoming = data.filter(g => g.record_date >= today).length;
   const soonList = data.filter(g => { const d = daysUntilDate(g.record_date); return d >= 0 && d <= 14; });
   const avgCP    = data.filter(g=>g.cp_ratio>0).reduce((s,g,_,a)=>s+g.cp_ratio/a.length,0);
-  document.getElementById('giftStatTotal').innerHTML = `共 <strong>${total}</strong> 筆`;
-  document.getElementById('giftStatSoon').innerHTML  = `本月截止 <strong>${soonList.length}</strong> 筆`;
-  document.getElementById('giftStatAvgCP').innerHTML = avgCP>0 ? `平均CP <strong>${avgCP.toFixed(2)}%</strong>` : `平均CP <strong>—</strong>`;
+  const egiftCount = _giftsData.filter(g => g.is_egift).length;
+  document.getElementById('giftStatTotal').innerHTML  = `共 <strong>${total}</strong> 筆`;
+  document.getElementById('giftStatSoon').innerHTML   = `本月截止 <strong>${soonList.length}</strong> 筆`;
+  document.getElementById('giftStatEgift').innerHTML  = `⚡ eGift <strong>${egiftCount}</strong> 家`;
+  document.getElementById('giftStatAvgCP').innerHTML  = avgCP>0 ? `平均CP <strong>${avgCP.toFixed(2)}%</strong>` : `平均CP <strong>—</strong>`;
 
   if (!data.length) {
     document.getElementById('giftsGrid').innerHTML = `<div class="gifts-empty"><div class="gifts-empty-icon">🎁</div>目前無符合條件的紀念品</div>`;
@@ -5246,7 +5262,7 @@ function giftCard(g) {
   const refStr = g.share_price_ref ? `NT$${Number(g.share_price_ref).toFixed(1)}` : '—';
 
   return `
-<div class="gift-card ${urgency}">
+<div class="gift-card ${urgency}${g.is_egift ? ' gc-egift' : ''}">
   <div class="gift-card-head">
     <div>
       <div class="gift-stock-id">${g.stock_id || '—'}</div>
@@ -5255,6 +5271,7 @@ function giftCard(g) {
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;">
       <span class="gift-cp-badge ${cpCls}">${cpStr}</span>
+      ${g.is_egift ? '<span class="gift-egift-badge">⚡ eGift</span>' : ''}
       <span class="gift-sector-tag ${meta.cls}">${meta.icon} ${meta.label}</span>
       ${g.sector ? `<span class="gift-sector-tag">${g.sector}</span>` : ''}
     </div>
