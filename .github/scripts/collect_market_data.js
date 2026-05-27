@@ -653,22 +653,25 @@ async function collectChips() {
         // 切出所有 td 文字（含空白 td），保留欄位順序
         const fields = rowM[1].split(/<\/td>/).map(f => f.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim());
         console.log('  🔍 TMF HTML 小計欄位：' + fields.join('|'));
-        // OI = 小計列 td 裡，「未沖銷契約量」欄位對應的數字
-        // 小計行結構：盤後成交量 | 一般成交量 | 合計成交量 | 結算價 | OI | ...
-        // 特徵：OI 出現在合計成交量（最大值）之後，且 OI < 合計成交量
-        // 更可靠的方式：直接在小計 tr 前的完整 HTML 裡抓未沖銷契約量數字
-        // 方法：找小計行整體文字中，合計成交量後、且獨立成行的數字即為 OI
-        const numFields = fields.map(f => ({ raw: f, n: parseInt(f.replace(/,/g, '')) }));
-        const validNums = numFields.filter(f => !isNaN(f.n) && f.n > 0).map(f => f.n);
-        // 合計成交量 = 盤後 + 一般，是最大值
-        const maxVal = Math.max(...validNums);
-        const maxIdx2 = validNums.indexOf(maxVal);
-        // OI 欄位出現在合計成交量之後，跳過價格類數字（通常 > 10000 且 < 合計）
-        // 取合計之後第一個合理範圍的未平倉口數（通常數萬口，不會超過百萬）
-        const afterMax = validNums.slice(maxIdx2 + 1).filter(v => v > 100 && v < 500000);
-        const n = afterMax[afterMax.length - 1]; // 取最後一個（OI 在最後）
+        // OI = 「小計:」文字之後、獨立出現的數字
+        // HTML 結構：小計行內文字為「小計:\n\n103597\n157587\n261184\n\n\n67426」
+        // 67426 是全體未平倉，獨立在成交量（103597/157587/261184）之後
+        const subtotalMatch = rowM[0].match(/小計[\s\S]*?(\d[\d,]+)\s*(?:<|$)/g);
+        // 直接從原始 HTML 小計區塊擷取所有獨立數字
+        const rawBlock = rowM[0].replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ');
+        // 找「小計」之後的所有純數字（去掉千位逗號）
+        const afterSubtotal = rawBlock.slice(rawBlock.indexOf('小計'));
+        const numsAfter = [...afterSubtotal.matchAll(/\b(\d[\d,]+)\b/g)]
+          .map(m => parseInt(m[1].replace(/,/g, '')))
+          .filter(v => !isNaN(v) && v > 0);
+        console.log('  🔍 小計後數字：' + numsAfter.join(', '));
+        // 結構：盤後成交量, 一般成交量, 合計成交量, [空行], 全體OI
+        // 合計 = 盤後 + 一般（最大值），OI 是合計之後第一個獨立數字
+        const maxVal = Math.max(...numsAfter);
+        const maxIdx2 = numsAfter.indexOf(maxVal);
+        const n = numsAfter[maxIdx2 + 1];
         if (n && n > 0) { tmfOI = n; console.log('  ✅ TMF 全體未平倉（HTML）：' + n + ' 口'); }
-        else throw new Error('HTML 數字定位失敗：' + validNums.join(','));
+        else throw new Error('HTML 數字定位失敗：' + numsAfter.join(','));
       }
 
       result.fut_tmf_total_oi = tmfOI;
