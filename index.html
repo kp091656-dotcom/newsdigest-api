@@ -4882,8 +4882,11 @@ async function loadMktSignals() {
   let score = 0; // 多空得分：正=多、負=空
   let oiScore = 0, vScore = 0; // 子分數（提升到外層 scope）
 
+  // ── 解出各 API 資料（提升到外層 scope，供子分數區塊使用）──
+  const opt  = optData.status  === 'fulfilled' ? optData.value  : null;
+  const inst = instData.status === 'fulfilled' ? instData.value : null;
+
   // ── ① 填入選擇權資料 ──
-  const opt = optData.status === 'fulfilled' ? optData.value : null;
   if (opt && opt.pcRatio) {
     const pcOI  = opt.pcRatio.oi;
     const pcVol = opt.pcRatio.volume;
