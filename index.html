@@ -4026,7 +4026,7 @@ function showGifts() {
 
 async function loadGifts() {
   try {
-    const r = await fetch('/api/news?endpoint=gifts&show_past=1', { signal: AbortSignal.timeout(8000) });
+    const r = await fetch('/api/news?endpoint=gifts&show_past=1&nocache=1', { signal: AbortSignal.timeout(8000) });
     _giftsData = r.ok ? await r.json() : [];
     reRenderGifts();
   } catch(e) {
