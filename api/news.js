@@ -1680,7 +1680,8 @@ ${redditTitles || '無'}
 
     const CACHE_TTL = 6 * 3600 * 1000; // 6小時
     if (!global._giftsCache) global._giftsCache = { data: null, ts: 0 };
-    if (global._giftsCache.data && (Date.now() - global._giftsCache.ts) < CACHE_TTL) {
+    const nocache = req.query.nocache === '1';
+    if (!nocache && global._giftsCache.data && (Date.now() - global._giftsCache.ts) < CACHE_TTL) {
       return res.status(200).json(global._giftsCache.data);
     }
 
