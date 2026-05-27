@@ -6843,10 +6843,10 @@ async function refreshDailySummary() {
 async function loadInstAlert() {
   try {
     const bar = document.getElementById('instAlertBar');
-    const rows = await sbFetch('institutional_daily', 'order=date.desc&limit=1&select=date,foreign_net,invest_net,dealer_net,total_net');
+    const rows = await sbFetch('institutional_daily', 'order=date.desc&limit=1&select=date,foreign_net,trust_net,dealer_net,total_net');
     if (!Array.isArray(rows) || !rows[0]) return;
     const d = rows[0];
-    const total = d.total_net ?? (d.foreign_net + d.invest_net + d.dealer_net);
+    const total = d.total_net ?? (d.foreign_net + d.trust_net + d.dealer_net);
     const threshold = 3000000000; // 30億門檻
     const alerts = [];
     const fmt = v => v >= 0 ? `+${(v/1e8).toFixed(1)}億` : `${(v/1e8).toFixed(1)}億`;
@@ -6854,8 +6854,8 @@ async function loadInstAlert() {
 
     if (Math.abs(d.foreign_net) >= threshold)
       alerts.push({ emoji: '🏦', label: '外資', val: fmt(d.foreign_net), color: clr(d.foreign_net) });
-    if (Math.abs(d.invest_net) >= threshold)
-      alerts.push({ emoji: '🏢', label: '投信', val: fmt(d.invest_net), color: clr(d.invest_net) });
+    if (Math.abs(d.trust_net) >= threshold)
+      alerts.push({ emoji: '🏢', label: '投信', val: fmt(d.trust_net), color: clr(d.trust_net) });
     if (Math.abs(total) >= threshold * 2)
       alerts.push({ emoji: '📊', label: '三大法人合計', val: fmt(total), color: clr(total) });
 
@@ -7119,7 +7119,7 @@ async function injectStockModalExtras(stock) {
   // 並行抓估值 + 法人籌碼
   const [valRes, instRes] = await Promise.allSettled([
     sbFetch('stock_valuation_daily', `stock_id=eq.${stock.id}&order=date.desc&limit=1&select=pe_ratio,pb_ratio,dividend_yield,date`),
-    sbFetch('institutional_daily', `stock_id=eq.${stock.id}&order=date.desc&limit=5&select=date,foreign_net,invest_net,dealer_net`).catch(() => null),
+    sbFetch('institutional_daily', `stock_id=eq.${stock.id}&order=date.desc&limit=5&select=date,foreign_net,trust_net,dealer_net`).catch(() => null),
   ]);
 
   // 基本面
@@ -7154,7 +7154,7 @@ async function injectStockModalExtras(stock) {
         <div style="display:grid;grid-template-columns:5rem 1fr 1fr 1fr;gap:0.35rem;margin-bottom:0.25rem;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;align-items:center;">
           <span style="color:var(--muted);">${r.date}</span>
           <span style="text-align:right;">${fmt(r.foreign_net??0)}</span>
-          <span style="text-align:right;">${fmt(r.invest_net??0)}</span>
+          <span style="text-align:right;">${fmt(r.trust_net??0)}</span>
           <span style="text-align:right;">${fmt(r.dealer_net??0)}</span>
         </div>`).join('') +
       '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:0.52rem;color:var(--muted);margin-top:0.4rem;">單位：千股（K）</div>';
