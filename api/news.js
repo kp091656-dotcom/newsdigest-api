@@ -1595,6 +1595,83 @@ ${redditTitles || '無'}
     }
   }
 
+  // ── 股東紀念品管理後台（需 ADMIN_KEY）──
+  if (endpoint === 'gifts_admin') {
+    const ADMIN_KEY = process.env.ADMIN_KEY;
+    const SB_URL    = process.env.SUPABASE_URL;
+    const SB_KEY    = process.env.SUPABASE_SERVICE_KEY;
+    if (!ADMIN_KEY || !SB_KEY) return res.status(500).json({ error: 'missing env' });
+
+    // 驗證 admin key
+    const reqKey = req.headers['x-admin-key'] || '';
+    if (reqKey !== ADMIN_KEY) return res.status(401).json({ error: 'unauthorized' });
+
+    const sbHeaders = {
+      apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    };
+    const BASE = `${SB_URL}/rest/v1/shareholder_gifts`;
+
+    try {
+      // GET：讀全部紀念品（不限年份）
+      if (req.method === 'GET') {
+        const r = await fetch(`${BASE}?order=record_date.asc&limit=1000`, { headers: sbHeaders });
+        if (!r.ok) throw new Error(`Supabase ${r.status}`);
+        const data = await r.json();
+        // 清除 gifts cache 讓前端下次重抓
+        if (global._giftsCache) global._giftsCache.ts = 0;
+        return res.status(200).json(data);
+      }
+
+      // POST：新增或更新
+      if (req.method === 'POST') {
+        const body = req.body || {};
+        const { id, ...fields } = body;
+        if (id) {
+          // 更新
+          const r = await fetch(`${BASE}?id=eq.${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            headers: sbHeaders,
+            body: JSON.stringify({ ...fields, updated_at: new Date().toISOString() }),
+          });
+          if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
+          const data = await r.json();
+          if (global._giftsCache) global._giftsCache.ts = 0;
+          return res.status(200).json(data);
+        } else {
+          // 新增
+          const r = await fetch(`${BASE}`, {
+            method: 'POST',
+            headers: sbHeaders,
+            body: JSON.stringify({ ...fields, updated_at: new Date().toISOString() }),
+          });
+          if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
+          const data = await r.json();
+          if (global._giftsCache) global._giftsCache.ts = 0;
+          return res.status(200).json(data);
+        }
+      }
+
+      // DELETE：刪除
+      if (req.method === 'DELETE') {
+        const id = req.query.id;
+        if (!id) return res.status(400).json({ error: 'missing id' });
+        const r = await fetch(`${BASE}?id=eq.${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: sbHeaders,
+        });
+        if (!r.ok) throw new Error(`Supabase ${r.status}`);
+        if (global._giftsCache) global._giftsCache.ts = 0;
+        return res.status(200).json({ deleted: true });
+      }
+
+      return res.status(405).json({ error: 'method not allowed' });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── 股東紀念品 ──
   if (endpoint === 'gifts') {
     const SB_URL = process.env.SUPABASE_URL;
