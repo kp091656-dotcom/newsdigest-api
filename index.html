@@ -6843,19 +6843,22 @@ async function refreshDailySummary() {
 async function loadInstAlert() {
   try {
     const bar = document.getElementById('instAlertBar');
-    const rows = await sbFetch('institutional_daily', 'order=date.desc&limit=1&select=date,foreign_net,trust_net,dealer_net,total_net');
+    // 從 chips_daily 讀取（億元單位，資料正確）
+    const rows = await sbFetch('chips_daily', 'order=date.desc&limit=1&select=date,spot_foreign_net,spot_trust_net,spot_dealer_net,spot_total_net');
     if (!Array.isArray(rows) || !rows[0]) return;
     const d = rows[0];
-    const total = d.total_net ?? (d.foreign_net + d.trust_net + d.dealer_net);
+    const foreignNet = (d.spot_foreign_net || 0) * 1e8; // 億→元（供門檻比較）
+    const trustNet   = (d.spot_trust_net   || 0) * 1e8;
+    const total      = (d.spot_total_net   || 0) * 1e8;
     const threshold = 3000000000; // 30億門檻
     const alerts = [];
     const fmt = v => v >= 0 ? `+${(v/1e8).toFixed(1)}億` : `${(v/1e8).toFixed(1)}億`;
     const clr = v => v >= 0 ? '#dc2626' : '#16a34a';
 
-    if (Math.abs(d.foreign_net) >= threshold)
-      alerts.push({ emoji: '🏦', label: '外資', val: fmt(d.foreign_net), color: clr(d.foreign_net) });
-    if (Math.abs(d.trust_net) >= threshold)
-      alerts.push({ emoji: '🏢', label: '投信', val: fmt(d.trust_net), color: clr(d.trust_net) });
+    if (Math.abs(foreignNet) >= threshold)
+      alerts.push({ emoji: '🏦', label: '外資', val: fmt(foreignNet), color: clr(foreignNet) });
+    if (Math.abs(trustNet) >= threshold)
+      alerts.push({ emoji: '🏢', label: '投信', val: fmt(trustNet), color: clr(trustNet) });
     if (Math.abs(total) >= threshold * 2)
       alerts.push({ emoji: '📊', label: '三大法人合計', val: fmt(total), color: clr(total) });
 
