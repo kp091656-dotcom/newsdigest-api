@@ -4019,7 +4019,6 @@ function showGifts() {
   });
   const fh = document.querySelector('.feed-header'); if (fh) fh.style.display = 'none';
   document.getElementById('giftsPanel').style.display = 'block';
-  mbnSetActive('news');
   if (!_giftsData) loadGifts();
   else reRenderGifts();
 }
