@@ -388,10 +388,6 @@ async function collectChips() {
     spot_trust_buy:  null, spot_trust_sell:  null, spot_trust_net:  null,
     spot_foreign_buy:null, spot_foreign_sell:null, spot_foreign_net:null,
     spot_total_net:  null,
-    // inst_* 是 spot_*_net 的別名（前端與 Alpha 報告使用）
-    inst_foreign_net: null, inst_trust_net: null, inst_dealer_net: null,
-    // 融資資料（FinMind 抓取，填入 chips_daily 供 Alpha 使用）
-    margin_balance: null, margin_change: null,
     fut_tx_dealer_long: null, fut_tx_dealer_short: null, fut_tx_dealer_net: null,
     fut_tx_trust_long:  null, fut_tx_trust_short:  null, fut_tx_trust_net:  null,
     fut_tx_foreign_long:null, fut_tx_foreign_short:null, fut_tx_foreign_net:null,
@@ -516,30 +512,6 @@ async function collectChips() {
     if (!spotOK) console.warn('  ⚠️  現貨三大法人：所有來源均失敗，欄位保持 null');
   } catch (e) {
     console.error(`  ❌ 現貨三大法人 失敗：${e.message}`);
-  }
-
-  // ── 現貨 inst_* 別名（spot_*_net 的同步）──
-  result.inst_foreign_net = result.spot_foreign_net;
-  result.inst_trust_net   = result.spot_trust_net;
-  result.inst_dealer_net  = result.spot_dealer_net;
-
-  // ── 融資資料（從 FinMind 抓，寫入 chips_daily 供 Alpha report 使用）──
-  if (FM_TOKEN) {
-    try {
-      const marginData = await fmFetch('TaiwanStockTotalMarginPurchaseShortSale',
-        { start_date: daysAgo(3), end_date: todayTW() });
-      const latestMarginDate = marginData.map(r => r.date?.slice(0,10)).filter(Boolean).sort().reverse()[0];
-      if (latestMarginDate) {
-        for (const r of marginData.filter(d => d.date?.slice(0,10) === latestMarginDate)) {
-          if (r.name === 'MarginPurchase') {
-            result.margin_balance = parseInt(r.TodayBalance) || null;
-            result.margin_change  = (parseInt(r.TodayBalance) || 0) - (parseInt(r.YesBalance) || 0);
-          }
-        }
-        if (result.margin_balance != null)
-          console.log(`  ✅ 融資餘額（chips）：${result.margin_balance.toLocaleString()} 張（變化 ${result.margin_change >= 0 ? '+' : ''}${result.margin_change}）`);
-      }
-    } catch(e) { console.warn('  ⚠️  chips 融資資料抓取失敗：' + e.message); }
   }
 
   // ── 2. TAIFEX 期貨三大法人（TX / MTX / TMF）──
@@ -681,17 +653,20 @@ async function collectChips() {
         // 切出所有 td 文字（含空白 td），保留欄位順序
         const fields = rowM[1].split(/<\/td>/).map(f => f.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim());
         console.log('  🔍 TMF HTML 小計欄位：' + fields.join('|'));
-        // OI 在小計列倒數第 3 個有數字的欄位（成交量|空|OI|交易時段|空）
+        // OI = 小計列 td 裡，「未沖銷契約量」欄位對應的數字
+        // 小計行結構：盤後成交量 | 一般成交量 | 合計成交量 | 結算價 | OI | ...
+        // 特徵：OI 出現在合計成交量（最大值）之後，且 OI < 合計成交量
+        // 更可靠的方式：直接在小計 tr 前的完整 HTML 裡抓未沖銷契約量數字
+        // 方法：找小計行整體文字中，合計成交量後、且獨立成行的數字即為 OI
         const numFields = fields.map(f => ({ raw: f, n: parseInt(f.replace(/,/g, '')) }));
         const validNums = numFields.filter(f => !isNaN(f.n) && f.n > 0).map(f => f.n);
-        // 小計列有效數字順序：盤後成交量、一般成交量、合計成交量、OI
-        // OI 是第 4 個，也是倒數第 1 個
-        // 但合計成交量 > OI（合計 = 盤後+一般），所以 OI 是最後一個 < 合計成交量的數字
-        const sorted = [...validNums].sort((a, b) => b - a);
-        const maxVal = sorted[0]; // 合計成交量（最大）
-        // OI 是合計成交量之後出現的數字
+        // 合計成交量 = 盤後 + 一般，是最大值
+        const maxVal = Math.max(...validNums);
         const maxIdx2 = validNums.indexOf(maxVal);
-        const n = validNums[maxIdx2 + 1];
+        // OI 欄位出現在合計成交量之後，跳過價格類數字（通常 > 10000 且 < 合計）
+        // 取合計之後第一個合理範圍的未平倉口數（通常數萬口，不會超過百萬）
+        const afterMax = validNums.slice(maxIdx2 + 1).filter(v => v > 100 && v < 500000);
+        const n = afterMax[afterMax.length - 1]; // 取最後一個（OI 在最後）
         if (n && n > 0) { tmfOI = n; console.log('  ✅ TMF 全體未平倉（HTML）：' + n + ' 口'); }
         else throw new Error('HTML 數字定位失敗：' + validNums.join(','));
       }
@@ -723,7 +698,6 @@ async function collectChips() {
 
     // FinMind 欄位：call_put（C/P）, institutional_investors（身份別）
     //   long_open_interest_balance_volume, short_open_interest_balance_volume
-    const getCP = (r) => (r.call_put || '').trim(); // Bug fix: was undefined before
     const parseOptFM = (rows, prefix) => {
       for (const row of rows) {
         const ident    = (row.institutional_investors || row.name || '').trim();
@@ -1077,7 +1051,7 @@ async function collectAlphaReport() {
     let chips = null;
     try {
       const chipsRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/chips_daily?order=date.desc&limit=1&select=date,inst_foreign_net,inst_trust_net,inst_dealer_net,margin_balance,margin_change,fut_tmf_total_net,fut_tmf_total_oi,fut_tmf_foreign_net,fut_tmf_dealer_net`,
+        `${SUPABASE_URL}/rest/v1/chips_daily?order=date.desc&limit=1&select=date,inst_foreign_net,inst_trust_net,inst_dealer_net,margin_balance,margin_change,short_balance,fut_tmf_total_net,fut_tmf_total_oi,fut_tmf_foreign_net,fut_tmf_dealer_net`,
         { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
       );
       const chipsJson = await chipsRes.json();
@@ -1274,15 +1248,10 @@ ${pttTitles}
         Prefer: 'resolution=merge-duplicates',
       },
       body: JSON.stringify({
-        report_date:     today,
-        market_mood:     result.market_mood    || '中性',
-        market_summary:  result.market_summary || '',
-        alpha_note:      result.alpha_note     || '',
-        dominant_player: result.dominant_player || '',
-        retail_signal:   result.retail_signal  || '中性',
-        suggest_cash:    result.suggest_cash   ?? false,
-        cash_reason:     result.cash_reason    || '',
-        margin_alert:    result.margin_alert   || '正常',
+        report_date:    today,
+        market_mood:    result.market_mood || '中性',
+        market_summary: result.market_summary || '',
+        alpha_note:     result.alpha_note || '',
         recommendations: result.recommendations || [],
         data_sources:   { stocks: stocks.length, news: Array.isArray(news) ? news.length : 0, ptt: (pttTitles && pttTitles !== '無法取得') ? pttTitles.split('\n').filter(l => l.trim()).length : 0 },
         generated_at:   new Date().toISOString(),
