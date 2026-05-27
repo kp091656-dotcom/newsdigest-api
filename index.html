@@ -1284,6 +1284,143 @@
   .inst-alert-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.85rem; font-size: 0.75rem; border-bottom: 1px solid var(--border); }
   .inst-alert-item:last-child { border-bottom: none; }
 
+  /* ══ 股東紀念品 ══════════════════════════════════════════════════════ */
+  #giftsPanel { padding: 0; }
+  .gifts-topbar {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    padding: 0.85rem 1rem 0.6rem; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .gifts-stat-pill {
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.62rem;
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 20px; padding: 0.18rem 0.65rem; color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  .gifts-stat-pill strong { color: var(--text); }
+  .gifts-filter-bar {
+    display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+    padding: 0.6rem 1rem; border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .gifts-filter-label { font-size: 0.63rem; color: var(--muted); font-family: 'IBM Plex Mono',monospace; flex-shrink:0; }
+  .gift-cat-btn {
+    font-size: 0.62rem; padding: 0.18rem 0.6rem; border-radius: 20px;
+    border: 1px solid var(--border); background: transparent; cursor: pointer;
+    color: var(--muted); font-family: 'IBM Plex Mono',monospace;
+    transition: all 0.12s; letter-spacing: 0.02em;
+  }
+  .gift-cat-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .gift-cat-btn.gc-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .gifts-sort-btn {
+    font-size: 0.6rem; padding: 0.18rem 0.6rem; border-radius: 4px;
+    border: 1px solid var(--border); background: transparent; cursor: pointer;
+    color: var(--muted); font-family: 'IBM Plex Mono',monospace;
+    margin-left: auto; transition: all 0.12s;
+  }
+  .gifts-sort-btn:hover { color: var(--text); }
+  .gifts-sort-btn.gs-active { color: var(--text); border-color: var(--border-dark); }
+  .gifts-sort-btn .sort-arr { opacity: 0.4; margin-left: 2px; }
+  .gifts-past-toggle { font-size: 0.62rem; cursor: pointer; color: var(--muted); display:flex; align-items:center; gap:0.3rem; }
+  .gifts-past-toggle input { accent-color: var(--accent); cursor:pointer; }
+
+  .gifts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.85rem; padding: 1rem;
+  }
+  @media (max-width: 600px) { .gifts-grid { grid-template-columns: 1fr; padding: 0.65rem; gap: 0.65rem; } }
+
+  .gift-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    transition: box-shadow 0.18s, transform 0.18s;
+    cursor: default;
+  }
+  .gift-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+  .gift-card.gc-urgent { border-color: #dc262640; }
+  .gift-card.gc-soon   { border-color: #d9770640; }
+  .gift-card.gc-past   { opacity: 0.55; }
+
+  .gift-card-head {
+    padding: 0.65rem 0.85rem 0.5rem;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;
+  }
+  .gift-stock-id {
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.65rem;
+    color: var(--muted); letter-spacing: 0.05em;
+  }
+  .gift-stock-name {
+    font-size: 0.92rem; font-weight: 600; color: var(--text); line-height: 1.2;
+    margin-top: 1px;
+  }
+  .gift-sector-tag {
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.54rem;
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.12rem 0.45rem; color: var(--muted);
+    white-space: nowrap; flex-shrink:0;
+  }
+  .gift-cp-badge {
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.68rem; font-weight: 700;
+    background: #6d56f515; border: 1px solid #6d56f540;
+    border-radius: 20px; padding: 0.15rem 0.55rem; color: var(--accent);
+    white-space: nowrap;
+  }
+  .gift-cp-badge.cp-high { background: #16a34a15; border-color: #16a34a40; color: #16a34a; }
+  .gift-cp-badge.cp-low  { background: var(--tag-bg); border-color: var(--border); color: var(--muted); }
+
+  .gift-card-body { padding: 0 0.85rem 0.6rem; }
+  .gift-desc {
+    font-size: 0.8rem; color: var(--text); line-height: 1.5;
+    display: flex; align-items: flex-start; gap: 0.4rem;
+    border-top: 1px solid var(--border); padding-top: 0.55rem; margin-top: 0.05rem;
+  }
+  .gift-desc-icon { font-size: 0.95rem; flex-shrink:0; margin-top: 1px; }
+
+  .gift-card-foot {
+    padding: 0.5rem 0.85rem; background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.6rem;
+    font-size: 0.65rem;
+  }
+  .gift-foot-item { display: flex; flex-direction: column; gap: 1px; }
+  .gift-foot-label { color: var(--muted); font-family: 'IBM Plex Mono',monospace; font-size: 0.57rem; letter-spacing: 0.04em; }
+  .gift-foot-val { color: var(--text); font-weight: 500; }
+
+  .gift-deadline-badge {
+    display: inline-flex; align-items: center; gap: 0.2rem;
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.58rem;
+    border-radius: 20px; padding: 0.12rem 0.5rem; font-weight: 600;
+    margin-top: 0.3rem;
+  }
+  .gdl-urgent { background: #dc262615; color: #dc2626; border: 1px solid #dc262630; }
+  .gdl-soon   { background: #d9770615; color: #d97706; border: 1px solid #d9770630; }
+  .gdl-ok     { background: #16a34a15; color: #16a34a; border: 1px solid #16a34a30; }
+  .gdl-past   { background: var(--tag-bg); color: var(--muted); border: 1px solid var(--border); }
+
+  .gift-note { font-size: 0.68rem; color: var(--muted); padding: 0.4rem 0.85rem 0.6rem; font-style: italic; }
+  .gift-egift-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: linear-gradient(135deg,#6366f115,#818cf815);
+    border: 1px solid #6366f140; border-radius: 4px;
+    padding: 0.1rem 0.45rem; font-size: 0.58rem; font-weight: 700;
+    color: #6366f1; letter-spacing: 0.03em; white-space: nowrap;
+  }
+  .gift-card.gc-egift { border-left: 3px solid #6366f1; }
+
+  .gifts-empty {
+    padding: 3rem 1rem; text-align: center;
+    font-family: 'IBM Plex Mono',monospace; font-size: 0.78rem; color: var(--muted);
+  }
+  .gifts-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+
+  .cat-icon-food    { background: #d9770615; color: #d97706; border-color: #d9770630; }
+  .cat-icon-goods   { background: #2563eb15; color: #2563eb; border-color: #2563eb30; }
+  .cat-icon-voucher { background: #16a34a15; color: #16a34a; border-color: #16a34a30; }
+  .cat-icon-cash    { background: #dc262615; color: #dc2626; border-color: #dc262630; }
+  .cat-icon-3c      { background: #6d56f515; color: var(--accent); border-color: #6d56f530; }
+  .cat-icon-other   { background: var(--tag-bg); color: var(--muted); border-color: var(--border); }
+
 </style>
 </head>
 <body>
@@ -1335,6 +1472,7 @@
   <button class="cat-tab cat-tab-tools" id="heatmapTab" onclick="showHeatmap()">🇹🇼 台股熱圖</button>
   <button class="cat-tab cat-tab-tools" id="signalTab" onclick="showSignal()">📡 多空訊號</button>
   <button class="cat-tab cat-tab-tools" id="screenerTab" onclick="openScreener()">🔍 選股篩選</button>
+  <button class="cat-tab cat-tab-tools" id="giftsTab" onclick="showGifts()">🎁 紀念品</button>
 </div>
 
 <main>
@@ -2104,6 +2242,39 @@
 
     </div><!-- end signalPanel -->
 
+    <div id="giftsPanel" style="display:none;">
+      <div class="gifts-topbar">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.04em;">🎁 股東紀念品</span>
+        <div class="gifts-stat-pill" id="giftStatTotal">—</div>
+        <div class="gifts-stat-pill" id="giftStatSoon">—</div>
+        <div class="gifts-stat-pill" id="giftStatEgift">—</div>
+        <div class="gifts-stat-pill" id="giftStatAvgCP">—</div>
+        <a href="/gifts-admin.html" target="_blank" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:0.15rem 0.55rem;border-radius:4px;">管理後台 →</a>
+      </div>
+      <div class="gifts-filter-bar">
+        <span class="gifts-filter-label">類別：</span>
+        <button class="gift-cat-btn gc-active" data-gcat="" onclick="setGiftCat(this,'')">全部</button>
+        <button class="gift-cat-btn" data-gcat="food"    onclick="setGiftCat(this,'food')">🍱 食品</button>
+        <button class="gift-cat-btn" data-gcat="goods"   onclick="setGiftCat(this,'goods')">🧴 日用品</button>
+        <button class="gift-cat-btn" data-gcat="voucher" onclick="setGiftCat(this,'voucher')">🎫 儲值卡</button>
+        <button class="gift-cat-btn" data-gcat="cash"    onclick="setGiftCat(this,'cash')">💵 現金等值</button>
+        <button class="gift-cat-btn" data-gcat="3c"      onclick="setGiftCat(this,'3c')">📱 3C</button>
+        <button class="gift-cat-btn" data-gcat="other"   onclick="setGiftCat(this,'other')">其他</button>
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;flex-wrap:wrap;">
+          <label class="gifts-past-toggle"><input type="checkbox" id="giftShowEgift" onchange="reRenderGifts()">
+            <span style="color:#6366f1;font-weight:600;">⚡ 僅 eGift</span>
+          </label>
+          <label class="gifts-past-toggle"><input type="checkbox" id="giftShowPast" onchange="reRenderGifts()"> 顯示已截止</label>
+          <button class="gifts-sort-btn gs-active" id="gsortDeadline" onclick="setGiftSort('deadline')">截止日 <span class="sort-arr">↑</span></button>
+          <button class="gifts-sort-btn" id="gsortCP" onclick="setGiftSort('cp')">CP值 <span class="sort-arr">↓</span></button>
+          <button class="gifts-sort-btn" id="gsortVal" onclick="setGiftSort('val')">估值 <span class="sort-arr">↓</span></button>
+        </div>
+      </div>
+      <div class="gifts-grid" id="giftsGrid">
+        <div class="gifts-empty"><div class="gifts-empty-icon">⏳</div>載入中…</div>
+      </div>
+    </div><!-- end giftsPanel -->
+
     <button class="load-more" id="loadMoreBtn" style="display:none" onclick="loadMore()">載入更多 ↓</button>
   </div><!-- end left column -->
 
@@ -2407,6 +2578,10 @@ async function sbFetch(table, params) {
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 // AI keys 存在 Vercel 環境變數，無需前端輸入
 let allArticles = [];
+let _giftsData = null;
+let _giftCat   = '';
+let _giftSort  = 'deadline';
+
 let displayedCount = 0;
 const PAGE_SIZE = 50;
 let currentLang = 'zh';
@@ -3421,6 +3596,7 @@ function showSentiment() {
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('sentimentTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
+  const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
   document.getElementById('futuresPanel').style.display = 'none';
@@ -3835,7 +4011,160 @@ const SECTOR_INDEX_MAP = {
 // 反向：SECTOR_COLORS key → 官方指數名（找 SECTOR_INDEX_MAP 第一個符合的）
 // 用於 bar 顯示
 
+function showGifts() {
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('giftsTab').classList.add('active');
+  ['newsFeed','loadMoreBtn','sentimentPanel','futuresPanel','heatmapPanel','signalPanel','screenerPanel'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  const fh = document.querySelector('.feed-header'); if (fh) fh.style.display = 'none';
+  document.getElementById('giftsPanel').style.display = 'block';
+  mbnSetActive('news');
+  if (!_giftsData) loadGifts();
+  else reRenderGifts();
+}
+
+async function loadGifts() {
+  try {
+    const r = await fetch('/api/news?endpoint=gifts&show_past=1', { signal: AbortSignal.timeout(8000) });
+    _giftsData = r.ok ? await r.json() : [];
+    reRenderGifts();
+  } catch(e) {
+    document.getElementById('giftsGrid').innerHTML = `<div class="gifts-empty"><div class="gifts-empty-icon">⚠️</div>無法載入紀念品資料<br><span style="font-size:0.65rem">${e.message}</span></div>`;
+  }
+}
+
+function reRenderGifts() {
+  if (!_giftsData) return;
+  const showPast = document.getElementById('giftShowPast')?.checked;
+  const today = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
+
+  const showEgift = document.getElementById('giftShowEgift')?.checked;
+  let data = _giftsData
+    .filter(g => _giftCat ? g.gift_category === _giftCat : true)
+    .filter(g => showEgift ? g.is_egift : true)
+    .filter(g => showPast ? true : g.record_date >= today);
+
+  // Sort
+  if (_giftSort === 'deadline') data.sort((a,b) => (a.record_date||'') < (b.record_date||'') ? -1 : 1);
+  if (_giftSort === 'cp')       data.sort((a,b) => (b.cp_ratio||0) - (a.cp_ratio||0));
+  if (_giftSort === 'val')      data.sort((a,b) => (b.gift_value_est||0) - (a.gift_value_est||0));
+
+  // Stats
+  const total    = data.length;
+  const upcoming = data.filter(g => g.record_date >= today).length;
+  const soonList = data.filter(g => { const d = daysUntilDate(g.record_date); return d >= 0 && d <= 14; });
+  const avgCP    = data.filter(g=>g.cp_ratio>0).reduce((s,g,_,a)=>s+g.cp_ratio/a.length,0);
+  const egiftCount = _giftsData.filter(g => g.is_egift).length;
+  document.getElementById('giftStatTotal').innerHTML  = `共 <strong>${total}</strong> 筆`;
+  document.getElementById('giftStatSoon').innerHTML   = `本月截止 <strong>${soonList.length}</strong> 筆`;
+  document.getElementById('giftStatEgift').innerHTML  = `⚡ eGift <strong>${egiftCount}</strong> 家`;
+  document.getElementById('giftStatAvgCP').innerHTML  = avgCP>0 ? `平均CP <strong>${avgCP.toFixed(2)}%</strong>` : `平均CP <strong>—</strong>`;
+
+  if (!data.length) {
+    document.getElementById('giftsGrid').innerHTML = `<div class="gifts-empty"><div class="gifts-empty-icon">🎁</div>目前無符合條件的紀念品</div>`;
+    return;
+  }
+  document.getElementById('giftsGrid').innerHTML = data.map(giftCard).join('');
+}
+
+function daysUntilDate(dateStr) {
+  if (!dateStr) return -999;
+  const today = new Date(Date.now() + 8*3600000);
+  today.setUTCHours(0,0,0,0);
+  const target = new Date(dateStr + 'T00:00:00Z');
+  return Math.round((target - today) / 86400000);
+}
+
+// 持股門檻顯示：以股為單位，整千股顯示為張
+function fmtShares(n) {
+  const s = parseInt(n) || 1000;
+  if (s >= 1000 && s % 1000 === 0) return `${s/1000}張（${s.toLocaleString()}股）以上`;
+  return `${s.toLocaleString()}股以上`;
+}
+
+const CAT_META = {
+  food:    { icon:'🍱', label:'食品',     cls:'cat-icon-food'    },
+  goods:   { icon:'🧴', label:'日用品',   cls:'cat-icon-goods'   },
+  voucher: { icon:'🎫', label:'儲值卡',   cls:'cat-icon-voucher' },
+  cash:    { icon:'💵', label:'現金等值', cls:'cat-icon-cash'    },
+  '3c':    { icon:'📱', label:'3C',       cls:'cat-icon-3c'      },
+  other:   { icon:'🎁', label:'其他',     cls:'cat-icon-other'   },
+};
+function catMeta(c) { return CAT_META[c] || CAT_META.other; }
+
+function giftCard(g) {
+  const days   = daysUntilDate(g.record_date);
+  const isPast = days < 0;
+  const meta   = catMeta(g.gift_category);
+  const cp     = g.cp_ratio ? parseFloat(g.cp_ratio) : null;
+  const cpCls  = cp == null ? '' : cp >= 2 ? 'cp-high' : cp < 0.5 ? 'cp-low' : '';
+  const cpStr  = cp != null ? `CP ${cp.toFixed(2)}%` : 'CP —';
+
+  let urgency = '', deadlineBadge = '';
+  if (isPast) {
+    urgency = 'gc-past';
+    deadlineBadge = `<span class="gift-deadline-badge gdl-past">● 已截止</span>`;
+  } else if (days <= 7) {
+    urgency = 'gc-urgent';
+    deadlineBadge = `<span class="gift-deadline-badge gdl-urgent">● ${days === 0 ? '今天截止！' : days + '天後截止'}</span>`;
+  } else if (days <= 30) {
+    urgency = 'gc-soon';
+    deadlineBadge = `<span class="gift-deadline-badge gdl-soon">● ${days}天後截止</span>`;
+  } else {
+    deadlineBadge = `<span class="gift-deadline-badge gdl-ok">● ${days}天後截止</span>`;
+  }
+
+  const valStr = g.gift_value_est ? `NT$${Number(g.gift_value_est).toLocaleString()}` : '—';
+  const refStr = g.share_price_ref ? `NT$${Number(g.share_price_ref).toFixed(1)}` : '—';
+
+  return `
+<div class="gift-card ${urgency}${g.is_egift ? ' gc-egift' : ''}">
+  <div class="gift-card-head">
+    <div>
+      <div class="gift-stock-id">${g.stock_id || '—'}</div>
+      <div class="gift-stock-name">${g.stock_name || '—'}</div>
+      ${deadlineBadge}
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;">
+      <span class="gift-cp-badge ${cpCls}">${cpStr}</span>
+      ${g.is_egift ? '<span class="gift-egift-badge">⚡ eGift</span>' : ''}
+      <span class="gift-sector-tag ${meta.cls}">${meta.icon} ${meta.label}</span>
+      ${g.sector ? `<span class="gift-sector-tag">${g.sector}</span>` : ''}
+    </div>
+  </div>
+  <div class="gift-card-body">
+    <div class="gift-desc"><span class="gift-desc-icon">${meta.icon}</span><span>${g.gift_desc || '—'}</span></div>
+  </div>
+  <div class="gift-card-foot">
+    <div class="gift-foot-item"><span class="gift-foot-label">停止過戶</span><span class="gift-foot-val">${g.record_date || '—'}</span></div>
+    <div class="gift-foot-item"><span class="gift-foot-label">股東會日期</span><span class="gift-foot-val">${g.meeting_date || '—'}</span></div>
+    <div class="gift-foot-item"><span class="gift-foot-label">禮品估值</span><span class="gift-foot-val">${valStr}</span></div>
+    <div class="gift-foot-item"><span class="gift-foot-label">持有門檻</span><span class="gift-foot-val">${fmtShares(g.share_required)}</span></div>
+    <div class="gift-foot-item"><span class="gift-foot-label">參考股價</span><span class="gift-foot-val">${refStr}</span></div>
+    ${g.source_url ? `<div class="gift-foot-item"><a href="${g.source_url}" target="_blank" style="font-size:0.6rem;color:var(--accent);text-decoration:none;">來源 →</a></div>` : '<div></div>'}
+  </div>
+  ${g.note ? `<div class="gift-note">※ ${g.note}</div>` : ''}
+</div>`;
+}
+
+function setGiftCat(btn, cat) {
+  document.querySelectorAll('.gift-cat-btn').forEach(b => b.classList.remove('gc-active'));
+  btn.classList.add('gc-active');
+  _giftCat = cat;
+  reRenderGifts();
+}
+
+function setGiftSort(s) {
+  _giftSort = s;
+  document.querySelectorAll('.gifts-sort-btn').forEach(b => b.classList.remove('gs-active'));
+  document.getElementById('gsort' + s.charAt(0).toUpperCase() + s.slice(1))?.classList.add('gs-active');
+  reRenderGifts();
+}
+
+
 function showHeatmap() {
+  const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('heatmapTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
@@ -3865,6 +4194,7 @@ function showSignal() {
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('signalTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
+  const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
   document.getElementById('sentimentPanel').style.display = 'none';
@@ -4820,6 +5150,7 @@ function showFutures() {
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('futuresTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
+  const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
   document.getElementById('sentimentPanel').style.display = 'none';
