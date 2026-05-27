@@ -1,0 +1,25 @@
+name: Collect Alpha Report
+
+on:
+  schedule:
+    # 台灣時間 06:20（UTC 前一天 22:20）
+    # 預留 20 分鐘讓 TWSE job 跑完
+    - cron: '20 22 * * 0-4'
+  workflow_dispatch:
+
+jobs:
+  collect-alpha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run Alpha Report
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GROQ_API_KEY:         ${{ secrets.GROQ_API_KEY }}
+          COLLECT_MODE:         alpha
+        run: node .github/scripts/collect_market_data.js

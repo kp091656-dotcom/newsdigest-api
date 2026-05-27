@@ -1,0 +1,23 @@
+name: Collect News
+
+on:
+  schedule:
+    # 每 2 小時更新一次（全天候）
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+jobs:
+  collect-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run News collect
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          COLLECT_MODE:         news
+        run: node .github/scripts/collect_market_data.js

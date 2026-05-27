@@ -1,0 +1,24 @@
+name: Collect FinMind
+
+on:
+  schedule:
+    # 台灣時間 06:30（UTC 前一天 22:30）
+    - cron: '30 22 * * 0-4'
+  workflow_dispatch:
+
+jobs:
+  collect-finmind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run FinMind collect
+        env:
+          FINMIND_TOKEN:        ${{ secrets.FINMIND_TOKEN }}
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          COLLECT_MODE:         finmind
+        run: node .github/scripts/collect_market_data.js

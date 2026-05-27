@@ -1,0 +1,47 @@
+name: Weekly Backup to pCloud
+
+on:
+  schedule:
+    # 每週日 09:00 台灣時間（UTC 01:00）
+    - cron: '0 1 * * 0'
+  workflow_dispatch:
+
+jobs:
+  backup-to-pcloud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone version
+
+      - name: Configure rclone pCloud
+        env:
+          RCLONE_PCLOUD_TOKEN:    ${{ secrets.RCLONE_PCLOUD_TOKEN }}
+          RCLONE_PCLOUD_HOSTNAME: ${{ secrets.RCLONE_PCLOUD_HOSTNAME }}
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [pcloud]
+          type = pcloud
+          hostname = ${RCLONE_PCLOUD_HOSTNAME}
+          token = ${RCLONE_PCLOUD_TOKEN}
+          EOF
+          echo "✅ rclone 設定完成"
+
+      - name: Test pCloud connection
+        run: |
+          rclone lsd pcloud: || echo "⚠️ pCloud 根目錄列出失敗，繼續執行"
+          rclone mkdir pcloud:AlphaScope-Backups || true
+
+      - name: Run backup
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node .github/scripts/backup.js
