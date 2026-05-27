@@ -1595,6 +1595,34 @@ ${redditTitles || '無'}
     }
   }
 
+  // ── 股東紀念品 ──
+  if (endpoint === 'gifts') {
+    const SB_URL = process.env.SUPABASE_URL;
+    const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+    if (!SB_KEY) return res.status(500).json({ error: 'missing env' });
+
+    const CACHE_TTL = 6 * 3600 * 1000; // 6小時
+    if (!global._giftsCache) global._giftsCache = { data: null, ts: 0 };
+    if (global._giftsCache.data && (Date.now() - global._giftsCache.ts) < CACHE_TTL) {
+      return res.status(200).json(global._giftsCache.data);
+    }
+
+    try {
+      const year = new Date(Date.now() + 8*3600000).getFullYear();
+      const fields = 'stock_id,stock_name,sector,record_date,meeting_date,gift_desc,gift_category,gift_value_est,share_required,share_price_ref,cp_ratio,is_egift,egift_min_share,source_url,note,year';
+      const r = await fetch(
+        `${SB_URL}/rest/v1/shareholder_gifts?year=eq.${year}&order=record_date.asc&limit=500&select=${fields}`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, signal: AbortSignal.timeout(10000) }
+      );
+      if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
+      const data = await r.json();
+      global._giftsCache = { data, ts: Date.now() };
+      return res.status(200).json(data);
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── 微型台指（TMF/微台）法人部位 ──
   if (endpoint === 'tmf') {
     const SB_URL = process.env.SUPABASE_URL || 'https://fdxedcwtmlurumfjmlys.supabase.co';
