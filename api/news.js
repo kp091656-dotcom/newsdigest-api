@@ -1597,8 +1597,9 @@ ${redditTitles || '無'}
 
   // ── 微型台指（TMF/微台）法人部位 ──
   if (endpoint === 'tmf') {
-    const TOKEN = process.env.FINMIND_TOKEN;
-    if (!TOKEN) return res.status(500).json({ error: 'FINMIND_TOKEN not configured' });
+    const SB_URL = process.env.SUPABASE_URL || 'https://fdxedcwtmlurumfjmlys.supabase.co';
+    const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+    if (!SB_KEY) return res.status(500).json({ error: 'SUPABASE_SERVICE_KEY not configured' });
 
     const CACHE_TTL = 60 * 60 * 1000; // 60 分鐘
     if (!global._tmfCache) global._tmfCache = { data: null, ts: 0 };
@@ -1607,44 +1608,30 @@ ${redditTitles || '無'}
       const ageMin = ((now - global._tmfCache.ts) / 60000).toFixed(1);
       return res.status(200).json({ ...global._tmfCache.data, cached: true, cacheAgeMin: parseFloat(ageMin) });
     }
-    const BASE = 'https://api.finmindtrade.com/api/v4/data';
+
     try {
-      const endDate = new Date().toISOString().slice(0, 10);
-      const startD  = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      // TMF = 微型臺指期貨（FinMind data_id）
-      const url = `${BASE}?dataset=TaiwanFuturesInstitutionalInvestors&data_id=TMF&start_date=${startD}&end_date=${endDate}`;
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } });
-      const d = await r.json();
-      const rows = d.data || [];
+      const fields = 'date,fut_tmf_foreign_net,fut_tmf_trust_net,fut_tmf_dealer_net,fut_tmf_total_net,fut_tmf_total_oi';
+      const r = await fetch(
+        `${SB_URL}/rest/v1/chips_daily?order=date.desc&limit=15&select=${fields}`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, signal: AbortSignal.timeout(8000) }
+      );
+      if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
+      const rows = await r.json();
+      if (!rows.length) throw new Error('chips_daily 無 TMF 資料');
 
-      // 依日期分組，加總三大法人的多空淨部位
-      // 欄位：institutional_investors（法人名稱）、long_open_interest_balance_volume、short_open_interest_balance_volume
-      const byDate = {};
-      for (const row of rows) {
-        const dt = row.date?.slice(0, 10);
-        if (!dt) continue;
-        if (!byDate[dt]) byDate[dt] = { date: dt, foreign_net: 0, trust_net: 0, dealer_net: 0, total_oi: 0 };
-        const longOI  = parseInt(row.long_open_interest_balance_volume)  || 0;
-        const shortOI = parseInt(row.short_open_interest_balance_volume) || 0;
-        const net = longOI - shortOI;
-        const name = row.institutional_investors || row.name || '';
-        if (name.includes('外資') || name.toLowerCase().includes('foreign')) byDate[dt].foreign_net = net;
-        else if (name.includes('投信') || name.toLowerCase().includes('investment trust')) byDate[dt].trust_net = net;
-        else if (name.includes('自營') || name.toLowerCase().includes('dealer')) byDate[dt].dealer_net = net;
-        // 總未平倉：取各法人多單之和作為參考基準
-        byDate[dt].total_oi += longOI;
-      }
-
-      // 排序最近 15 天
-      const sorted = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15);
-
-      // 計算散戶多空比：散戶 = -(三大法人總淨部位) / 總未平倉口數 × 100%
-      const history = sorted.map(d => {
-        const inst_total_net = d.foreign_net + d.trust_net + d.dealer_net;
-        const retail_net = -inst_total_net;
-        const oi = d.total_oi || 1;
-        const retail_ratio = parseFloat((retail_net / oi * 100).toFixed(2));
-        return { ...d, total_net: inst_total_net, retail_ratio };
+      const history = rows.map(d => {
+        const total_oi  = d.fut_tmf_total_oi  || 1;
+        const total_net = d.fut_tmf_total_net  || 0;
+        const retail_ratio = parseFloat((-total_net / total_oi * 100).toFixed(2));
+        return {
+          date:        d.date,
+          foreign_net: d.fut_tmf_foreign_net || 0,
+          trust_net:   d.fut_tmf_trust_net   || 0,
+          dealer_net:  d.fut_tmf_dealer_net  || 0,
+          total_net,
+          total_oi,
+          retail_ratio,
+        };
       });
 
       const latest = history[0] || null;
