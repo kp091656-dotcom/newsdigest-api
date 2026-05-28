@@ -2126,6 +2126,9 @@
         </div>
       </div>
 
+      <!-- 近N日趨勢圖 -->
+      <div id="chips-trend-chart" style="margin-top:1rem;"></div>
+
     </div><!-- end chipsPanel -->
 
         <!-- 免責聲明 -->
@@ -7035,6 +7038,93 @@ async function loadChipsPanel() {
       tr4('外資及陸資', fmtGray(d.opt_put_foreign_long), fmtGray(d.opt_put_foreign_short), fmtInt(d.opt_put_foreign_net), true) +
       tr4('投信',       fmtGray(d.opt_put_trust_long),   fmtGray(d.opt_put_trust_short),   fmtInt(d.opt_put_trust_net)) +
       tr4('自營商',     fmtGray(d.opt_put_dealer_long),  fmtGray(d.opt_put_dealer_short),  fmtInt(d.opt_put_dealer_net));
+
+    // ── 近N日趨勢圖 ──
+    try {
+      const histRows = await sbFetch('chips_daily',
+        'order=date.desc&limit=10&select=date,fut_tx_foreign_net,fut_tx_trust_net,fut_tx_dealer_net,fut_tx_total_net,opt_call_foreign_net,opt_call_trust_net,opt_call_dealer_net,opt_put_foreign_net,opt_put_trust_net,opt_put_dealer_net'
+      );
+      const chartEl = document.getElementById('chips-trend-chart');
+      if (chartEl && histRows && histRows.length >= 2) {
+        const rows = [...histRows].reverse(); // 舊→新
+        const n = rows.length;
+
+        // ── SVG 折線圖生成器 ──
+        function makeChipSvg(title, seriesDef) {
+          const W=320, H=90, PL=38, PR=8, PT=18, PB=20;
+          const cW=W-PL-PR, cH=H-PT-PB;
+          const allVals = rows.flatMap(r => seriesDef.map(s => r[s.key] ?? 0));
+          const vMin = Math.min(0, ...allVals), vMax = Math.max(0, ...allVals);
+          const vRange = vMax - vMin || 1;
+          const xPos = i => PL + (i / Math.max(n-1,1)) * cW;
+          const yPos = v => PT + cH - ((v - vMin) / vRange) * cH;
+          const zero = yPos(0);
+
+          // 格線（0 + 上下各一）
+          const gridVals = [vMin, 0, vMax].filter((v,i,a) => a.indexOf(v)===i);
+          const gridLines = gridVals.map(gv => {
+            const gy = yPos(gv).toFixed(1);
+            const lbl = Math.abs(gv) >= 1000 ? `${(gv/1000).toFixed(1)}K` : `${gv}`;
+            return `<line x1="${PL}" y1="${gy}" x2="${W-PR}" y2="${gy}" stroke="var(--border)" stroke-width="0.6"/>
+                    <text x="${PL-3}" y="${parseFloat(gy)+3.5}" font-family="IBM Plex Mono,monospace" font-size="6" fill="var(--muted)" text-anchor="end">${lbl}</text>`;
+          }).join('');
+
+          // X 軸日期（首/中/末）
+          const xIdx = [0, Math.floor((n-1)/2), n-1].filter((v,i,a)=>a.indexOf(v)===i);
+          const xLabels = xIdx.map(i =>
+            `<text x="${xPos(i).toFixed(1)}" y="${H-3}" font-family="IBM Plex Mono,monospace" font-size="6" fill="var(--muted)" text-anchor="middle">${rows[i]?.date?.slice(5)||''}</text>`
+          ).join('');
+
+          // 折線 + 點
+          const lines = seriesDef.map(s => {
+            const pts = rows.map((r,i) => `${xPos(i).toFixed(1)},${yPos(r[s.key]??0).toFixed(1)}`).join(' ');
+            const dots = rows.map((r,i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(r[s.key]??0).toFixed(1)}" r="2" fill="${s.color}"/>`).join('');
+            return `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+          }).join('');
+
+          // 圖例
+          const legend = seriesDef.map((s,i) =>
+            `<g transform="translate(${PL + i*72},0)">
+              <line x1="0" y1="4" x2="10" y2="4" stroke="${s.color}" stroke-width="1.5"/>
+              <circle cx="5" cy="4" r="2" fill="${s.color}"/>
+              <text x="13" y="7.5" font-family="IBM Plex Mono,monospace" font-size="7" fill="var(--muted)">${s.label}</text>
+            </g>`
+          ).join('');
+
+          return `
+            <div style="background:var(--surface);border-radius:12px;padding:0.9rem 1rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.4rem;">${title}<span style="margin-left:6px;font-size:0.5rem;opacity:0.6;">近 ${n} 日 · 口數</span></div>
+              <svg viewBox="0 0 ${W} ${H+12}" width="100%" style="display:block;overflow:visible;">
+                <g transform="translate(0,2)">${legend}</g>
+                <line x1="${PL}" y1="${zero.toFixed(1)}" x2="${W-PR}" y2="${zero.toFixed(1)}" stroke="var(--border-dark)" stroke-width="0.8" stroke-dasharray="3,2"/>
+                ${gridLines}
+                ${lines}
+                ${xLabels}
+              </svg>
+            </div>`;
+        }
+
+        chartEl.innerHTML =
+          `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;margin-bottom:0.75rem;">近期趨勢</div>` +
+          makeChipSvg('📈 台指期 TX 三大法人淨口', [
+            { key: 'fut_tx_foreign_net', label: '外資', color: '#6366f1' },
+            { key: 'fut_tx_trust_net',   label: '投信', color: '#f59e0b' },
+            { key: 'fut_tx_dealer_net',  label: '自營', color: '#10b981' },
+          ]) +
+          makeChipSvg('▲ 選擇權 CALL 三大法人淨口', [
+            { key: 'opt_call_foreign_net', label: '外資', color: '#6366f1' },
+            { key: 'opt_call_trust_net',   label: '投信', color: '#f59e0b' },
+            { key: 'opt_call_dealer_net',  label: '自營', color: '#10b981' },
+          ]) +
+          makeChipSvg('▼ 選擇權 PUT 三大法人淨口', [
+            { key: 'opt_put_foreign_net', label: '外資', color: '#6366f1' },
+            { key: 'opt_put_trust_net',   label: '投信', color: '#f59e0b' },
+            { key: 'opt_put_dealer_net',  label: '自營', color: '#10b981' },
+          ]);
+      }
+    } catch(chartErr) {
+      console.warn('[chips trend] 圖表載入失敗：', chartErr.message);
+    }
 
   } catch (e) {
     console.warn('[chips] 載入失敗：', e.message);
