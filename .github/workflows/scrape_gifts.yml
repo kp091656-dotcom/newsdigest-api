@@ -1,9 +1,9 @@
 name: Shareholder Gifts Scraper
 
 on:
-  schedule:
-    # 每週一至週五 09:00 台灣時間（UTC 01:00），3-6 月股東會季自動執行
-    - cron: '0 1 * 3-6 1-5'
+  # ⚠️ 自動排程已停用（2026-05-28）
+  # schedule:
+  #   - cron: '0 1 * 3-6 1-5'
   workflow_dispatch:
     inputs:
       batch_size:
