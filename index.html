@@ -1420,9 +1420,364 @@
   .cat-icon-cash    { background: #dc262615; color: #dc2626; border-color: #dc262630; }
   .cat-icon-3c      { background: #6d56f515; color: var(--accent); border-color: #6d56f530; }
   .cat-icon-other   { background: var(--tag-bg); color: var(--muted); border-color: var(--border); }
+  /* ══════════════════════════════════════════
+     全站個股搜尋
+     ══════════════════════════════════════════ */
+  .stock-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .stock-search-input {
+    width: 160px;
+    padding: 0.3rem 0.7rem 0.3rem 2rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: var(--r-sm);
+    color: rgba(255,255,255,0.85);
+    outline: none;
+    transition: background 0.15s, border-color 0.15s, width 0.2s;
+  }
+  .stock-search-input::placeholder { color: rgba(255,255,255,0.32); }
+  .stock-search-input:focus {
+    background: rgba(255,255,255,0.11);
+    border-color: rgba(99,102,241,0.6);
+    width: 200px;
+  }
+  .stock-search-icon {
+    position: absolute;
+    left: 0.55rem;
+    color: rgba(255,255,255,0.38);
+    font-size: 0.72rem;
+    pointer-events: none;
+    line-height: 1;
+  }
+  .stock-search-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 260px;
+    background: #fff;
+    border: 1px solid var(--border-dark);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 9999;
+    overflow: hidden;
+    display: none;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  .stock-search-dropdown.open { display: block; }
+  .ssd-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.5rem 0.85rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .ssd-item:last-child { border-bottom: none; }
+  .ssd-item:hover { background: #f5f5fb; }
+  .ssd-item.ssd-active { background: #eef0fb; }
+  .ssd-id {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--accent);
+    width: 44px;
+    flex-shrink: 0;
+  }
+  .ssd-name {
+    font-size: 0.78rem;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ssd-sector {
+    font-size: 0.58rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .ssd-chg {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    width: 52px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .ssd-empty {
+    padding: 0.9rem 0.85rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: center;
+  }
+  .ssd-loading {
+    padding: 0.8rem 0.85rem;
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: center;
+  }
+  /* ══════════════════════════════════════════
+     籌碼面板
+     ══════════════════════════════════════════ */
+  #chipsPanel {
+    padding: 1rem 0;
+  }
+  .chips-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    padding: 0 0.1rem;
+  }
+  .chips-topbar-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+  .chips-date-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+  }
+  .chips-range-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chips-range-btn:hover  { border-color: var(--accent); color: var(--accent); }
+  .chips-range-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-</style>
-</head>
+  /* KPI 卡片列 */
+  .chips-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.6rem;
+    margin-bottom: 1.1rem;
+  }
+  @media (max-width: 600px) {
+    .chips-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  }
+  .chips-kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 0.7rem 0.85rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .chips-kpi-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    margin-bottom: 0.2rem;
+  }
+  .chips-kpi-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--text);
+  }
+  .chips-kpi-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+
+  /* 圖表卡片 */
+  .chips-chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 680px) {
+    .chips-chart-grid { grid-template-columns: 1fr; }
+  }
+  .chips-chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 0.85rem 0.9rem 0.7rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .chips-chart-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.03em;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chips-chart-title span {
+    font-weight: 400;
+    color: var(--muted);
+    font-size: 0.55rem;
+  }
+
+  /* mini bar chart */
+  .chips-bar-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 56px;
+  }
+  .chips-bar-item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    height: 56px;
+    cursor: default;
+    position: relative;
+  }
+  .chips-bar-fill {
+    width: 100%;
+    border-radius: 2px 2px 0 0;
+    transition: opacity 0.15s;
+    min-height: 2px;
+  }
+  .chips-bar-item:hover .chips-bar-fill { opacity: 1 !important; }
+  .chips-date-row {
+    display: flex;
+    gap: 2px;
+    margin-top: 3px;
+  }
+  .chips-date-item {
+    flex: 1;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.38rem;
+    color: var(--muted);
+    text-align: center;
+    overflow: hidden;
+  }
+
+  /* 分項橫條（法人比較） */
+  .chips-inst-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.32rem;
+  }
+  .chips-inst-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    width: 40px;
+    flex-shrink: 0;
+  }
+  .chips-inst-bar-wrap {
+    flex: 1;
+    height: 7px;
+    background: var(--bg);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  .chips-inst-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s;
+    position: absolute;
+  }
+  .chips-inst-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    width: 64px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* 散戶多空比 gauge */
+  .chips-retail-gauge {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 0.5rem 0 0.3rem;
+  }
+  .chips-retail-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .chips-retail-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+
+  /* 融資融券 */
+  .chips-margin-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+  }
+  .chips-margin-item {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 0.45rem 0.6rem;
+  }
+  .chips-margin-lbl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.52rem;
+    color: var(--muted);
+  }
+  .chips-margin-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+  .chips-margin-chg {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    margin-top: 1px;
+  }
+
+  /* loading / error */
+  .chips-loading {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+  }
+
+
 <body>
 
 <!-- Header -->
@@ -1432,6 +1787,22 @@
     <div class="live-dot">LIVE</div>
   </div>
   <nav style="display:flex;align-items:center;gap:0.5rem;">
+    <!-- 個股搜尋 -->
+    <div class="stock-search-wrap" id="stockSearchWrap">
+      <span class="stock-search-icon">🔍</span>
+      <input
+        class="stock-search-input"
+        id="stockSearchInput"
+        type="text"
+        placeholder="搜尋個股..."
+        autocomplete="off"
+        spellcheck="false"
+        oninput="stockSearchOnInput(this.value)"
+        onkeydown="stockSearchKeydown(event)"
+        onfocus="stockSearchOnInput(this.value)"
+      >
+      <div class="stock-search-dropdown" id="stockSearchDropdown"></div>
+    </div>
     <div class="font-size-ctrl" title="字體大小">
       <button class="font-size-btn sm" onclick="setFontSize('small')" id="fsSmall">A</button>
       <button class="font-size-btn md active" onclick="setFontSize('medium')" id="fsMedium">A</button>
@@ -1472,6 +1843,7 @@
   <button class="cat-tab cat-tab-tools" id="heatmapTab" onclick="showHeatmap()">🇹🇼 台股熱圖</button>
   <button class="cat-tab cat-tab-tools" id="signalTab" onclick="showSignal()">📡 多空訊號</button>
   <button class="cat-tab cat-tab-tools" id="screenerTab" onclick="openScreener()">🔍 選股篩選</button>
+  <button class="cat-tab cat-tab-tools" id="chipsTab" onclick="showChips()">🧩 籌碼</button>
   <button class="cat-tab cat-tab-tools" id="giftsTab" onclick="showGifts()">🎁 紀念品</button>
 </div>
 
@@ -2274,6 +2646,131 @@
         <div class="gifts-empty"><div class="gifts-empty-icon">⏳</div>載入中…</div>
       </div>
     </div><!-- end giftsPanel -->
+
+    <!-- ══ 籌碼面板 ══ -->
+    <div id="chipsPanel" style="display:none;">
+      <div class="chips-topbar">
+        <span class="chips-topbar-title">🧩 籌碼面板</span>
+        <span class="chips-date-badge" id="chipsDateBadge">—</span>
+        <div style="display:flex;gap:0.3rem;margin-left:auto;">
+          <button class="chips-range-btn active" id="chipsRange20" onclick="chipsSetRange(20,this)">20日</button>
+          <button class="chips-range-btn" id="chipsRange60" onclick="chipsSetRange(60,this)">60日</button>
+        </div>
+      </div>
+
+      <!-- loading -->
+      <div id="chipsLoading" class="chips-loading">
+        <div class="spinner" style="margin:0 auto 12px;"></div>
+        載入籌碼資料中…
+      </div>
+
+      <!-- 主內容 -->
+      <div id="chipsContent" style="display:none;">
+
+        <!-- KPI 摘要列 -->
+        <div class="chips-kpi-row" id="chipsKpiRow"></div>
+
+        <!-- 圖表 2×2 -->
+        <div class="chips-chart-grid">
+
+          <!-- 外資現貨買賣超 -->
+          <div class="chips-chart-card">
+            <div class="chips-chart-title">外資現貨買賣超 <span id="chipsInstDateSub"></span></div>
+            <div class="chips-bar-wrap" id="chipsInstBars"></div>
+            <div class="chips-date-row" id="chipsInstDates"></div>
+            <!-- 法人三分法 -->
+            <div style="margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.55rem;">
+              <div class="chips-inst-row" id="chipsInstForeign">
+                <span class="chips-inst-label">外資</span>
+                <div class="chips-inst-bar-wrap"><div class="chips-inst-bar-fill" id="barForeign"></div></div>
+                <span class="chips-inst-val" id="valForeign">—</span>
+              </div>
+              <div class="chips-inst-row" id="chipsInstTrust">
+                <span class="chips-inst-label">投信</span>
+                <div class="chips-inst-bar-wrap"><div class="chips-inst-bar-fill" id="barTrust"></div></div>
+                <span class="chips-inst-val" id="valTrust">—</span>
+              </div>
+              <div class="chips-inst-row" id="chipsInstDealer">
+                <span class="chips-inst-label">自營商</span>
+                <div class="chips-inst-bar-wrap"><div class="chips-inst-bar-fill" id="barDealer"></div></div>
+                <span class="chips-inst-val" id="valDealer">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 散戶多空比 -->
+          <div class="chips-chart-card">
+            <div class="chips-chart-title">微台散戶多空比 <span>TMF 未平倉反推</span></div>
+            <div class="chips-retail-gauge">
+              <div>
+                <div class="chips-retail-num" id="chipsRetailRatio">—</div>
+                <div class="chips-retail-badge" id="chipsRetailBadge">—</div>
+              </div>
+              <div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);line-height:1.6;" id="chipsRetailDetail"></div>
+            </div>
+            <div class="chips-bar-wrap" style="height:44px;margin-top:0.4rem;" id="chipsRetailBars"></div>
+            <div class="chips-date-row" id="chipsRetailDates"></div>
+            <!-- P/C Ratio -->
+            <div style="margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.55rem;display:flex;align-items:center;gap:0.6rem;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);width:80px;flex-shrink:0;">P/C Ratio</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.88rem;font-weight:700;" id="chipsPCRatio">—</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;" id="chipsPCLabel">—</span>
+            </div>
+          </div>
+
+          <!-- 台指期貨法人 OI -->
+          <div class="chips-chart-card">
+            <div class="chips-chart-title">台指期貨法人未平倉 <span>TX + MTX</span></div>
+            <div style="margin-bottom:0.5rem;" id="chipsFutOI">
+              <div class="chips-inst-row">
+                <span class="chips-inst-label">外資 TX</span>
+                <div class="chips-inst-bar-wrap"><div class="chips-inst-bar-fill" id="barTxForeign"></div></div>
+                <span class="chips-inst-val" id="valTxForeign">—</span>
+              </div>
+              <div class="chips-inst-row">
+                <span class="chips-inst-label">外資 MTX</span>
+                <div class="chips-inst-bar-wrap"><div class="chips-inst-bar-fill" id="barMtxForeign"></div></div>
+                <span class="chips-inst-val" id="valMtxForeign">—</span>
+              </div>
+              <div class="chips-inst-row">
+                <span class="chips-inst-label">自營 TX</span>
+                <div class="chips-inst-bar-wrap"><div class="chips-inst-bar-fill" id="barTxProp"></div></div>
+                <span class="chips-inst-val" id="valTxProp">—</span>
+              </div>
+              <div class="chips-inst-row">
+                <span class="chips-inst-label">散戶 MTX</span>
+                <div class="chips-inst-bar-wrap"><div class="chips-inst-bar-fill" id="barMtxRetail"></div></div>
+                <span class="chips-inst-val" id="valMtxRetail">—</span>
+              </div>
+            </div>
+            <!-- TX OI 近期走勢 bar -->
+            <div style="border-top:1px solid var(--border);padding-top:0.55rem;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.35rem;">外資 TX 淨 OI 走勢</div>
+              <div class="chips-bar-wrap" style="height:44px;" id="chipsTxBars"></div>
+              <div class="chips-date-row" id="chipsTxDates"></div>
+            </div>
+          </div>
+
+          <!-- 融資融券 -->
+          <div class="chips-chart-card">
+            <div class="chips-chart-title">融資融券 <span>全市場</span></div>
+            <div class="chips-margin-row" id="chipsMarginKpi"></div>
+            <div style="margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.5rem;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.35rem;">融資餘額走勢</div>
+              <div class="chips-bar-wrap" style="height:44px;" id="chipsMarginBars"></div>
+              <div class="chips-date-row" id="chipsMarginDates"></div>
+            </div>
+            <div style="margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.55rem;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);" id="chipsMarginTs"></div>
+          </div>
+
+        </div><!-- end chips-chart-grid -->
+
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-align:center;padding-top:0.5rem;padding-bottom:0.5rem;">
+          ⚠️ 資料來源：TAIFEX / FinMind，每日盤後更新。不構成投資建議。
+        </div>
+
+      </div><!-- end chipsContent -->
+    </div><!-- end chipsPanel -->
 
     <button class="load-more" id="loadMoreBtn" style="display:none" onclick="loadMore()">載入更多 ↓</button>
   </div><!-- end left column -->
@@ -3597,6 +4094,7 @@ function showSentiment() {
   document.getElementById('sentimentTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
   const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
+  const cp = document.getElementById('chipsPanel'); if (cp) cp.style.display = 'none';
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
   document.getElementById('futuresPanel').style.display = 'none';
@@ -4014,7 +4512,7 @@ const SECTOR_INDEX_MAP = {
 function showGifts() {
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('giftsTab').classList.add('active');
-  ['newsFeed','loadMoreBtn','sentimentPanel','futuresPanel','heatmapPanel','signalPanel','screenerPanel'].forEach(id => {
+  ['newsFeed','loadMoreBtn','sentimentPanel','futuresPanel','heatmapPanel','signalPanel','screenerPanel','chipsPanel'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = 'none';
   });
   const fh = document.querySelector('.feed-header'); if (fh) fh.style.display = 'none';
@@ -4164,6 +4662,7 @@ function setGiftSort(s) {
 
 function showHeatmap() {
   const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
+  const cp = document.getElementById('chipsPanel'); if (cp) cp.style.display = 'none';
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('heatmapTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
@@ -4194,6 +4693,7 @@ function showSignal() {
   document.getElementById('signalTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
   const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
+  const cp = document.getElementById('chipsPanel'); if (cp) cp.style.display = 'none';
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
   document.getElementById('sentimentPanel').style.display = 'none';
@@ -4202,7 +4702,6 @@ function showSignal() {
   document.getElementById('signalPanel').style.display = 'block';
   loadMktSignals();
   initAlphaIfNeeded();
-  loadChipsPanel();  // 籌碼面板
 }
 
 function hideHeatmap() {
@@ -5150,6 +5649,7 @@ function showFutures() {
   document.getElementById('futuresTab').classList.add('active');
   document.getElementById('newsFeed').style.display = 'none';
   const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
+  const cp = document.getElementById('chipsPanel'); if (cp) cp.style.display = 'none';
   document.getElementById('loadMoreBtn').style.display = 'none';
   document.querySelector('.feed-header').style.display = 'none';
   document.getElementById('sentimentPanel').style.display = 'none';
@@ -6821,8 +7321,380 @@ function loadSavedFontSize() {
   setFontSize(saved);
 }
 
-// ── Init ──
-renderTrending();
+// ════════ 籌碼面板 ════════
+let _chipsData    = null; // { latest, history }
+let _chipsRange   = 20;
+
+function showChips() {
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('chipsTab').classList.add('active');
+  ['newsFeed','loadMoreBtn','sentimentPanel','futuresPanel','heatmapPanel','signalPanel','screenerPanel'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  const gp = document.getElementById('giftsPanel'); if (gp) gp.style.display = 'none';
+  document.querySelector('.feed-header').style.display = 'none';
+  document.getElementById('chipsPanel').style.display = 'block';
+  if (!_chipsData) loadChipsPanel();
+  else chipsRender(_chipsData, _chipsRange);
+}
+
+function chipsSetRange(n, btn) {
+  _chipsRange = n;
+  document.querySelectorAll('.chips-range-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (_chipsData) chipsRender(_chipsData, n);
+}
+
+async function loadChipsPanel() {
+  document.getElementById('chipsLoading').style.display = 'block';
+  document.getElementById('chipsContent').style.display = 'none';
+  try {
+    const rows = await sbFetch('chips_daily',
+      'order=date.desc&limit=65&select=date,foreign_net,invest_trust_net,dealer_net,inst_total_net,tx_foreign_oi,mtx_foreign_oi,mtx_retail_oi,tmf_total_oi,retail_bias,put_call_ratio,margin_balance,short_balance,margin_net'
+    );
+    if (!rows || !rows.length) throw new Error('無籌碼資料');
+    _chipsData = { latest: rows[0], history: rows.slice().reverse() };
+    document.getElementById('chipsDateBadge').textContent = `資料日期：${rows[0].date}`;
+    chipsRender(_chipsData, _chipsRange);
+  } catch(e) {
+    document.getElementById('chipsLoading').innerHTML =
+      `<div style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.78rem;padding:3rem 1rem;text-align:center;">
+        ⚠️ 籌碼資料載入失敗：${e.message}<br>
+        <span style="font-size:0.62rem;opacity:0.65;">chips_daily 表尚未有資料，或 Supabase RLS 需確認</span>
+      </div>`;
+  }
+}
+
+function chipsRender({ latest, history }, range) {
+  document.getElementById('chipsLoading').style.display = 'none';
+  document.getElementById('chipsContent').style.display = 'block';
+
+  const hist = history.slice(-range); // 只顯示 range 天
+  const L    = latest;
+
+  // ── KPI 摘要 ──
+  const fmtBil = v => v == null ? '—' : `${v >= 0 ? '+' : ''}${(v / 1e8).toFixed(1)}億`;
+  const fmtOI  = v => v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toLocaleString()}口`;
+
+  const pcRatio   = L.put_call_ratio;
+  const pcColor   = pcRatio == null ? 'var(--muted)' : pcRatio >= 1.3 ? 'var(--up)' : pcRatio <= 0.8 ? 'var(--down)' : 'var(--muted)';
+  const retailBias = L.retail_bias; // 散戶多空比 %
+  const retailColor = retailBias == null ? 'var(--muted)' : retailBias > 5 ? 'var(--up)' : retailBias < -5 ? 'var(--down)' : 'var(--muted)';
+
+  document.getElementById('chipsKpiRow').innerHTML = [
+    {
+      label: '外資現貨買賣超',
+      val: fmtBil(L.foreign_net),
+      color: L.foreign_net == null ? 'var(--muted)' : L.foreign_net >= 0 ? 'var(--up)' : 'var(--down)',
+      sub: `投信 ${fmtBil(L.invest_trust_net)}`,
+    },
+    {
+      label: '三大法人合計',
+      val: fmtBil(L.inst_total_net),
+      color: L.inst_total_net == null ? 'var(--muted)' : L.inst_total_net >= 0 ? 'var(--up)' : 'var(--down)',
+      sub: `自營 ${fmtBil(L.dealer_net)}`,
+    },
+    {
+      label: '散戶多空比',
+      val: retailBias != null ? `${retailBias >= 0 ? '+' : ''}${retailBias.toFixed(1)}%` : '—',
+      color: retailColor,
+      sub: `TMF 全體OI ${L.tmf_total_oi != null ? L.tmf_total_oi.toLocaleString()+'口' : '—'}`,
+    },
+    {
+      label: 'P/C Ratio (OI)',
+      val: pcRatio != null ? pcRatio.toFixed(3) : '—',
+      color: pcColor,
+      sub: pcRatio == null ? '' : pcRatio >= 1.3 ? '偏多（PUT量大）' : pcRatio <= 0.8 ? '偏空（CALL量大）' : '中性',
+    },
+  ].map(k => `
+    <div class="chips-kpi-card">
+      <div class="chips-kpi-label">${k.label}</div>
+      <div class="chips-kpi-val" style="color:${k.color};">${k.val}</div>
+      <div class="chips-kpi-sub">${k.sub}</div>
+    </div>`).join('');
+
+  // ── 外資現貨買賣超 bar ──
+  _chipsRenderBar('chipsInstBars', 'chipsInstDates', hist,
+    d => d.foreign_net, 'var(--up)', 'var(--down)', true);
+
+  // 法人三分法橫條
+  const maxInst = Math.max(
+    Math.abs(L.foreign_net || 0),
+    Math.abs(L.invest_trust_net || 0),
+    Math.abs(L.dealer_net || 0), 1
+  );
+  [
+    { bar: 'barForeign', val: 'valForeign', v: L.foreign_net },
+    { bar: 'barTrust',   val: 'valTrust',   v: L.invest_trust_net },
+    { bar: 'barDealer',  val: 'valDealer',  v: L.dealer_net },
+  ].forEach(({ bar, val, v }) => {
+    const pos   = v != null && v >= 0;
+    const color = v == null ? 'var(--muted)' : pos ? 'var(--up)' : 'var(--down)';
+    const pct   = v == null ? 0 : Math.min(100, Math.abs(v) / maxInst * 100);
+    const barEl = document.getElementById(bar);
+    if (barEl) {
+      barEl.style.width    = pct.toFixed(1) + '%';
+      barEl.style.background = color;
+      barEl.style.left     = pos ? '50%' : `${50 - pct}%`;
+    }
+    const valEl = document.getElementById(val);
+    if (valEl) { valEl.textContent = fmtBil(v); valEl.style.color = color; }
+  });
+
+  // ── 散戶多空比 ──
+  const rb = L.retail_bias;
+  const rbColor = rb == null ? 'var(--muted)' : rb > 5 ? 'var(--up)' : rb < -5 ? 'var(--down)' : 'var(--muted)';
+  const rbEl = document.getElementById('chipsRetailRatio');
+  if (rbEl) { rbEl.textContent = rb != null ? `${rb >= 0 ? '+' : ''}${rb.toFixed(2)}%` : '—'; rbEl.style.color = rbColor; }
+  const rbBadge = document.getElementById('chipsRetailBadge');
+  if (rbBadge) {
+    let lbl = '中性', bg = 'rgba(128,128,128,0.1)';
+    if      (rb > 20)  { lbl = '散戶極度偏多 ⚠️'; bg = 'rgba(220,38,38,0.1)'; }
+    else if (rb > 5)   { lbl = '散戶偏多';         bg = 'rgba(220,38,38,0.08)'; }
+    else if (rb > -5)  { lbl = '散戶中性';          bg = 'rgba(128,128,128,0.08)'; }
+    else if (rb > -20) { lbl = '散戶偏空';          bg = 'rgba(22,163,74,0.08)'; }
+    else               { lbl = '散戶極度偏空';      bg = 'rgba(22,163,74,0.1)'; }
+    rbBadge.textContent      = lbl;
+    rbBadge.style.color      = rbColor;
+    rbBadge.style.background = bg;
+  }
+  const detEl = document.getElementById('chipsRetailDetail');
+  if (detEl) detEl.innerHTML =
+    `TMF 全體OI：<b style="color:var(--text);">${L.tmf_total_oi != null ? L.tmf_total_oi.toLocaleString() : '—'}</b><br>` +
+    `散戶 MTX OI：<b style="color:${rbColor};">${L.mtx_retail_oi != null ? L.mtx_retail_oi.toLocaleString() : '—'}</b>`;
+
+  _chipsRenderBar('chipsRetailBars', 'chipsRetailDates', hist,
+    d => d.retail_bias, 'var(--up)', 'var(--down)', false);
+
+  // P/C Ratio
+  const pcEl = document.getElementById('chipsPCRatio');
+  const pcLbl = document.getElementById('chipsPCLabel');
+  if (pcEl) { pcEl.textContent = pcRatio != null ? pcRatio.toFixed(3) : '—'; pcEl.style.color = pcColor; }
+  if (pcLbl) {
+    pcLbl.textContent = pcRatio == null ? '' : pcRatio >= 1.5 ? '強力偏多' : pcRatio >= 1.3 ? '偏多' : pcRatio <= 0.7 ? '強力偏空' : pcRatio <= 0.9 ? '偏空' : '中性';
+    pcLbl.style.color = pcColor;
+  }
+
+  // ── 期貨法人 OI ──
+  const maxOI = Math.max(
+    Math.abs(L.tx_foreign_oi || 0), Math.abs(L.mtx_foreign_oi || 0),
+    Math.abs(L.mtx_retail_oi || 0), 1
+  );
+  [
+    { bar: 'barTxForeign',  val: 'valTxForeign',  v: L.tx_foreign_oi  },
+    { bar: 'barMtxForeign', val: 'valMtxForeign', v: L.mtx_foreign_oi },
+    { bar: 'barTxProp',     val: 'valTxProp',      v: L.tx_prop_oi     },
+    { bar: 'barMtxRetail',  val: 'valMtxRetail',  v: L.mtx_retail_oi  },
+  ].forEach(({ bar, val, v }) => {
+    const pos   = v != null && v >= 0;
+    const color = v == null ? 'var(--muted)' : pos ? 'var(--up)' : 'var(--down)';
+    const pct   = v == null ? 0 : Math.min(100, Math.abs(v) / maxOI * 100);
+    const barEl = document.getElementById(bar);
+    if (barEl) {
+      barEl.style.width      = pct.toFixed(1) + '%';
+      barEl.style.background = color;
+      barEl.style.left       = pos ? '50%' : `${50 - pct}%`;
+    }
+    const valEl = document.getElementById(val);
+    if (valEl) { valEl.textContent = fmtOI(v); valEl.style.color = color; }
+  });
+  _chipsRenderBar('chipsTxBars', 'chipsTxDates', hist,
+    d => d.tx_foreign_oi, 'var(--up)', 'var(--down)', false);
+
+  // ── 融資融券 KPI ──
+  const mb  = L.margin_balance;
+  const sb  = L.short_balance;
+  const mn  = L.margin_net;
+  const mnColor = mn == null ? 'var(--muted)' : mn >= 0 ? 'var(--up)' : 'var(--down)';
+  document.getElementById('chipsMarginKpi').innerHTML = [
+    { label: '融資餘額', val: mb != null ? `${(mb / 1e8).toFixed(1)}億` : '—', color: 'var(--text)', chg: mn != null ? `淨 ${mn >= 0 ? '+' : ''}${(mn / 1e8).toFixed(1)}億` : '' },
+    { label: '融券餘額', val: sb != null ? `${(sb / 1000).toFixed(1)}K張` : '—', color: 'var(--text)', chg: '' },
+  ].map(m => `
+    <div class="chips-margin-item">
+      <div class="chips-margin-lbl">${m.label}</div>
+      <div class="chips-margin-val" style="color:${m.color};">${m.val}</div>
+      ${m.chg ? `<div class="chips-margin-chg" style="color:${mnColor};">${m.chg}</div>` : ''}
+    </div>`).join('');
+
+  _chipsRenderBar('chipsMarginBars', 'chipsMarginDates', hist,
+    d => d.margin_balance, '#dc2626', '#dc2626', false, true);
+
+  const tsEl = document.getElementById('chipsMarginTs');
+  if (tsEl) tsEl.textContent = `最新資料：${L.date}`;
+}
+
+// 通用小 bar chart 渲染
+function _chipsRenderBar(barsId, datesId, hist, valFn, posColor, negColor, diverging, absolute) {
+  const vals   = hist.map(valFn);
+  const maxAbs = Math.max(...vals.map(v => Math.abs(v || 0)), 1);
+
+  document.getElementById(barsId).innerHTML = hist.map((d, i) => {
+    const v   = valFn(d);
+    const pct = v == null ? 0 : Math.min(100, Math.abs(v) / maxAbs * 100);
+    const col = v == null ? '#ccc' : (!diverging || v >= 0) ? posColor : negColor;
+    const opacity = i === hist.length - 1 ? 1 : 0.65;
+    return `<div class="chips-bar-item" title="${d.date}\n${v != null ? (v >= 0 ? '+' : '') + (absolute ? (v/1e8).toFixed(1)+'億' : v.toLocaleString()) : '—'}">
+      <div class="chips-bar-fill" style="height:${Math.max(2, pct * 0.52)}px;background:${col};opacity:${opacity};"></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById(datesId).innerHTML = hist.map((d, i) =>
+    `<div class="chips-date-item">${i % Math.ceil(hist.length / 8) === 0 ? d.date.slice(5) : ''}</div>`
+  ).join('');
+}
+// ════════ end 籌碼面板 ════════
+
+
+let _ssIndex  = -1;   // 鍵盤游標
+let _ssItems  = [];   // 目前候選清單
+let _ssTimer  = null; // debounce timer
+
+// 從 heatmapData + Supabase 雙管齊下搜尋
+async function stockSearchQuery(q) {
+  q = q.trim().toUpperCase();
+  if (!q) return [];
+
+  // 1. 本地 heatmapData（已載入的 ~120 支）
+  const local = (window.heatmapData || []).filter(d =>
+    d.id.startsWith(q) || d.name.includes(q)
+  ).map(d => ({
+    id: d.id, name: d.name, sector: d.sector,
+    price: d.price, chgPct: d.chgPct, mcap: d.mcap, prev: d.prev,
+    _source: 'local'
+  }));
+
+  // 2. 全市場 Supabase 搜尋（如果本地不夠）
+  let remote = [];
+  try {
+    // 先抓 stock_valuation_daily 最新一天，含 stock_id/stock_name
+    // 用 ilike 模糊搜尋股票名稱（或完整代碼比對）
+    const isNum = /^\d+/.test(q);
+    let filter;
+    if (isNum) {
+      // 數字開頭：股票代碼前綴搜尋
+      filter = `stock_id=gte.${q}&stock_id=lt.${q}Z&order=stock_id&limit=15&select=stock_id,stock_name,close,chg_pct`;
+    } else {
+      // 中文/英文：名稱模糊搜尋
+      filter = `stock_name=ilike.*${q}*&order=stock_id&limit=15&select=stock_id,stock_name,close,chg_pct`;
+    }
+    const rows = await sbFetch('stock_daily_twse',
+      `${filter}&date=gte.${(() => { const d = new Date(Date.now()-7*86400000); return d.toISOString().slice(0,10); })()}`
+    );
+    if (rows && rows.length) {
+      const localIds = new Set(local.map(d => d.id));
+      remote = rows.filter(r => !localIds.has(r.stock_id)).map(r => ({
+        id: r.stock_id, name: r.stock_name || '', sector: '',
+        price: r.close, chgPct: r.chg_pct, mcap: 0, prev: r.close,
+        _source: 'remote'
+      }));
+    }
+  } catch(e) { /* 搜尋失敗不中斷 */ }
+
+  // 合併：本地優先，代碼精確比對排最前
+  const merged = [...local, ...remote];
+  merged.sort((a, b) => {
+    const aExact = a.id === q ? 0 : a.id.startsWith(q) ? 1 : 2;
+    const bExact = b.id === q ? 0 : b.id.startsWith(q) ? 1 : 2;
+    if (aExact !== bExact) return aExact - bExact;
+    return (b.mcap || 0) - (a.mcap || 0); // 市值大的排前
+  });
+  return merged.slice(0, 10);
+}
+
+function stockSearchRender(items, q) {
+  const dd = document.getElementById('stockSearchDropdown');
+  _ssItems = items;
+  _ssIndex = -1;
+  if (!items.length) {
+    dd.innerHTML = `<div class="ssd-empty">找不到「${q}」相關個股</div>`;
+  } else {
+    dd.innerHTML = items.map((s, i) => {
+      const pct   = s.chgPct != null ? (s.chgPct * 100) : null;
+      const sign  = pct != null ? (pct >= 0 ? '+' : '') : '';
+      const color = pct != null ? (pct >= 0 ? '#dc2626' : '#16a34a') : 'var(--muted)';
+      const pctStr = pct != null ? `${sign}${pct.toFixed(2)}%` : '—';
+      return `<div class="ssd-item" data-idx="${i}"
+        onmousedown="stockSearchSelect(${i})"
+        onmouseover="stockSearchHover(${i})">
+        <span class="ssd-id">${s.id}</span>
+        <span class="ssd-name">${s.name}</span>
+        ${s.sector ? `<span class="ssd-sector">${s.sector}</span>` : ''}
+        <span class="ssd-chg" style="color:${color};">${pctStr}</span>
+      </div>`;
+    }).join('');
+  }
+  dd.classList.add('open');
+}
+
+function stockSearchHover(i) {
+  _ssIndex = i;
+  document.querySelectorAll('#stockSearchDropdown .ssd-item').forEach((el, idx) => {
+    el.classList.toggle('ssd-active', idx === i);
+  });
+}
+
+function stockSearchSelect(i) {
+  const s = _ssItems[i];
+  if (!s) return;
+  stockSearchClose();
+  document.getElementById('stockSearchInput').value = '';
+  // 開啟 modal — 補齊 openStockModal 需要的欄位
+  openStockModal({
+    id: s.id, name: s.name, sector: s.sector || '',
+    price: s.price || 0, chgPct: s.chgPct || 0,
+    prev: s.prev || s.price || 0, mcap: s.mcap || 0,
+  });
+}
+
+function stockSearchClose() {
+  const dd = document.getElementById('stockSearchDropdown');
+  dd.classList.remove('open');
+  _ssIndex = -1;
+}
+
+function stockSearchOnInput(val) {
+  clearTimeout(_ssTimer);
+  const dd = document.getElementById('stockSearchDropdown');
+  const q  = val.trim();
+  if (!q) { stockSearchClose(); return; }
+
+  // 立刻顯示 loading
+  dd.innerHTML = `<div class="ssd-loading">搜尋中…</div>`;
+  dd.classList.add('open');
+
+  _ssTimer = setTimeout(async () => {
+    const items = await stockSearchQuery(q);
+    stockSearchRender(items, q);
+  }, 220); // debounce 220ms
+}
+
+function stockSearchKeydown(e) {
+  const dd = document.getElementById('stockSearchDropdown');
+  if (!dd.classList.contains('open')) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    stockSearchHover(Math.min(_ssIndex + 1, _ssItems.length - 1));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    stockSearchHover(Math.max(_ssIndex - 1, 0));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (_ssIndex >= 0) stockSearchSelect(_ssIndex);
+    else if (_ssItems.length === 1) stockSearchSelect(0);
+  } else if (e.key === 'Escape') {
+    stockSearchClose();
+    document.getElementById('stockSearchInput').blur();
+  }
+}
+
+// 點擊外部關閉
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('stockSearchWrap');
+  if (wrap && !wrap.contains(e.target)) stockSearchClose();
+});
+// ════════ end 個股搜尋 ════════
+
+
 loadSavedKeys();
 loadSavedFontSize();
 updateOwnerBadge();
