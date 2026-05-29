@@ -117,11 +117,17 @@ async function loadChipsPanel() {
         // ── 共用：設定 canvas 高清尺寸 ──
         // 所有座標用 CSS px，ctx.scale(DPR,DPR) 一次放大，canvas buffer = CSS*DPR
         function setupCanvas(canvas, cssW, cssH) {
-          canvas.width  = Math.round(cssW * DPR);
-          canvas.height = Math.round(cssH * DPR);
+          const newW = Math.round(cssW * DPR);
+          const newH = Math.round(cssH * DPR);
+          // 只在尺寸真正改變時才重設（避免觸發 ResizeObserver 迴圈）
+          if (canvas.width !== newW || canvas.height !== newH) {
+            canvas.width  = newW;
+            canvas.height = newH;
+          }
           canvas.style.width  = cssW + 'px';
           canvas.style.height = cssH + 'px';
           const ctx = canvas.getContext('2d');
+          ctx.setTransform(1, 0, 0, 1, 0, 0); // 重設 transform 再 scale
           ctx.scale(DPR, DPR);
           return ctx;
         }
@@ -132,7 +138,8 @@ async function loadChipsPanel() {
           const PL = 46, PR = 10, PT = 10, PB = 24;
 
           const wrap = document.createElement('div');
-          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.9rem 1rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;';
+          // ⚡ 固定高度 + overflow:hidden 是關鍵，防止 Canvas 撐爆容器
+          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.9rem 1rem 0.7rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;overflow:hidden;box-sizing:border-box;';
 
           const ttl = document.createElement('div');
           ttl.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.4rem;";
@@ -140,7 +147,7 @@ async function loadChipsPanel() {
           wrap.appendChild(ttl);
 
           const lgd = document.createElement('div');
-          lgd.style.cssText = 'display:flex;gap:1.2rem;margin-bottom:0.5rem;flex-wrap:wrap;';
+          lgd.style.cssText = 'display:flex;gap:1.2rem;margin-bottom:0.4rem;flex-wrap:wrap;';
           seriesDef.forEach(s => {
             const sp = document.createElement('span');
             sp.style.cssText = `font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);display:inline-flex;align-items:center;gap:5px;`;
@@ -149,8 +156,9 @@ async function loadChipsPanel() {
           });
           wrap.appendChild(lgd);
 
+          // ⚡ Canvas 必須用固定 px，不能用 width:100% 或 height:auto
           const canvas = document.createElement('canvas');
-          canvas.style.display = 'block';
+          canvas.style.cssText = `display:block;width:300px;height:${CSS_H}px;`;
           wrap.appendChild(canvas);
 
           const tip = document.createElement('div');
@@ -174,11 +182,7 @@ async function loadChipsPanel() {
 
           function draw(hoverIdx = -1) {
             const ctx = canvas.getContext('2d');
-            // reset transform before clearing (setupCanvas scaled it)
-            ctx.save();
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.restore();
+            ctx.clearRect(0, 0, cssW, CSS_H);
 
             const cs = getComputedStyle(document.documentElement);
             const colBorder  = cs.getPropertyValue('--border').trim()      || '#2a2a42';
@@ -245,9 +249,14 @@ async function loadChipsPanel() {
 
           function resize(w) {
             cssW = w;
+            canvas.style.width = w + 'px'; // 只改 CSS 寬，不改 buffer → 不觸發 ResizeObserver
             setupCanvas(canvas, cssW, CSS_H);
             draw();
           }
+
+          // 初始化：用 300px 先畫，ResizeObserver 會立刻給真實寬度
+          setupCanvas(canvas, cssW, CSS_H);
+          draw();
 
           // Hover
           canvas.addEventListener('mousemove', e => {
@@ -301,7 +310,7 @@ async function loadChipsPanel() {
           });
 
           const wrap = document.createElement('div');
-          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.9rem 1rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;';
+          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.9rem 1rem 0.7rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;overflow:hidden;box-sizing:border-box;';
 
           const ttl = document.createElement('div');
           ttl.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.4rem;";
@@ -309,7 +318,7 @@ async function loadChipsPanel() {
           wrap.appendChild(ttl);
 
           const lgd = document.createElement('div');
-          lgd.style.cssText = 'display:flex;gap:1.2rem;margin-bottom:0.5rem;flex-wrap:wrap;';
+          lgd.style.cssText = 'display:flex;gap:1.2rem;margin-bottom:0.4rem;flex-wrap:wrap;';
           cumSeries.forEach(s => {
             const sp = document.createElement('span');
             sp.style.cssText = `font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);display:inline-flex;align-items:center;gap:5px;`;
@@ -318,8 +327,9 @@ async function loadChipsPanel() {
           });
           wrap.appendChild(lgd);
 
+          // ⚡ 固定 px，不用 width:100%
           const canvas = document.createElement('canvas');
-          canvas.style.display = 'block';
+          canvas.style.cssText = `display:block;width:300px;height:${CSS_H}px;`;
           wrap.appendChild(canvas);
 
           const tip = document.createElement('div');
@@ -336,7 +346,7 @@ async function loadChipsPanel() {
 
           function drawCum(hoverIdx = -1) {
             const ctx = canvas.getContext('2d');
-            ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.restore();
+            ctx.clearRect(0, 0, cssW, CSS_H);
 
             const cs = getComputedStyle(document.documentElement);
             const colBorder  = cs.getPropertyValue('--border').trim()      || '#2a2a42';
@@ -403,7 +413,15 @@ async function loadChipsPanel() {
             });
           }
 
-          function resize(w) { cssW = w; setupCanvas(canvas, cssW, CSS_H); drawCum(); }
+          function resize(w) {
+            cssW = w;
+            canvas.style.width = w + 'px';
+            setupCanvas(canvas, cssW, CSS_H);
+            drawCum();
+          }
+
+          setupCanvas(canvas, cssW, CSS_H);
+          drawCum();
 
           canvas.addEventListener('mousemove', e => {
             const mouseX = e.offsetX !== undefined ? e.offsetX : (e.clientX - canvas.getBoundingClientRect().left);
@@ -461,13 +479,20 @@ async function loadChipsPanel() {
 
         charts.forEach(c => chartEl.appendChild(c.wrap));
 
-        // ResizeObserver：DOM 插入後才能取得正確寬度，並自動響應容器縮放
+        // ResizeObserver：觀察 chartEl 的父容器（不觀察 chartEl 本身，避免 canvas resize 觸發迴圈）
+        let lastW = 0;
+        let rafId = null;
+        const roTarget = chartEl.parentElement || chartEl;
         const ro = new ResizeObserver(entries => {
           const w = entries[0].contentRect.width;
-          if (w < 100) return;
-          charts.forEach(c => c.resize(w));
+          if (w < 100 || Math.abs(w - lastW) < 2) return; // 寬度沒變就不重繪
+          lastW = w;
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => {
+            charts.forEach(c => c.resize(w));
+          });
         });
-        ro.observe(chartEl);
+        ro.observe(roTarget);
       }
     } catch(chartErr) {
       console.warn('[chips trend] 圖表載入失敗：', chartErr.message);
