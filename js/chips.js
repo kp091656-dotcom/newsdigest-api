@@ -102,6 +102,7 @@ async function loadChipsPanel() {
       tr4('投信',       fmtGray(d.opt_put_trust_long),   fmtGray(d.opt_put_trust_short),   fmtInt(d.opt_put_trust_net)) +
       tr4('自營商',     fmtGray(d.opt_put_dealer_long),  fmtGray(d.opt_put_dealer_short),  fmtInt(d.opt_put_dealer_net));
 
+
     // ── 近N日趨勢圖（Canvas + Hover Tooltip）──
     try {
       const histRes  = await fetch('/api/news?endpoint=chips&limit=10&order=date.desc');
@@ -110,16 +111,13 @@ async function loadChipsPanel() {
       const chartEl  = document.getElementById('chips-trend-chart');
 
       if (chartEl && histRaw.length >= 2) {
-        const rows = [...histRaw].reverse(); // 舊→新
+        const rows = [...histRaw].reverse();
         const n = rows.length;
         const DPR = window.devicePixelRatio || 1;
 
-        // ── 共用：設定 canvas 高清尺寸 ──
-        // 所有座標用 CSS px，ctx.scale(DPR,DPR) 一次放大，canvas buffer = CSS*DPR
         function setupCanvas(canvas, cssW, cssH) {
           const newW = Math.round(cssW * DPR);
           const newH = Math.round(cssH * DPR);
-          // 只在尺寸真正改變時才重設（避免觸發 ResizeObserver 迴圈）
           if (canvas.width !== newW || canvas.height !== newH) {
             canvas.width  = newW;
             canvas.height = newH;
@@ -127,18 +125,17 @@ async function loadChipsPanel() {
           canvas.style.width  = cssW + 'px';
           canvas.style.height = cssH + 'px';
           const ctx = canvas.getContext('2d');
-          ctx.setTransform(1, 0, 0, 1, 0, 0); // 重設 transform 再 scale
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.scale(DPR, DPR);
           return ctx;
         }
 
-        // ── Canvas 折線圖生成器 ──
         function makeCanvasChart(title, unit, seriesDef) {
-          const CSS_H = 120;
-          const PL = 46, PR = 10, PT = 10, PB = 24;
+          const CSS_H = 110;
+          const PL = 46, PR = 10, PT = 10, PB = 20;
 
           const wrap = document.createElement('div');
-          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.9rem 1rem 0.7rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;overflow:hidden;box-sizing:border-box;height:185px;';
+          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.8rem 0.9rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;overflow:hidden;box-sizing:border-box;height:185px;';
 
           const ttl = document.createElement('div');
           ttl.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.4rem;";
@@ -156,10 +153,10 @@ async function loadChipsPanel() {
           wrap.appendChild(lgd);
 
           const canvasWrap = document.createElement('div');
-          canvasWrap.style.cssText = `position:relative;width:100%;height:${CSS_H}px;overflow:hidden;`;
+          canvasWrap.style.cssText = `position:relative;width:100%;height:${CSS_H}px;overflow:hidden;max-height:${CSS_H}px;`;
 
           const canvas = document.createElement('canvas');
-          canvas.style.cssText = `display:block;width:100%;height:${CSS_H}px;`;
+          canvas.style.cssText = `display:block;width:100%;height:${CSS_H}px;position:absolute;top:0;left:0;`;
           canvasWrap.appendChild(canvas);
           wrap.appendChild(canvasWrap);
 
@@ -171,7 +168,7 @@ async function loadChipsPanel() {
           const absMax = Math.max(...allVals.map(Math.abs), 1);
           const vMax = absMax, vMin = -absMax, vRange = vMax - vMin;
 
-          let cssW = 300;
+          let cssW = 0; // 💡 初始 0，等 ResizeObserver 給真實寬度才畫
 
           function xPos(i, w) { return PL + (i / Math.max(n - 1, 1)) * (w - PL - PR); }
           function yPos(v)    { return PT + (CSS_H - PT - PB) - ((v - vMin) / vRange) * (CSS_H - PT - PB); }
@@ -182,6 +179,7 @@ async function loadChipsPanel() {
           }
 
           function draw(hoverIdx = -1) {
+            if (cssW <= 0) return;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, cssW, CSS_H);
 
@@ -200,10 +198,8 @@ async function loadChipsPanel() {
               ctx.stroke(); ctx.setLineDash([]);
 
               const lbl = Math.abs(gv) >= 1000 ? `${(gv/1000).toFixed(1)}K` : `${Math.round(gv)}`;
-              ctx.fillStyle = colMuted;
-              ctx.font = '9px "IBM Plex Mono",monospace';
-              ctx.textAlign = 'right';
-              ctx.textBaseline = 'middle';
+              ctx.fillStyle = colMuted; ctx.font = '9px "IBM Plex Mono",monospace';
+              ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
               ctx.fillText(lbl, PL - 5, gy);
             });
 
@@ -219,7 +215,7 @@ async function loadChipsPanel() {
             rows.forEach((r, i) => {
               const x = xPos(i, cssW);
               ctx.textAlign = i === 0 ? 'left' : i === n - 1 ? 'right' : 'center';
-              ctx.fillText((r.date || '').slice(5), x, PT + cH_inner + 5);
+              ctx.fillText((r.date || '').slice(5), x, PT + cH_inner + 4);
             });
 
             seriesDef.forEach(s => {
@@ -241,15 +237,12 @@ async function loadChipsPanel() {
           function resize(w) {
             if (cssW === w) return;
             cssW = w;
-            canvas.style.width = w + 'px';
             setupCanvas(canvas, cssW, CSS_H);
             draw();
           }
 
-          setupCanvas(canvas, cssW, CSS_H);
-          draw();
-
           canvas.addEventListener('mousemove', e => {
+            if (cssW <= 0) return;
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.offsetX !== undefined ? e.offsetX : (e.clientX - rect.left);
             let closest = 0, minDist = Infinity;
@@ -258,7 +251,6 @@ async function loadChipsPanel() {
               if (dist < minDist) { minDist = dist; closest = i; }
             });
             if (minDist > 28) { draw(); tip.style.display = 'none'; return; }
-
             draw(closest);
             const r = rows[closest];
             tip.innerHTML = `<div style="color:var(--muted);margin-bottom:3px;font-size:0.55rem;">${r.date}</div>` +
@@ -279,10 +271,9 @@ async function loadChipsPanel() {
           return { wrap, resize };
         }
 
-        // ── 現貨累積買賣超圖 ──
         function makeCumulativeChart(title) {
-          const CSS_H = 120;
-          const PL = 52, PR = 10, PT = 10, PB = 24;
+          const CSS_H = 110;
+          const PL = 52, PR = 10, PT = 10, PB = 20;
 
           const cumSeries = [
             { label: '外資', color: '#6366f1', key: 'spot_foreign_net' },
@@ -299,7 +290,7 @@ async function loadChipsPanel() {
           });
 
           const wrap = document.createElement('div');
-          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.9rem 1rem 0.7rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;overflow:hidden;box-sizing:border-box;height:185px;';
+          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.8rem 0.9rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;overflow:hidden;box-sizing:border-box;height:185px;';
 
           const ttl = document.createElement('div');
           ttl.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.4rem;";
@@ -317,10 +308,10 @@ async function loadChipsPanel() {
           wrap.appendChild(lgd);
 
           const canvasWrap = document.createElement('div');
-          canvasWrap.style.cssText = `position:relative;width:100%;height:${CSS_H}px;overflow:hidden;`;
+          canvasWrap.style.cssText = `position:relative;width:100%;height:${CSS_H}px;overflow:hidden;max-height:${CSS_H}px;`;
 
           const canvas = document.createElement('canvas');
-          canvas.style.cssText = `display:block;width:100%;height:${CSS_H}px;`;
+          canvas.style.cssText = `display:block;width:100%;height:${CSS_H}px;position:absolute;top:0;left:0;`;
           canvasWrap.appendChild(canvas);
           wrap.appendChild(canvasWrap);
 
@@ -331,12 +322,13 @@ async function loadChipsPanel() {
           const allCum = cumRows.flatMap(r => cumSeries.map(s => r[s.key]));
           const absMax = Math.max(...allCum.map(Math.abs), 1);
           const vMax = absMax, vMin = -absMax, vRange = vMax - vMin;
-          let cssW = 300;
+          let cssW = 0;
 
           function xPos(i, w) { return PL + (i / Math.max(n - 1, 1)) * (w - PL - PR); }
           function yPos(v)    { return PT + (CSS_H - PT - PB) - ((v - vMin) / vRange) * (CSS_H - PT - PB); }
 
           function drawCum(hoverIdx = -1) {
+            if (cssW <= 0) return;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, cssW, CSS_H);
 
@@ -373,12 +365,11 @@ async function loadChipsPanel() {
             cumRows.forEach((r, i) => {
               const x = xPos(i, cssW);
               ctx.textAlign = i === 0 ? 'left' : i === n - 1 ? 'right' : 'center';
-              ctx.fillText((r.date || '').slice(5), x, PT + cH_inner + 5);
+              ctx.fillText((r.date || '').slice(5), x, PT + cH_inner + 4);
             });
 
             cumSeries.forEach(s => {
               const pts = cumRows.map((r, i) => ({ x: xPos(i, cssW), y: yPos(r[s.key]) }));
-
               ctx.beginPath();
               ctx.moveTo(pts[0].x, zero);
               pts.forEach(p => ctx.lineTo(p.x, p.y));
@@ -404,15 +395,12 @@ async function loadChipsPanel() {
           function resize(w) {
             if (cssW === w) return;
             cssW = w;
-            canvas.style.width = w + 'px';
             setupCanvas(canvas, cssW, CSS_H);
             drawCum();
           }
 
-          setupCanvas(canvas, cssW, CSS_H);
-          drawCum();
-
           canvas.addEventListener('mousemove', e => {
+            if (cssW <= 0) return;
             const mouseX = e.offsetX !== undefined ? e.offsetX : (e.clientX - canvas.getBoundingClientRect().left);
             let closest = 0, minDist = Infinity;
             cumRows.forEach((_, i) => {
@@ -440,7 +428,7 @@ async function loadChipsPanel() {
           return { wrap, resize };
         }
 
-        // ── 組裝 ──
+        // 💡 先建 DOM，不畫圖
         chartEl.innerHTML = '';
         const header = document.createElement('div');
         header.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;margin-bottom:0.75rem;";
@@ -466,9 +454,10 @@ async function loadChipsPanel() {
           ]),
         ];
 
+        // 💡 先掛到畫面，卡片寬度生效，Canvas 仍空白
         charts.forEach(c => chartEl.appendChild(c.wrap));
 
-        // ── 終極防禦 ResizeObserver ──
+        // 🔒 ResizeObserver：第一次拿到真實寬度才畫，之後 < 4px 變化不觸發
         let lastW = 0;
         let rafId = null;
         const roTarget = chartEl.parentElement || chartEl;
