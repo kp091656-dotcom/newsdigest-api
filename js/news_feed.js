@@ -1,19 +1,5 @@
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 // AI keys 存在 Vercel 環境變數，無需前端輸入
-let allArticles = [];
-let _giftsData = null;
-let _giftCat   = '';
-let _giftSort  = 'deadline';
-
-let displayedCount = 0;
-const PAGE_SIZE = 50;
-let currentLang = 'zh';
-let currentCat = 'general';
-
-// ── 統一 API base URL（本地開發自動用相對路徑）──
-const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? '/api/news'
-  : 'https://alphascope-fin.vercel.app/api/news';
+// 全域變數（API_BASE, allArticles, futuresData 等）定義於 api.js
 
 // ── Static data ──
 const mockArticles = [
@@ -893,8 +879,7 @@ async function loadVix() {
 
 
 // ── Global Futures Leaderboard ──
-let futuresData = [];
-let futuresSortKey = 'chgPct';
+// futuresData / futuresSortKey 定義於 api.js
 
 async function loadFutures() {
   if (loadFutures._busy) return;
