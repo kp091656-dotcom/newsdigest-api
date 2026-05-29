@@ -102,7 +102,7 @@ async function loadChipsPanel() {
       tr4('投信',       fmtGray(d.opt_put_trust_long),   fmtGray(d.opt_put_trust_short),   fmtInt(d.opt_put_trust_net)) +
       tr4('自營商',     fmtGray(d.opt_put_dealer_long),  fmtGray(d.opt_put_dealer_short),  fmtInt(d.opt_put_dealer_net));
 
-    // ── 近N日趨勢圖 ──
+    // ── 近N日趨勢圖（Canvas + Hover Tooltip）──
     try {
       const histRes  = await fetch('/api/news?endpoint=chips&limit=10&order=date.desc');
       const histJson = await histRes.json();
@@ -112,74 +112,389 @@ async function loadChipsPanel() {
       if (chartEl && histRaw.length >= 2) {
         const rows = [...histRaw].reverse(); // 舊→新
         const n = rows.length;
+        const DPR = window.devicePixelRatio || 1;
 
-        function makeChipSvg(title, seriesDef) {
-          const W=320, H=90, PL=38, PR=8, PT=18, PB=20;
-          const cW=W-PL-PR, cH=H-PT-PB;
+        // ── Canvas 折線圖生成器 ──
+        function makeCanvasChart(containerId, title, unit, seriesDef, ySymmetric = true) {
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.9rem 1rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;';
+
+          // 標題
+          const ttl = document.createElement('div');
+          ttl.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.5rem;";
+          ttl.innerHTML = `${title} <span style="font-size:0.5rem;opacity:0.6;">近 ${n} 日 · ${unit}</span>`;
+          wrap.appendChild(ttl);
+
+          // 圖例
+          const lgd = document.createElement('div');
+          lgd.style.cssText = 'display:flex;gap:1rem;margin-bottom:0.5rem;';
+          seriesDef.forEach(s => {
+            lgd.innerHTML += `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);display:flex;align-items:center;gap:4px;">
+              <span style="display:inline-block;width:16px;height:2px;background:${s.color};border-radius:1px;vertical-align:middle;"></span>
+              <span style="display:inline-block;width:6px;height:6px;background:${s.color};border-radius:50%;margin-left:-10px;vertical-align:middle;"></span>
+              ${s.label}</span>`;
+          });
+          wrap.appendChild(lgd);
+
+          // Canvas
+          const canvas = document.createElement('canvas');
+          const cssW = wrap.parentElement ? wrap.parentElement.clientWidth - 32 : 320;
+          const cssH = 110;
+          canvas.width  = Math.max(cssW, 280) * DPR;
+          canvas.height = cssH * DPR;
+          canvas.style.width  = '100%';
+          canvas.style.height = cssH + 'px';
+          canvas.style.display = 'block';
+          wrap.appendChild(canvas);
+
+          // Tooltip div
+          const tip = document.createElement('div');
+          tip.style.cssText = 'position:absolute;background:rgba(15,15,30,0.92);border:1px solid var(--border-dark);border-radius:8px;padding:6px 10px;font-family:"IBM Plex Mono",monospace;font-size:0.58rem;color:var(--text);pointer-events:none;display:none;z-index:10;min-width:100px;';
+          wrap.appendChild(tip);
+
+          const PL = 44 * DPR, PR = 10 * DPR, PT = 8 * DPR, PB = 22 * DPR;
+          const cW = canvas.width - PL - PR;
+          const cH = canvas.height - PT - PB;
+
+          // Y 軸：對稱（取絕對值最大後兩邊等距）
           const allVals = rows.flatMap(r => seriesDef.map(s => r[s.key] ?? 0));
-          const vMin = Math.min(0, ...allVals), vMax = Math.max(0, ...allVals);
+          const absMax = Math.max(...allVals.map(Math.abs), 1);
+          const vMax = ySymmetric ? absMax : Math.max(0, ...allVals);
+          const vMin = ySymmetric ? -absMax : Math.min(0, ...allVals);
           const vRange = vMax - vMin || 1;
-          const xPos = i => PL + (i / Math.max(n-1,1)) * cW;
+
+          const xPos = i => PL + (i / Math.max(n - 1, 1)) * cW;
           const yPos = v => PT + cH - ((v - vMin) / vRange) * cH;
-          const zero = yPos(0);
 
-          const gridVals = [vMin, 0, vMax].filter((v,i,a) => a.indexOf(v)===i);
-          const gridLines = gridVals.map(gv => {
-            const gy = yPos(gv).toFixed(1);
-            const lbl = Math.abs(gv) >= 1000 ? `${(gv/1000).toFixed(1)}K` : `${gv}`;
-            return `<line x1="${PL}" y1="${gy}" x2="${W-PR}" y2="${gy}" stroke="var(--border)" stroke-width="0.6"/>
-                    <text x="${PL-3}" y="${parseFloat(gy)+3.5}" font-family="IBM Plex Mono,monospace" font-size="6" fill="var(--muted)" text-anchor="end">${lbl}</text>`;
-          }).join('');
+          function fmtVal(v, u) {
+            if (u === '口數') return (v >= 0 ? '+' : '') + Math.round(v).toLocaleString() + ' 口';
+            return (v >= 0 ? '+' : '') + v.toFixed(2) + ' 億';
+          }
 
-          const xIdx = [0, Math.floor((n-1)/2), n-1].filter((v,i,a) => a.indexOf(v)===i);
-          const xLabels = xIdx.map(i =>
-            `<text x="${xPos(i).toFixed(1)}" y="${H-3}" font-family="IBM Plex Mono,monospace" font-size="6" fill="var(--muted)" text-anchor="middle">${rows[i]?.date?.slice(5)||''}</text>`
-          ).join('');
+          function draw(hoverIdx = -1) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          const lines = seriesDef.map(s => {
-            const pts  = rows.map((r,i) => `${xPos(i).toFixed(1)},${yPos(r[s.key]??0).toFixed(1)}`).join(' ');
-            const dots = rows.map((r,i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(r[s.key]??0).toFixed(1)}" r="2" fill="${s.color}"/>`).join('');
-            return `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
-          }).join('');
+            const cs = getComputedStyle(document.documentElement);
+            const colBorder  = cs.getPropertyValue('--border').trim()      || '#2a2a42';
+            const colBorderD = cs.getPropertyValue('--border-dark').trim() || '#3a3a5c';
+            const colMuted   = cs.getPropertyValue('--muted').trim()       || '#6e6e9e';
+            const colText    = cs.getPropertyValue('--text').trim()        || '#e2e2ec';
 
-          const legend = seriesDef.map((s,i) =>
-            `<g transform="translate(${PL + i*72},0)">
-              <line x1="0" y1="4" x2="10" y2="4" stroke="${s.color}" stroke-width="1.5"/>
-              <circle cx="5" cy="4" r="2" fill="${s.color}"/>
-              <text x="13" y="7.5" font-family="IBM Plex Mono,monospace" font-size="7" fill="var(--muted)">${s.label}</text>
-            </g>`
-          ).join('');
+            // 格線：-max, 0, +max
+            [-absMax, 0, absMax].forEach(gv => {
+              const gy = yPos(gv);
+              ctx.beginPath();
+              ctx.strokeStyle = gv === 0 ? colBorderD : colBorder;
+              ctx.lineWidth = gv === 0 ? 1.5 * DPR : 0.8 * DPR;
+              if (gv === 0) { ctx.setLineDash([4 * DPR, 3 * DPR]); } else { ctx.setLineDash([]); }
+              ctx.moveTo(PL, gy); ctx.lineTo(canvas.width - PR, gy);
+              ctx.stroke();
+              ctx.setLineDash([]);
 
-          return `
-            <div style="background:var(--surface);border-radius:12px;padding:0.9rem 1rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;">
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.4rem;">${title}<span style="margin-left:6px;font-size:0.5rem;opacity:0.6;">近 ${n} 日 · 口數</span></div>
-              <svg viewBox="0 0 ${W} ${H+14}" width="100%" style="display:block;overflow:visible;">
-                <g transform="translate(0,2)">${legend}</g>
-                <line x1="${PL}" y1="${zero.toFixed(1)}" x2="${W-PR}" y2="${zero.toFixed(1)}" stroke="var(--border-dark)" stroke-width="0.8" stroke-dasharray="3,2"/>
-                ${gridLines}
-                ${lines}
-                ${xLabels}
-              </svg>
-            </div>`;
+              // Y 軸標籤
+              const lbl = Math.abs(gv) >= 1000 ? `${(gv/1000).toFixed(1)}K` : `${Math.round(gv)}`;
+              ctx.fillStyle = colMuted;
+              ctx.font = `${9 * DPR}px "IBM Plex Mono",monospace`;
+              ctx.textAlign = 'right';
+              ctx.fillText(lbl, PL - 4 * DPR, gy + 3.5 * DPR);
+            });
+
+            // X 軸標籤（每個日期都顯示）
+            ctx.fillStyle = colMuted;
+            ctx.font = `${8 * DPR}px "IBM Plex Mono",monospace`;
+            ctx.textAlign = 'center';
+            rows.forEach((r, i) => {
+              const lbl = (r.date || '').slice(5);
+              const x = xPos(i);
+              // 避免首尾溢出
+              const align = i === 0 ? 'left' : i === n - 1 ? 'right' : 'center';
+              ctx.textAlign = align;
+              ctx.fillText(lbl, x, PT + cH + 16 * DPR);
+            });
+
+            // hover 垂直線
+            if (hoverIdx >= 0) {
+              const hx = xPos(hoverIdx);
+              ctx.beginPath();
+              ctx.strokeStyle = 'rgba(160,160,220,0.25)';
+              ctx.lineWidth = 1 * DPR;
+              ctx.setLineDash([3 * DPR, 3 * DPR]);
+              ctx.moveTo(hx, PT); ctx.lineTo(hx, PT + cH);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+
+            // 折線 + 節點
+            seriesDef.forEach(s => {
+              const pts = rows.map((r, i) => ({ x: xPos(i), y: yPos(r[s.key] ?? 0) }));
+
+              // 線
+              ctx.beginPath();
+              ctx.strokeStyle = s.color;
+              ctx.lineWidth = 2 * DPR;
+              ctx.lineJoin = 'round';
+              ctx.lineCap  = 'round';
+              pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+              ctx.stroke();
+
+              // 節點
+              pts.forEach((p, i) => {
+                const isHov = i === hoverIdx;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, (isHov ? 5 : 3) * DPR, 0, Math.PI * 2);
+                ctx.fillStyle = isHov ? s.color : s.color;
+                ctx.fill();
+                if (isHov) {
+                  ctx.strokeStyle = '#fff';
+                  ctx.lineWidth = 1.5 * DPR;
+                  ctx.stroke();
+                }
+              });
+            });
+          }
+
+          draw();
+
+          // Hover 互動
+          canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = (e.clientX - rect.left) * DPR;
+            // 找最近的 x index
+            let closest = 0, minDist = Infinity;
+            rows.forEach((_, i) => {
+              const dist = Math.abs(xPos(i) - mouseX);
+              if (dist < minDist) { minDist = dist; closest = i; }
+            });
+            if (minDist > 30 * DPR) { draw(); tip.style.display = 'none'; return; }
+
+            draw(closest);
+            const r = rows[closest];
+            tip.innerHTML = `<div style="color:var(--muted);margin-bottom:4px;">${r.date}</div>` +
+              seriesDef.map(s => {
+                const v = r[s.key] ?? 0;
+                const c = v > 0 ? '#ef4444' : v < 0 ? '#22c55e' : 'var(--muted)';
+                return `<div style="display:flex;justify-content:space-between;gap:12px;">
+                  <span style="color:${s.color};">● ${s.label}</span>
+                  <span style="color:${c};font-weight:700;">${fmtVal(v, unit)}</span>
+                </div>`;
+              }).join('');
+
+            // tooltip 位置
+            const tipX = e.clientX - rect.left;
+            const tipY = e.clientY - rect.top;
+            tip.style.display = 'block';
+            tip.style.left = (tipX > rect.width / 2 ? tipX - 115 : tipX + 12) + 'px';
+            tip.style.top  = Math.max(0, tipY - 20) + 'px';
+          });
+
+          canvas.addEventListener('mouseleave', () => { draw(); tip.style.display = 'none'; });
+
+          return wrap;
         }
 
-        chartEl.innerHTML =
-          `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;margin-bottom:0.75rem;">近期趨勢</div>` +
-          makeChipSvg('📈 台指期 TX 三大法人淨口', [
-            { key: 'fut_tx_foreign_net', label: '外資', color: '#6366f1' },
-            { key: 'fut_tx_trust_net',   label: '投信', color: '#f59e0b' },
-            { key: 'fut_tx_dealer_net',  label: '自營', color: '#10b981' },
-          ]) +
-          makeChipSvg('▲ 選擇權 CALL 三大法人淨口', [
-            { key: 'opt_call_foreign_net', label: '外資', color: '#6366f1' },
-            { key: 'opt_call_trust_net',   label: '投信', color: '#f59e0b' },
-            { key: 'opt_call_dealer_net',  label: '自營', color: '#10b981' },
-          ]) +
-          makeChipSvg('▼ 選擇權 PUT 三大法人淨口', [
-            { key: 'opt_put_foreign_net', label: '外資', color: '#6366f1' },
-            { key: 'opt_put_trust_net',   label: '投信', color: '#f59e0b' },
-            { key: 'opt_put_dealer_net',  label: '自營', color: '#10b981' },
-          ]);
+        // ── 現貨累積買賣超圖（面積圖）──
+        function makeCumulativeChart(title) {
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.9rem 1rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;';
+
+          const ttl = document.createElement('div');
+          ttl.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:0.5rem;";
+          ttl.innerHTML = `${title} <span style="font-size:0.5rem;opacity:0.6;">近 ${n} 日累積 · 億元</span>`;
+          wrap.appendChild(ttl);
+
+          const lgd = document.createElement('div');
+          lgd.style.cssText = 'display:flex;gap:1rem;margin-bottom:0.5rem;';
+          const cumSeries = [
+            { label: '外資', color: '#6366f1', key: 'spot_foreign_net' },
+            { label: '投信', color: '#f59e0b', key: 'spot_trust_net' },
+            { label: '自營', color: '#10b981', key: 'spot_dealer_net' },
+          ];
+          cumSeries.forEach(s => {
+            lgd.innerHTML += `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);display:flex;align-items:center;gap:4px;">
+              <span style="display:inline-block;width:16px;height:2px;background:${s.color};border-radius:1px;vertical-align:middle;"></span>
+              <span style="display:inline-block;width:6px;height:6px;background:${s.color};border-radius:50%;margin-left:-10px;vertical-align:middle;"></span>
+              ${s.label}</span>`;
+          });
+          wrap.appendChild(lgd);
+
+          // 計算累積值
+          const cumRows = rows.map((r, i) => {
+            const obj = { date: r.date };
+            cumSeries.forEach(s => {
+              const dailyVals = rows.slice(0, i + 1).map(rr => parseFloat(rr[s.key] ?? 0));
+              obj[s.key] = dailyVals.reduce((a, b) => a + b, 0);
+            });
+            return obj;
+          });
+
+          const canvas = document.createElement('canvas');
+          const cssW = wrap.parentElement ? wrap.parentElement.clientWidth - 32 : 320;
+          const cssH = 110;
+          canvas.width  = Math.max(cssW, 280) * DPR;
+          canvas.height = cssH * DPR;
+          canvas.style.width  = '100%';
+          canvas.style.height = cssH + 'px';
+          canvas.style.display = 'block';
+          wrap.appendChild(canvas);
+
+          const tip = document.createElement('div');
+          tip.style.cssText = 'position:absolute;background:rgba(15,15,30,0.92);border:1px solid var(--border-dark);border-radius:8px;padding:6px 10px;font-family:"IBM Plex Mono",monospace;font-size:0.58rem;color:var(--text);pointer-events:none;display:none;z-index:10;min-width:110px;';
+          wrap.appendChild(tip);
+
+          const PL = 44 * DPR, PR = 10 * DPR, PT = 8 * DPR, PB = 22 * DPR;
+          const cW = canvas.width - PL - PR;
+          const cH = canvas.height - PT - PB;
+
+          const allCum = cumRows.flatMap(r => cumSeries.map(s => r[s.key]));
+          const absMax = Math.max(...allCum.map(Math.abs), 1);
+          const vMax = absMax, vMin = -absMax, vRange = vMax - vMin;
+          const xPos = i => PL + (i / Math.max(n - 1, 1)) * cW;
+          const yPos = v => PT + cH - ((v - vMin) / vRange) * cH;
+
+          function drawCum(hoverIdx = -1) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const cs = getComputedStyle(document.documentElement);
+            const colBorder  = cs.getPropertyValue('--border').trim()      || '#2a2a42';
+            const colBorderD = cs.getPropertyValue('--border-dark').trim() || '#3a3a5c';
+            const colMuted   = cs.getPropertyValue('--muted').trim()       || '#6e6e9e';
+
+            // 格線
+            [-absMax, 0, absMax].forEach(gv => {
+              const gy = yPos(gv);
+              ctx.beginPath();
+              ctx.strokeStyle = gv === 0 ? colBorderD : colBorder;
+              ctx.lineWidth = gv === 0 ? 1.5 * DPR : 0.8 * DPR;
+              if (gv === 0) ctx.setLineDash([4 * DPR, 3 * DPR]); else ctx.setLineDash([]);
+              ctx.moveTo(PL, gy); ctx.lineTo(canvas.width - PR, gy);
+              ctx.stroke();
+              ctx.setLineDash([]);
+              const lbl = Math.abs(gv) >= 1 ? `${gv >= 0 ? '+' : ''}${gv.toFixed(0)}億` : '0';
+              ctx.fillStyle = colMuted;
+              ctx.font = `${8.5 * DPR}px "IBM Plex Mono",monospace`;
+              ctx.textAlign = 'right';
+              ctx.fillText(lbl, PL - 4 * DPR, gy + 3.5 * DPR);
+            });
+
+            // X 軸標籤
+            ctx.fillStyle = colMuted;
+            ctx.font = `${8 * DPR}px "IBM Plex Mono",monospace`;
+            cumRows.forEach((r, i) => {
+              const lbl = (r.date || '').slice(5);
+              ctx.textAlign = i === 0 ? 'left' : i === n - 1 ? 'right' : 'center';
+              ctx.fillText(lbl, xPos(i), PT + cH + 16 * DPR);
+            });
+
+            if (hoverIdx >= 0) {
+              ctx.beginPath();
+              ctx.strokeStyle = 'rgba(160,160,220,0.25)';
+              ctx.lineWidth = 1 * DPR;
+              ctx.setLineDash([3 * DPR, 3 * DPR]);
+              ctx.moveTo(xPos(hoverIdx), PT); ctx.lineTo(xPos(hoverIdx), PT + cH);
+              ctx.stroke(); ctx.setLineDash([]);
+            }
+
+            // 面積 + 折線
+            cumSeries.forEach(s => {
+              const pts = cumRows.map((r, i) => ({ x: xPos(i), y: yPos(r[s.key]) }));
+              const zero = yPos(0);
+
+              // 半透明面積
+              ctx.beginPath();
+              ctx.moveTo(pts[0].x, zero);
+              pts.forEach(p => ctx.lineTo(p.x, p.y));
+              ctx.lineTo(pts[pts.length - 1].x, zero);
+              ctx.closePath();
+              ctx.fillStyle = s.color + '22';
+              ctx.fill();
+
+              // 折線
+              ctx.beginPath();
+              ctx.strokeStyle = s.color;
+              ctx.lineWidth = 2 * DPR;
+              ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+              pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+              ctx.stroke();
+
+              // 節點
+              pts.forEach((p, i) => {
+                const isHov = i === hoverIdx;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, (isHov ? 5 : 3) * DPR, 0, Math.PI * 2);
+                ctx.fillStyle = s.color; ctx.fill();
+                if (isHov) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 * DPR; ctx.stroke(); }
+              });
+            });
+          }
+
+          drawCum();
+
+          canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = (e.clientX - rect.left) * DPR;
+            let closest = 0, minDist = Infinity;
+            cumRows.forEach((_, i) => {
+              const dist = Math.abs(xPos(i) - mouseX);
+              if (dist < minDist) { minDist = dist; closest = i; }
+            });
+            if (minDist > 30 * DPR) { drawCum(); tip.style.display = 'none'; return; }
+            drawCum(closest);
+            const r = cumRows[closest];
+            tip.innerHTML = `<div style="color:var(--muted);margin-bottom:4px;">${r.date} 累積</div>` +
+              cumSeries.map(s => {
+                const v = r[s.key];
+                const c = v > 0 ? '#ef4444' : v < 0 ? '#22c55e' : 'var(--muted)';
+                return `<div style="display:flex;justify-content:space-between;gap:12px;">
+                  <span style="color:${s.color};">● ${s.label}</span>
+                  <span style="color:${c};font-weight:700;">${v >= 0 ? '+' : ''}${v.toFixed(1)} 億</span>
+                </div>`;
+              }).join('');
+            const tipX = e.clientX - rect.left;
+            const tipY = e.clientY - rect.top;
+            tip.style.display = 'block';
+            tip.style.left = (tipX > rect.width / 2 ? tipX - 125 : tipX + 12) + 'px';
+            tip.style.top  = Math.max(0, tipY - 20) + 'px';
+          });
+          canvas.addEventListener('mouseleave', () => { drawCum(); tip.style.display = 'none'; });
+
+          return wrap;
+        }
+
+        // ── 組裝所有圖表 ──
+        chartEl.innerHTML = '';
+        const header = document.createElement('div');
+        header.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;margin-bottom:0.75rem;";
+        header.textContent = '近期趨勢';
+        chartEl.appendChild(header);
+
+        chartEl.appendChild(makeCumulativeChart('🏢 三大法人現貨買賣超'));
+
+        chartEl.appendChild(makeCanvasChart('tx', '📈 台指期 TX 三大法人淨口', '口數', [
+          { key: 'fut_tx_foreign_net', label: '外資', color: '#6366f1' },
+          { key: 'fut_tx_trust_net',   label: '投信', color: '#f59e0b' },
+          { key: 'fut_tx_dealer_net',  label: '自營', color: '#10b981' },
+        ]));
+        chartEl.appendChild(makeCanvasChart('call', '▲ 選擇權 CALL 三大法人淨口', '口數', [
+          { key: 'opt_call_foreign_net', label: '外資', color: '#6366f1' },
+          { key: 'opt_call_trust_net',   label: '投信', color: '#f59e0b' },
+          { key: 'opt_call_dealer_net',  label: '自營', color: '#10b981' },
+        ]));
+        chartEl.appendChild(makeCanvasChart('put', '▼ 選擇權 PUT 三大法人淨口', '口數', [
+          { key: 'opt_put_foreign_net', label: '外資', color: '#6366f1' },
+          { key: 'opt_put_trust_net',   label: '投信', color: '#f59e0b' },
+          { key: 'opt_put_dealer_net',  label: '自營', color: '#10b981' },
+        ]));
+
+        // canvas 寬度在 DOM 插入後才能正確取得，需 resize 重繪
+        window.addEventListener('resize', () => {
+          chartEl.querySelectorAll('canvas').forEach(c => {
+            const cssW = c.parentElement.clientWidth - 32;
+            c.width = Math.max(cssW, 280) * DPR;
+            // 觸發 mouseleave 重繪
+            c.dispatchEvent(new Event('mouseleave'));
+          });
+        });
       }
     } catch(chartErr) {
       console.warn('[chips trend] 圖表載入失敗：', chartErr.message);
