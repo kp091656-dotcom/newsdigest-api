@@ -54,6 +54,8 @@ async function loadAlphaDailyReport() {
     const res = await fetch(`${API_BASE}?endpoint=alpha_report&_t=${Date.now()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    // 快取供 signals.js 殖利率曲線等總經資料使用
+    try { sessionStorage.setItem('alpha_report_cache', JSON.stringify(data)); } catch { }
     const today   = _alphaTodayStr();
     const isToday = data.report_date === today;
     await renderAlphaResult(data);
@@ -177,6 +179,84 @@ async function renderAlphaResult(data) {
     noteEl.style.display = 'block';
   } else {
     noteEl.style.display = 'none';
+  }
+
+  // ── Fear & Greed + 總經指標 ──
+  let macroEl = document.getElementById('alphaMacroBar');
+  // 若 index.html 尚未加入此元素，動態建立並插在 alphaNote 之後
+  if (!macroEl) {
+    macroEl = document.createElement('div');
+    macroEl.id = 'alphaMacroBar';
+    macroEl.style.cssText = 'margin-top:0.6rem;display:none;';
+    const noteEl2 = document.getElementById('alphaNote');
+    if (noteEl2?.parentNode) noteEl2.parentNode.insertBefore(macroEl, noteEl2.nextSibling);
+  }
+  if (macroEl) {
+    let macroHtml = '';
+
+    // Fear & Greed
+    const fg = data.fear_greed;
+    if (fg?.score != null) {
+      const score   = fg.score;
+      const rating  = fg.rating || '';
+      const prev7   = fg.prev_week;
+      const fgColor = score >= 75 ? '#ef4444' : score >= 56 ? '#f97316'
+                    : score <= 25 ? '#22c55e' : score <= 44 ? '#86efac' : '#94a3b8';
+      const trendStr = prev7 != null
+        ? `<span style="font-size:0.58rem;color:var(--muted);margin-left:3px;">${score > prev7 ? '▲' : '▼'}上週${prev7}</span>`
+        : '';
+      macroHtml += `<div style="display:flex;align-items:center;gap:0.4rem;padding:0.45rem 0.6rem;background:var(--surface);border-radius:6px;border:1px solid var(--border);">
+        <span style="font-size:0.6rem;color:var(--muted);flex-shrink:0;">😨 恐懼貪婪</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.82rem;font-weight:700;color:${fgColor};">${score}</span>
+        <span style="font-size:0.6rem;color:${fgColor};font-weight:600;">${rating}</span>
+        ${trendStr}
+      </div>`;
+    }
+
+    // 總經指標（macro_data）
+    const macro = data.macro_data;
+    if (macro && Object.keys(macro).length) {
+      // 挑最重要的幾個顯示
+      const KEY_ORDER = ['SOX費城半導體','DXY美元指數','美債10Y殖利率','美債2Y殖利率','台幣USD/TWD','聯準會利率','S&P500'];
+      const items = KEY_ORDER.filter(k => macro[k]?.close != null).map(k => {
+        const d     = macro[k];
+        const chg   = d.chg;
+        const chgColor = chg > 0 ? '#dc2626' : chg < 0 ? '#16a34a' : 'var(--muted)';
+        const chgStr   = chg != null ? `<span style="font-size:0.55rem;color:${chgColor};margin-left:2px;">${chg > 0 ? '+' : ''}${chg}%</span>` : '';
+        // 聯準會利率顯示絕對值
+        const valStr = k === '聯準會利率' ? `${d.close}%` : d.close;
+        return `<div style="display:flex;flex-direction:column;align-items:center;padding:0.35rem 0.5rem;background:var(--surface);border-radius:6px;border:1px solid var(--border);min-width:0;">
+          <span style="font-size:0.5rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56px;text-align:center;">${k.replace('殖利率','').replace('費城半導體','').replace('美元指數','').replace('USD/TWD','匯率')}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;font-weight:700;color:var(--text);">${valStr}</span>
+          ${chgStr}
+        </div>`;
+      });
+
+      if (items.length) {
+        macroHtml += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:0.35rem;margin-top:0.4rem;">
+          ${items.join('')}
+        </div>`;
+
+        // 殖利率曲線倒掛提示
+        const y2  = macro['美債2Y殖利率']?.close;
+        const y10 = macro['美債10Y殖利率']?.close;
+        if (y2 != null && y10 != null) {
+          const spread = parseFloat((y10 - y2).toFixed(3));
+          if (spread < 0) {
+            macroHtml += `<div style="font-size:0.65rem;color:#f97316;padding:0.3rem 0.5rem;background:rgba(249,115,22,0.08);border-radius:4px;border:1px solid rgba(249,115,22,0.2);margin-top:0.35rem;">
+              ⚠️ 殖利率曲線倒掛（10Y-2Y=${spread > 0 ? '+' : ''}${spread}%）歷史衰退前兆
+            </div>`;
+          }
+        }
+      }
+    }
+
+    if (macroHtml) {
+      macroEl.innerHTML = macroHtml;
+      macroEl.style.display = 'block';
+    } else {
+      macroEl.style.display = 'none';
+    }
   }
 
   // 資料來源 badge
