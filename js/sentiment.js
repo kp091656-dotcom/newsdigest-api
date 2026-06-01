@@ -242,7 +242,10 @@ ${postLines}`;
     for (let attempt = 0; attempt < 3 && !analyzed; attempt++) {
       try {
         const rawText = await callGroq(prompt, 900, 0.15);
-        const parsed = JSON.parse(rawText.replace(/```json|```/g,'').trim());
+        // 強健 JSON 提取：取第一個 [ 到最後一個 ] 之間的內容，避免 Groq 夾雜說明文字
+        const jsonMatch = rawText.match(/\[.*\]/s);
+        if (!jsonMatch) throw new Error('No JSON array found in response');
+        const parsed = JSON.parse(jsonMatch[0]);
         parsed.forEach(r => {
           if (batch[r.idx]) {
             batch[r.idx].sentiment   = r.sentiment;
