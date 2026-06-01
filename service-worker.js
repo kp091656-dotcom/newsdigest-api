@@ -3,8 +3,8 @@
  * 策略：靜態資源 Cache First，API 請求 Network First
  */
 
-const CACHE_NAME    = 'alphascope-__SW_VERSION__';
-const STATIC_CACHE  = 'alphascope-static-__SW_VERSION__';
+const CACHE_NAME    = 'alphascope-20260601-111534';
+const STATIC_CACHE  = 'alphascope-static-20260601-111534';
 
 // 靜態資源：優先從快取讀取
 const STATIC_ASSETS = [
