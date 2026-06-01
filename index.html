@@ -97,6 +97,21 @@
         <button onclick="openWatchlistPanel()" style="font-size:0.75rem;padding:0.3rem 0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap;">⭐ 自選股</button>
       </div>
       <div class="dsb-note" id="dsbNote">載入中…</div>
+
+      <!-- 盤勢背景 -->
+      <div id="dsbContext" style="display:none;margin-top:0.65rem;padding:0.55rem 0.75rem;border-left:3px solid #3b82f6;background:rgba(59,130,246,0.06);border-radius:0 6px 6px 0;font-size:0.75rem;color:var(--text);line-height:1.6;"></div>
+
+      <!-- 關鍵風險 -->
+      <div id="dsbRisks" style="display:none;margin-top:0.6rem;">
+        <div style="font-size:0.68rem;font-weight:700;color:#d97706;margin-bottom:0.35rem;">⚠ 關鍵風險</div>
+        <ul id="dsbRiskList" style="margin:0;padding-left:1.1rem;font-size:0.73rem;color:var(--text);line-height:1.7;"></ul>
+      </div>
+
+      <!-- 今日重點產業 -->
+      <div id="dsbSectors" style="display:none;margin-top:0.6rem;">
+        <div style="font-size:0.68rem;font-weight:700;color:var(--muted);margin-bottom:0.35rem;">🏭 今日重點產業</div>
+        <div id="dsbSectorList" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+      </div>
     </div>
 
     <!-- 法人籌碼異動警示 -->
