@@ -975,13 +975,18 @@ async function collectAlphaReport() {
     // ⚠️ 使用台灣時間（UTC+8），避免 UTC 22:xx 跑時寫入前一天日期
     const today = todayTW();
 
-    const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/alpha_daily_report?report_date=eq.${today}&select=id`, {
+    const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/alpha_daily_report?report_date=eq.${today}&select=id,market_context`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     });
     const existing = await checkRes.json();
     if (Array.isArray(existing) && existing.length > 0) {
-      console.log(`  ℹ️  今日報告已存在（${today}），跳過`);
-      return { ok: true, skipped: true };
+      // 若 market_context 已有內容才跳過，否則重新產生（補齊新欄位）
+      const hasContext = existing[0]?.market_context && existing[0].market_context.trim().length > 0;
+      if (hasContext) {
+        console.log(`  ℹ️  今日報告已存在（${today}），跳過`);
+        return { ok: true, skipped: true };
+      }
+      console.log(`  ⚠️  今日報告存在但 market_context 為空，重新產生…`);
     }
 
     // ── 1. 抓最新日期股價 ──
