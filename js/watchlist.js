@@ -143,21 +143,7 @@ async function loadDailySummary() {
       ? `<span style="color:#dc2626">${buys}買進</span> <span style="color:var(--muted);font-size:0.7rem">/ ${avoids}避開</span>`
       : `<span style="color:var(--muted)">—</span>`;
 
-    // VIX：從 futuresData 取
-    try {
-      let vixItem = (window.futuresData || []).find(d => d.symbol && d.symbol.toLowerCase().includes('vix'));
-      if (!vixItem && window._dsbFutJson) {
-        vixItem = (window._dsbFutJson.data || []).find(d => d.symbol && d.symbol.toLowerCase().includes('vix'));
-      }
-      const vixEl = document.getElementById('dsbVIX');
-      if (vixItem) {
-        const clr = vixItem.chgPct >= 0 ? '#dc2626' : '#16a34a';
-        const pct = (vixItem.chgPct * 100).toFixed(2);
-        vixEl.innerHTML = `<span style="color:${clr}">${vixItem.price?.toFixed(2) ?? '—'} <span style="font-size:0.75em">${pct >= 0 ? '+' : ''}${pct}%</span></span>`;
-      } else {
-        vixEl.textContent = '見全球商品';
-      }
-    } catch { document.getElementById('dsbVIX').textContent = '—'; }
+
 
     // 日期
     document.getElementById('dsbDate').textContent = alpha?.report_date
@@ -178,7 +164,7 @@ async function loadDailySummary() {
 
     // ── MIS 即時大盤（盤中覆蓋昨收顯示）──
     if (isTradingHours()) {
-      const taiexRow = await fetchMISPrice([{ id: 'TAIEX', market: 'tse' }]);
+      const taiexRow = await fetchMISPrice([{ id: 't00', market: 'tse' }]);
       if (taiexRow.length) {
         const d    = parseMISRow(taiexRow[0]);
         const pct  = d.chgPct != null ? `${d.chgPct >= 0 ? '+' : ''}${d.chgPct.toFixed(2)}%` : '';
