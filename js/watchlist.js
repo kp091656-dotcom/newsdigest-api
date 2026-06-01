@@ -12,14 +12,12 @@ function isTradingHours() {
 }
 
 // stockList: [{ id: '2330', market: 'tse' }]（上櫃用 'otc'）
+// 透過 Vercel proxy 轉發，避免 CORS 問題
 async function fetchMISPrice(stockList) {
   try {
     const exCh = stockList.map(s => `${s.market || 'tse'}_${s.id}.tw`).join('|');
-    const url  = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${exCh}&_=${Date.now()}`;
-    const res  = await fetch(url, {
-      headers: { Referer: 'https://mis.twse.com.tw/' },
-      signal: AbortSignal.timeout(5000),
-    });
+    const url  = `${API_BASE}?endpoint=mis&ex_ch=${encodeURIComponent(exCh)}`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return [];
     const json = await res.json();
     return (json.msgArray || []).filter(r => r && r.z && r.z !== '-');
