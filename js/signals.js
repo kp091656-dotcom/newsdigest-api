@@ -301,6 +301,33 @@ async function loadMktSignals() {
   else                       { signalColor='#15803d';      signalTitle='明顯偏空'; signalDesc='空方訊號強烈，謹慎為宜'; }
   // 加入 VIX 附註
   if (vixNote) signalDesc += `｜${vixNote}`;
+
+  // ── 殖利率曲線狀態（從 alpha_report macro_data 取，非同步不阻擋）──
+  try {
+    const alphaCache = sessionStorage.getItem('alpha_report_cache');
+    const alphaData  = alphaCache ? JSON.parse(alphaCache) : null;
+    const macro = alphaData?.macro_data;
+    if (macro) {
+      const y2  = macro['美債2Y殖利率']?.close;
+      const y10 = macro['美債10Y殖利率']?.close;
+      const fed = macro['聯準會利率']?.close;
+      const dxy = macro['DXY美元指數']?.close;
+      const sox = macro['SOX費城半導體']?.chg;
+      const extraParts = [];
+      if (y2 != null && y10 != null) {
+        const spread = parseFloat((y10 - y2).toFixed(3));
+        if (spread < 0) extraParts.push(`⚠️ 曲線倒掛(${spread}%)`);
+        else extraParts.push(`利差+${spread}%`);
+      }
+      if (fed != null) extraParts.push(`Fed ${fed}%`);
+      if (dxy != null) {
+        const dxyChg = macro['DXY美元指數']?.chg;
+        extraParts.push(`DXY ${dxy}${dxyChg != null ? `(${dxyChg > 0 ? '+' : ''}${dxyChg}%)` : ''}`);
+      }
+      if (sox != null) extraParts.push(`SOX ${sox > 0 ? '+' : ''}${sox}%`);
+      if (extraParts.length) signalDesc += `｜${extraParts.join(' ')}`;
+    }
+  } catch { /* 靜默 */ }
   // ── 更新圓形儀表盤 ──
   // totalScore 範圍約 -8 ~ +8，映射到 0~100
   const gaugeVal = Math.round(Math.max(0, Math.min(100, (totalScore + 8) / 16 * 100)));
@@ -577,6 +604,56 @@ async function openStockModal(stock) {
       aiResult.innerHTML = '';
       if (aiBtn) aiBtn.textContent = '✦ 生成機構風格個股分析';
     }
+  }
+
+  // ── MIS 即時報價（盤中覆蓋昨收）──
+  // isTradingHours 定義於 watchlist.js（同頁面載入）
+  if (typeof isTradingHours === 'function' && isTradingHours()) {
+    fetch(
+      `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${stock.id}.tw&_=${Date.now()}`,
+      { headers: { Referer: 'https://mis.twse.com.tw/' }, signal: AbortSignal.timeout(5000) }
+    ).then(r => r.json()).then(json => {
+      const row = (json.msgArray || []).find(r => r.z && r.z !== '-');
+      if (!row) return;
+      const price  = parseFloat(row.z);
+      const prev   = parseFloat(row.y);
+      const up     = parseFloat(row.u);
+      const down   = parseFloat(row.w);
+      if (!price || !prev) return;
+      const chg    = parseFloat((price - prev).toFixed(2));
+      const chgPct = parseFloat((chg / prev * 100).toFixed(2));
+      const sign   = chgPct >= 0 ? '+' : '';
+      const color  = chgPct >= 0 ? '#dc2626' : '#16a34a';
+
+      // 漲跌停標記
+      const limitTag = price >= up   ? '<span style="font-size:0.55rem;margin-left:4px;color:#ff9500;font-weight:700;">漲停</span>'
+                     : price <= down ? '<span style="font-size:0.55rem;margin-left:4px;color:#06b6d4;font-weight:700;">跌停</span>'
+                     : '';
+
+      // 覆蓋今日統計四格
+      document.getElementById('modalTodayStats').innerHTML = [
+        { label:'即時價 ⚡', val: `$${price.toFixed(2)}${limitTag}`, color, raw: true },
+        { label:'漲跌幅',    val: `${sign}${chgPct.toFixed(2)}%`,    color },
+        { label:'昨收',      val: `$${prev.toFixed(2)}`,             color: 'var(--muted)' },
+        { label:'漲跌',      val: `${sign}${chg.toFixed(2)}`,        color },
+      ].map(s => `<div style="background:var(--surface);border-radius:8px;padding:0.5rem 0.7rem;box-shadow:0 0 0 1px var(--border);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);">${s.label}</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:800;color:${s.color};">${s.raw ? s.val : s.val}</div>
+      </div>`).join('');
+
+      // 成交量（若有）
+      const vol = parseInt(row.v);
+      if (vol > 0) {
+        const nameEl = document.getElementById('modalStockName');
+        if (nameEl && !nameEl.querySelector('.mis-time')) {
+          const timeTag = document.createElement('span');
+          timeTag.className = 'mis-time';
+          timeTag.style.cssText = 'font-size:0.55rem;color:var(--muted);margin-left:0.5rem;font-family:"IBM Plex Mono",monospace;font-weight:400;';
+          timeTag.textContent = `${row.t} · ${(vol/1000).toFixed(0)}k張`;
+          nameEl.appendChild(timeTag);
+        }
+      }
+    }).catch(() => { /* 靜默失敗，保留昨收 */ });
   }
 
   // 重置顯示
