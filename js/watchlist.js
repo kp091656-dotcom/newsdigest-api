@@ -1,4 +1,71 @@
 // ══════════════════════════════════════════════════════════════
+// TWSE MIS 即時報價 helpers（參考 TWSE_MIS_SKILL.md）
+// 免費、不需 key、盤中約 5 秒延遲
+// ══════════════════════════════════════════════════════════════
+
+function isTradingHours() {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) return false;
+  const mins = now.getHours() * 60 + now.getMinutes();
+  return mins >= 9 * 60 && mins <= 13 * 60 + 30;
+}
+
+// stockList: [{ id: '2330', market: 'tse' }]（上櫃用 'otc'）
+async function fetchMISPrice(stockList) {
+  try {
+    const exCh = stockList.map(s => `${s.market || 'tse'}_${s.id}.tw`).join('|');
+    const url  = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${exCh}&_=${Date.now()}`;
+    const res  = await fetch(url, {
+      headers: { Referer: 'https://mis.twse.com.tw/' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.msgArray || []).filter(r => r && r.z && r.z !== '-');
+  } catch { return []; }
+}
+
+function parseMISRow(row) {
+  const price  = parseFloat(row.z) || null;
+  const prev   = parseFloat(row.y) || null;
+  const chg    = (price && prev) ? parseFloat((price - prev).toFixed(2))           : null;
+  const chgPct = (chg   && prev) ? parseFloat((chg / prev * 100).toFixed(2))       : null;
+  const up     = parseFloat(row.u) || null;
+  const down   = parseFloat(row.w) || null;
+  return {
+    id: row.ch?.replace('.tw', ''),
+    name: row.n,
+    price, prev, chg, chgPct,
+    limitUp: up, limitDown: down,
+    volume: parseInt(row.v) || 0,
+    time: row.t || '',
+    isLimitUp:   price != null && up   != null && price >= up,
+    isLimitDown: price != null && down != null && price <= down,
+  };
+}
+
+let _misTimer  = null;
+let _misStocks = [];
+
+function startMISPolling(stockList, onUpdate) {
+  stopMISPolling();
+  _misStocks = stockList;
+  if (!stockList.length) return;
+  async function poll() {
+    if (!isTradingHours()) return;
+    const rows = await fetchMISPrice(_misStocks);
+    rows.forEach(row => onUpdate(parseMISRow(row)));
+  }
+  poll();
+  _misTimer = setInterval(poll, 5000);
+}
+
+function stopMISPolling() {
+  if (_misTimer) { clearInterval(_misTimer); _misTimer = null; }
+}
+
+// ══════════════════════════════════════════════════════════════
 // ① 今日總結橫幅
 // ══════════════════════════════════════════════════════════════
 async function loadDailySummary() {
@@ -108,6 +175,20 @@ async function loadDailySummary() {
 
     // 法人籌碼警示
     await loadInstAlert();
+
+    // ── MIS 即時大盤（盤中覆蓋昨收顯示）──
+    if (isTradingHours()) {
+      const taiexRow = await fetchMISPrice([{ id: 'TAIEX', market: 'tse' }]);
+      if (taiexRow.length) {
+        const d    = parseMISRow(taiexRow[0]);
+        const pct  = d.chgPct != null ? `${d.chgPct >= 0 ? '+' : ''}${d.chgPct.toFixed(2)}%` : '';
+        const clr  = (d.chgPct || 0) >= 0 ? '#dc2626' : '#16a34a';
+        const twseEl = document.getElementById('dsbTWSE');
+        if (twseEl && d.price) {
+          twseEl.innerHTML = `<span style="color:${clr}">${d.price.toLocaleString('en', { maximumFractionDigits: 2 })}<span style="font-size:0.75em;margin-left:0.3em">${pct}</span></span><span style="font-size:0.55em;color:var(--muted);margin-left:0.3em">⚡${d.time}</span>`;
+        }
+      }
+    }
   } catch(e) {
     console.warn('loadDailySummary error:', e);
   }
@@ -163,8 +244,13 @@ function wlSave(list) { localStorage.setItem('as_watchlist', JSON.stringify(list
 
 function openWatchlistPanel() {
   const p = document.getElementById('watchlistPanel');
-  p.style.display = p.style.display === 'none' || !p.style.display ? 'block' : 'none';
-  if (p.style.display === 'block') wlRender();
+  const isOpen = p.style.display === 'block';
+  p.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    wlRender();
+  } else {
+    stopMISPolling(); // 關閉時停止輪詢
+  }
 }
 
 async function wlRender() {
@@ -231,17 +317,41 @@ async function wlRender() {
 
       const row = document.createElement('div');
       row.className = 'wl-item';
+      row.setAttribute('data-wl-id', id);
       row.innerHTML = `
         <span style="font-weight:700;cursor:pointer;">${id}</span>
         <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d?.name || '—'}</span>
-        <span>${latest?.close ?? '—'}</span>
-        <span style="color:${clr};font-weight:600;">${pct}</span>
+        <span class="wl-price" style="font-family:'IBM Plex Mono',monospace;">${latest?.close ?? '—'}</span>
+        <span class="wl-chg" style="color:${clr};font-weight:600;">${pct}</span>
         <span style="line-height:0;">${spark}</span>
         <button onclick="wlRemove('${id}')" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0 0.2rem;">✕</button>`;
       row.querySelector('span').addEventListener('click', () => {
         if (latest) openStockModal({ id, name: d.name, price: latest.close, chgPct: latest.chg_pct, prev: latest.close, sector: '', mcap: 0 });
       });
       el.appendChild(row);
+    }
+
+    // ── 盤中啟動 MIS 即時輪詢 ──
+    if (isTradingHours() && list.length) {
+      startMISPolling(
+        list.map(id => ({ id, market: 'tse' })), // 預設上市，上櫃個股會無回應（靜默失敗）
+        (data) => {
+          const row = document.querySelector(`.wl-item[data-wl-id="${data.id}"]`);
+          if (!row) return;
+          const priceEl = row.querySelector('.wl-price');
+          const chgEl   = row.querySelector('.wl-chg');
+          if (priceEl && data.price != null) {
+            priceEl.textContent = data.price.toFixed(2);
+            if      (data.isLimitUp)   priceEl.style.color = '#ff9500';
+            else if (data.isLimitDown) priceEl.style.color = '#06b6d4';
+            else priceEl.style.color = (data.chgPct || 0) >= 0 ? '#dc2626' : '#16a34a';
+          }
+          if (chgEl && data.chgPct != null) {
+            chgEl.textContent = `${data.chgPct >= 0 ? '+' : ''}${data.chgPct.toFixed(2)}%`;
+            chgEl.style.color = (data.chgPct || 0) >= 0 ? '#dc2626' : '#16a34a';
+          }
+        }
+      );
     }
   } catch { /* 靜默 */ }
 }
