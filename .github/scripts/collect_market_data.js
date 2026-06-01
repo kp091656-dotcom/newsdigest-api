@@ -301,49 +301,48 @@ async function collectOptions() {
 }
 
 async function collectFutures() {
-  console.log('🌍 全球商品/指數（stooq + FinMind）...');
+  // ⚠️ stooq 已完全棄用（不穩定、常被限速封鎖）
+  // 資料來源：FinMind（美股/SOX/VIX/商品/台幣/美債）+ Yahoo Finance（DXY — FinMind 無）
+  console.log('🌍 全球商品/指數（FinMind + Yahoo Finance）...');
   try {
-    const today = new Date();
-    const d2    = today.toISOString().slice(0,10).replace(/-/g,'');
-    const d1    = new Date(today - 30*86400000).toISOString().slice(0,10).replace(/-/g,'');
-
-    const STOOQ = [
-      ['%5Etwii','台灣加權','亞股指數'],['%5Enk225','日經225','亞股指數'],['%5Ehsi','香港恆生','亞股指數'],
-      ['%5Edax','德國DAX','歐股指數'],['%5Eftse','英國FTSE100','歐股指數'],
-      ['GLD.US','黃金ETF','金屬'],['SLV.US','白銀ETF','金屬'],['COPX.US','銅礦ETF','金屬'],
-      ['USO.US','原油ETF','能源'],['UNG.US','天然氣ETF','能源'],
-      ['EURUSD','歐元/美元','外匯'],['GBPUSD','英鎊/美元','外匯'],['USDJPY','美元/日圓','外匯'],
-      ['USDCNH','美元/人民幣','外匯'],['TLT.US','20年美債ETF','債券'],
-      ['IBIT.US','比特幣ETF','加密貨幣'],['FETH.US','以太幣ETF','加密貨幣'],
-    ];
-
-    const stooqRows = (await Promise.all(STOOQ.map(async ([sym, name, cat]) => {
+    // Yahoo Finance helper（只用於 FinMind 沒有的資料，目前僅 DXY）
+    async function yahooQuote(symbol, label, cat) {
       try {
-        const r   = await fetch(`https://stooq.com/q/d/l/?s=${sym}&d1=${d1}&d2=${d2}&i=d`,
-          { headers: {'User-Agent':'Mozilla/5.0'}, signal: AbortSignal.timeout(8000) });
+        const r = await fetch(
+          `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
+          { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }, signal: AbortSignal.timeout(8000) }
+        );
         if (!r.ok) return null;
-        const csv = await r.text();
-        if (!csv || csv.includes('No data') || csv.length < 20) return null;
-        const lines = csv.trim().split('\n').filter(l => l && !l.startsWith('Date'));
-        if (!lines.length) return null;
-        const l = lines[lines.length-1].split(',');
-        const p = lines.length >= 2 ? lines[lines.length-2].split(',') : l;
-        const close = parseFloat(l[4]);
-        const prev  = parseFloat(p[4]);
-        if (!close || isNaN(close)) return null;
-        return { date: l[0], symbol: sym, name, cat, close, prev,
-          chg_pct: prev ? parseFloat(((close-prev)/prev).toFixed(6)) : 0, source:'stooq' };
+        const j      = await r.json();
+        const closes = j?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
+        const times  = j?.chart?.result?.[0]?.timestamp || [];
+        const valid  = closes.map((c, i) => ({ c, t: times[i] })).filter(x => x.c != null && x.c > 0);
+        if (!valid.length) return null;
+        const curr = valid[valid.length - 1];
+        const prev = valid.length >= 2 ? valid[valid.length - 2] : curr;
+        return {
+          date: new Date(curr.t * 1000).toISOString().slice(0, 10),
+          symbol, name: label, cat,
+          close:   parseFloat(curr.c.toFixed(4)),
+          prev:    parseFloat(prev.c.toFixed(4)),
+          chg_pct: prev.c ? parseFloat(((curr.c - prev.c) / prev.c).toFixed(6)) : 0,
+          source: 'yahoo',
+        };
       } catch { return null; }
-    }))).filter(Boolean);
+    }
 
     const FM_ITEMS = [
-      { ds: 'USStockPrice',   id: '^GSPC',  name: 'S&P500',    cat: '美股指數', ck: 'Close' },
-      { ds: 'USStockPrice',   id: '^IXIC',  name: '那斯達克',  cat: '美股指數', ck: 'Close' },
-      { ds: 'USStockPrice',   id: '^DJI',   name: '道瓊',      cat: '美股指數', ck: 'Close' },
-      { ds: 'USStockPrice',   id: '^VIX',   name: 'VIX',       cat: '波動率',   ck: 'Close' },
-      { ds: 'GoldPrice',      id: '',       name: '黃金現貨',  cat: '金屬',     ck: 'price' },
-      { ds: 'CrudeOilPrices', id: 'WTI',    name: 'WTI原油',   cat: '能源',     ck: 'price' },
-      { ds: 'CrudeOilPrices', id: 'Brent',  name: 'Brent原油', cat: '能源',     ck: 'price' },
+      { ds: 'USStockPrice',         id: '^GSPC',                   name: 'S&P500',        cat: '美股指數', ck: 'Close'    },
+      { ds: 'USStockPrice',         id: '^IXIC',                   name: '那斯達克',      cat: '美股指數', ck: 'Close'    },
+      { ds: 'USStockPrice',         id: '^DJI',                    name: '道瓊',          cat: '美股指數', ck: 'Close'    },
+      { ds: 'USStockPrice',         id: '^SOX',                    name: 'SOX費城半導體', cat: '美股指數', ck: 'Close'    },
+      { ds: 'USStockPrice',         id: '^VIX',                    name: 'VIX',           cat: '波動率',   ck: 'Close'    },
+      { ds: 'GoldPrice',            id: '',                        name: '黃金現貨',      cat: '金屬',     ck: 'price'    },
+      { ds: 'CrudeOilPrices',       id: 'WTI',                     name: 'WTI原油',       cat: '能源',     ck: 'price'    },
+      { ds: 'CrudeOilPrices',       id: 'Brent',                   name: 'Brent原油',     cat: '能源',     ck: 'price'    },
+      { ds: 'TaiwanExchangeRate',   id: 'USD',                     name: '台幣USD/TWD',   cat: '外匯',     ck: 'spot_buy' },
+      { ds: 'GovernmentBondsYield', id: 'United States 2-Year',   name: '美債2Y殖利率',  cat: '債券',     ck: 'value'    },
+      { ds: 'GovernmentBondsYield', id: 'United States 10-Year',  name: '美債10Y殖利率', cat: '債券',     ck: 'value'    },
     ];
 
     const fmRows = FM_TOKEN ? (await Promise.all(FM_ITEMS.map(async s => {
@@ -351,26 +350,33 @@ async function collectFutures() {
         const params = { start_date: daysAgo(7) };
         if (s.id) params.data_id = s.id;
         const rows = await fmFetch(s.ds, params);
-        const sorted = (rows||[]).filter(r => (r[s.ck]||r.Close||r.close||r.price) > 0)
-          .sort((a,b) => (a.date||'').localeCompare(b.date||''));
+        const sorted = (rows||[]).filter(r => {
+          const v = r[s.ck] ?? r.Close ?? r.close ?? r.price ?? r.value;
+          return v != null && v > 0;
+        }).sort((a, b) => (a.date||'').localeCompare(b.date||''));
         if (!sorted.length) { console.log(`  ⚠️  ${s.name}(${s.ds}) 無資料`); return null; }
-        const curr  = sorted[sorted.length-1];
-        const prev  = sorted.length >= 2 ? sorted[sorted.length-2] : curr;
-        const close = curr[s.ck]||curr.Close||curr.close||curr.price||0;
-        const pClose= prev[s.ck]||prev.Close||prev.close||prev.price||close;
-        return { date: curr.date?.slice(0,10), symbol: s.id||s.ds, name: s.name, cat: s.cat,
-          close, prev: pClose, chg_pct: pClose ? parseFloat(((close-pClose)/pClose).toFixed(6)):0, source:'finmind' };
+        const curr   = sorted[sorted.length - 1];
+        const prev   = sorted.length >= 2 ? sorted[sorted.length - 2] : curr;
+        const getV   = r => r[s.ck] ?? r.Close ?? r.close ?? r.price ?? r.value ?? 0;
+        const close  = getV(curr);
+        const pClose = getV(prev);
+        return {
+          date: curr.date?.slice(0, 10), symbol: s.id || s.ds, name: s.name, cat: s.cat,
+          close, prev: pClose,
+          chg_pct: pClose ? parseFloat(((close - pClose) / pClose).toFixed(6)) : 0,
+          source: 'finmind',
+        };
       } catch(e) { console.log(`  ⚠️  ${s.name}(${s.ds}) 失敗：${e.message}`); return null; }
     }))).filter(Boolean) : [];
 
-    const allRows = [...fmRows, ...stooqRows];
-    console.log(`  stooq: ${stooqRows.length}/${STOOQ.length}，FinMind: ${fmRows.length}/${FM_ITEMS.length}，合計: ${allRows.length}`);
-    console.log(`  ℹ️  futures_daily Supabase 欄位待確認，本次不寫入（前端走 Vercel proxy）`);
+    // DXY — FinMind 無此資料，唯一使用 Yahoo Finance 的項目
+    const dxyRow = await yahooQuote('DX-Y.NYB', 'DXY美元指數', '外匯');
+    const allRows = [...fmRows, ...(dxyRow ? [dxyRow] : [])];
 
-    if (!allRows.length) {
-      console.warn(`  ⚠️  全球商品：stooq 被擋且 FinMind 無資料，前端改從 Vercel proxy 即時取得`);
-    }
-    return { ok: true, count: allRows.length };
+    console.log(`  FinMind: ${fmRows.length}/${FM_ITEMS.length}，Yahoo(DXY): ${dxyRow ? 1 : 0}，合計: ${allRows.length}`);
+    console.log(`  ℹ️  futures_daily 前端走 Vercel proxy 即時取得，本函式資料供 Alpha AI 使用`);
+
+    return { ok: true, count: allRows.length, rows: allRows };
   } catch (e) { console.error(`  ❌ 全球商品 失敗：${e.message}`); return { ok: false, error: e.message }; }
 }
 
@@ -1067,6 +1073,174 @@ async function collectAlphaReport() {
       retailRatio = (-1 * chips.fut_tmf_total_net / chips.fut_tmf_total_oi * 100).toFixed(2);
     }
 
+    // ── 4b. 選擇權 P/C Ratio + Max Pain ──
+    let optBlock = '【選擇權市場】（資料暫無）';
+    try {
+      const opt = (await fetch(
+        `${SUPABASE_URL}/rest/v1/options_daily?order=date.desc&limit=1&select=date,pc_ratio_vol,pc_ratio_oi,max_pain,call_oi,put_oi`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      ).then(r => r.json()))?.[0] || null;
+      if (opt) {
+        const pcOI  = opt.pc_ratio_oi  != null ? opt.pc_ratio_oi.toFixed(3)  : 'N/A';
+        const pcVol = opt.pc_ratio_vol != null ? opt.pc_ratio_vol.toFixed(3) : 'N/A';
+        optBlock = `【選擇權市場（${opt.date}）】
+P/C OI比值：${pcOI}（>1偏空，<1偏多）　P/C 量比值：${pcVol}
+Max Pain：${opt.max_pain ?? 'N/A'}　Call OI：${opt.call_oi ?? 'N/A'}　Put OI：${opt.put_oi ?? 'N/A'}`;
+        console.log(`  ✅ 選擇權：P/C OI=${pcOI}，Max Pain=${opt.max_pain}`);
+      }
+    } catch(e) { console.warn('  ⚠️  options_daily：' + e.message); }
+
+    // ── 4c. 大台期貨（TX）三大法人淨口 ──
+    let txBlock = '';
+    try {
+      const tx = (await fetch(
+        `${SUPABASE_URL}/rest/v1/chips_daily?order=date.desc&limit=1&select=date,fut_tx_foreign_net,fut_tx_trust_net,fut_tx_dealer_net,fut_tx_total_net`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      ).then(r => r.json()))?.[0] || null;
+      if (tx?.fut_tx_foreign_net != null) {
+        const s = n => (n > 0 ? `+${n}` : `${n}`);
+        txBlock = `\n大台期貨（TX）法人淨口：外資${s(tx.fut_tx_foreign_net)} 投信${s(tx.fut_tx_trust_net ?? 0)} 自營${s(tx.fut_tx_dealer_net ?? 0)} 合計${s(tx.fut_tx_total_net ?? 0)}`;
+        console.log(`  ✅ TX：外資${s(tx.fut_tx_foreign_net)}`);
+      }
+    } catch(e) { console.warn('  ⚠️  TX期貨：' + e.message); }
+
+    // ── 4d. 產業指數 Top5 / Bottom5 ──
+    let sectorBlock = '【產業指數】（資料暫無）';
+    try {
+      const [topRes, botRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/sector_index_daily?order=date.desc,chg_pct.desc&limit=5&select=index_name,chg_pct,date`,
+          { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }).then(r => r.json()).catch(() => []),
+        fetch(`${SUPABASE_URL}/rest/v1/sector_index_daily?order=date.desc,chg_pct.asc&limit=5&select=index_name,chg_pct,date`,
+          { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }).then(r => r.json()).catch(() => []),
+      ]);
+      const top = Array.isArray(topRes) ? topRes.filter(r => r.chg_pct != null) : [];
+      const bot = Array.isArray(botRes) ? botRes.filter(r => r.chg_pct != null) : [];
+      if (top.length || bot.length) {
+        const fmt = r => `${r.index_name}${r.chg_pct > 0 ? '+' : ''}${(r.chg_pct * 100).toFixed(2)}%`;
+        sectorBlock = `【產業指數強弱（${top[0]?.date || latestDate}）】
+強勢 Top5：${top.map(fmt).join('　')}
+弱勢 Bot5：${bot.map(fmt).join('　')}`;
+        console.log(`  ✅ 產業指數：${top.slice(0,2).map(r => r.index_name).join('/')}`);
+      }
+    } catch(e) { console.warn('  ⚠️  sector_index_daily：' + e.message); }
+
+    // ── 4e. 總體經濟指標 ──
+    // 來源：FinMind（SOX/台幣/美債2Y+10Y/聯準會利率）+ Yahoo Finance（DXY — FinMind 無）
+    // ⚠️ stooq 已完全棄用（不穩定）
+    let macroBlock = '【總體經濟指標】（資料暫無）';
+    let macroData  = {};
+    try {
+      const fmMacroItems = [
+        { ds: 'USStockPrice',          id: '^SOX',                   name: 'SOX費城半導體', ck: 'Close'         },
+        { ds: 'TaiwanExchangeRate',    id: 'USD',                    name: '台幣USD/TWD',   ck: 'spot_buy'      },
+        { ds: 'GovernmentBondsYield',  id: 'United States 2-Year',  name: '美債2Y殖利率',  ck: 'value'         },
+        { ds: 'GovernmentBondsYield',  id: 'United States 10-Year', name: '美債10Y殖利率', ck: 'value'         },
+        { ds: 'InterestRate',          id: 'FED',                    name: '聯準會利率',    ck: 'interest_rate' },
+        { ds: 'USStockPrice',          id: '^GSPC',                  name: 'S&P500',        ck: 'Close'         },
+      ];
+
+      const fmMacroRows = FM_TOKEN ? (await Promise.all(fmMacroItems.map(async s => {
+        try {
+          // 聯準會利率變動少，抓近 90 天確保取到最新值
+          const startDate = s.ds === 'InterestRate' ? daysAgo(90) : daysAgo(7);
+          const rows = await fmFetch(s.ds, { data_id: s.id, start_date: startDate });
+          const sorted = (rows||[]).filter(r => {
+            const v = r[s.ck] ?? r.Close ?? r.close ?? r.value ?? r.interest_rate;
+            return v != null && v > 0;
+          }).sort((a, b) => (a.date||'').localeCompare(b.date||''));
+          if (!sorted.length) return { label: s.name, close: null, chg: null };
+          const curr   = sorted[sorted.length - 1];
+          const prev   = sorted.length >= 2 ? sorted[sorted.length - 2] : curr;
+          const getV   = r => r[s.ck] ?? r.Close ?? r.close ?? r.value ?? r.interest_rate ?? 0;
+          const close  = getV(curr);
+          const pClose = getV(prev);
+          const chg    = pClose ? parseFloat(((close - pClose) / pClose * 100).toFixed(2)) : null;
+          // 聯準會利率顯示絕對值更有意義
+          const display = s.ds === 'InterestRate' ? { label: s.name, close, chg, date: curr.date } : { label: s.name, close, chg };
+          return display;
+        } catch { return { label: s.name, close: null, chg: null }; }
+      }))).filter(Boolean) : [];
+
+      // DXY — FinMind 無此資料，用 Yahoo Finance
+      let dxyRow = { label: 'DXY美元指數', close: null, chg: null };
+      try {
+        const r = await fetch(
+          'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=5d',
+          { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }, signal: AbortSignal.timeout(8000) }
+        );
+        if (r.ok) {
+          const j      = await r.json();
+          const closes = j?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
+          const valid  = closes.filter(c => c != null && c > 0);
+          if (valid.length >= 1) {
+            const close  = valid[valid.length - 1];
+            const pClose = valid.length >= 2 ? valid[valid.length - 2] : close;
+            dxyRow = { label: 'DXY美元指數', close: parseFloat(close.toFixed(3)),
+              chg: pClose ? parseFloat(((close - pClose) / pClose * 100).toFixed(2)) : null };
+          }
+        }
+      } catch { /* DXY 失敗不中斷 */ }
+
+      const macroRows = [...fmMacroRows, dxyRow];
+
+      // 計算 2Y-10Y 利差（殖利率曲線）
+      const y2  = fmMacroRows.find(r => r.label === '美債2Y殖利率')?.close;
+      const y10 = fmMacroRows.find(r => r.label === '美債10Y殖利率')?.close;
+      let yieldCurveNote = '';
+      if (y2 != null && y10 != null) {
+        const spread = parseFloat((y10 - y2).toFixed(3));
+        const status = spread < 0 ? '⚠️ 殖利率曲線倒掛（衰退警示）' : spread < 0.3 ? '殖利率曲線平坦（注意）' : '殖利率曲線正常';
+        yieldCurveNote = `\n10Y-2Y 利差：${spread > 0 ? '+' : ''}${spread}%（${status}）`;
+      }
+
+      // 聯準會利率補充說明
+      const fedRow = fmMacroRows.find(r => r.label === '聯準會利率');
+      let fedNote = '';
+      if (fedRow?.close != null) {
+        fedNote = `（最新決議日：${fedRow.date || '近期'}）`;
+      }
+
+      for (const r of macroRows) {
+        if (r.close != null) macroData[r.label] = { close: r.close, chg: r.chg };
+      }
+
+      const fmt = r => {
+        if (r.close == null) return `${r.label}：N/A`;
+        const chgStr = r.chg != null ? `（${r.chg > 0 ? '+' : ''}${r.chg}%）` : '';
+        if (r.label === '聯準會利率') return `${r.label}：${r.close}%${fedNote}`;
+        return `${r.label}：${r.close}${chgStr}`;
+      };
+
+      macroBlock = `【總體經濟指標】
+${macroRows.map(fmt).join('\n')}${yieldCurveNote}`;
+      console.log(`  ✅ 總經：${macroRows.filter(r => r.close != null).map(r => r.label).join('、')}`);
+      if (yieldCurveNote) console.log(`  📐 ${yieldCurveNote.trim()}`);
+    } catch(e) { console.warn('  ⚠️  總經指標：' + e.message); }
+
+    // ── 4f. CNN Fear & Greed Index ──
+    let fearGreedBlock = '【市場情緒 Fear & Greed】（資料暫無）';
+    let fearGreedData  = null;
+    try {
+      const fgRes = await fetch(
+        'https://production.dataviz.cnn.io/index/fearandgreed/graphdata',
+        { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://edition.cnn.com/' }, signal: AbortSignal.timeout(8000) }
+      );
+      if (fgRes.ok) {
+        const fg     = (await fgRes.json())?.fear_and_greed;
+        const score  = fg?.score;
+        const rating = fg?.rating;
+        const prev7  = fg?.previous_1_week?.score;
+        if (score != null) {
+          fearGreedData = { score: Math.round(score), rating, prev_week: prev7 ? Math.round(prev7) : null };
+          const trend = prev7 != null ? `（上週 ${Math.round(prev7)}，${score > prev7 ? '貪婪升溫 ▲' : '恐懼升溫 ▼'}）` : '';
+          fearGreedBlock = `【CNN Fear & Greed Index】
+目前分數：${Math.round(score)} / 100（${rating}）${trend}
+解讀：0-25極度恐懼　26-44恐懼　45-55中性　56-74貪婪　75-100極度貪婪`;
+          console.log(`  ✅ Fear & Greed：${Math.round(score)}（${rating}）`);
+        }
+      }
+    } catch(e) { console.warn('  ⚠️  Fear & Greed：' + e.message); }
+
     // ── 5. 整理資料 ──
     const valMap = {};
     for (const v of valuation) valMap[v.stock_id] = v;
@@ -1080,7 +1254,7 @@ async function collectAlphaReport() {
       .map(n => `[${n.source}] ${n.title}`).join('\n');
 
     // ── 5. 呼叫 Groq ──
-    const systemPrompt = `你是 Alpha，一位台股專業交易員，思維框架來自機構級交易邏輯。
+    const systemPrompt = `你是 Alpha，一位台股專業交易員兼市場分析師，思維框架來自機構級研究邏輯。
 今天是 ${today}，台股將於 09:00 開盤。
 
 【核心分析框架】
@@ -1089,52 +1263,64 @@ async function collectAlphaReport() {
    - 基本面：PE/PB/殖利率是否合理
    - 事件面：新聞催化劑、產業鏈邏輯
    - 供需邏輯：誰在買？誰在賣？市場有需求嗎？
+   - 總經面：SOX/DXY/美債/台幣/聯準會利率/Fear&Greed 綜合研判
 
 2. 找出今日主導者（Who Took My Money）：
-   - 每一個市場現象都要問：「是誰在主導這個方向？」
    - 外資大買 → 外資主導；散戶偏多 + 外資賣 → 小心散戶接刀
    - 明確指出今日誰是主導力量（外資/自營商/投信/散戶）
 
 3. 供需邏輯選股（Business Mindset）：
-   - 成交量爆量 → 誰是直接受惠方？（如成交量大 → 券商手續費收入增）
+   - 成交量爆量 → 誰是直接受惠方？
    - 融資大減 + 維持率低 → 籌碼危機，逆向機會
-   - 找事件驅動的供需失衡點
 
 4. 賣方思維的市場情緒判讀：
-   - 散戶多空比 > +10% → 散戶過度偏多 → 賣方警戒，市場可能反轉
-   - 散戶多空比 < -10% → 散戶極度悲觀 → 賣方有利，可能反彈
-   - 融資大增 → 散戶加槓桿 → 風險累積
+   - 散戶多空比 > +10% → 賣方警戒，可能反轉
+   - 散戶多空比 < -10% → 賣方有利，可能反彈
+   - Fear & Greed > 75 + 外資賣超 → 高度警戒
+   - Fear & Greed < 25 + 外資買超 → 逆向機會
 
-5. 空手也是一種策略（Cash is a Position）：
-   - 若市場方向不明、籌碼混亂、新聞無明確催化劑 → 建議空手等待
-   - 不為交易而交易，正期望值才進場
+5. 總經環境研判：
+   - SOX 上漲 → 半導體族群順風
+   - DXY 強升 → 外資撤出新興市場壓力，台股承壓
+   - 美債10Y 升 → 科技股本益比受壓
+   - 台幣升值（數字下降）→ 外資匯入，有利台股
+   - 聯準會利率高（>4%）→ 高利率環境，壓縮估值空間，留意資金成本
+   - 殖利率曲線倒掛（10Y-2Y < 0）→ 衰退警示，偏保守
+
+6. 空手也是一種策略（Cash is a Position）：
+   - 若市場方向不明、籌碼混亂 → 建議空手
 
 【信心來源標記】
-每個推薦必須標明信心主要來源：
 - "籌碼面"：三大法人方向明確
-- "基本面"：PE/PB/殖利率有優勢  
+- "基本面"：PE/PB/殖利率有優勢
 - "事件面"：有明確新聞催化劑
 - "供需面"：成交量/融資/產業鏈邏輯支撐
+- "總經面"：SOX/DXY/美債/匯率/利率方向支撐
 
 【融資危機訊號】
-若某股融資大幅減少（變化 < -5000張）且走勢已跌一段，標記為逆向機會。
+若某股融資大幅減少（< -5000張）且已跌一段，標記為逆向機會。
 
 【價格規則 — 嚴格遵守】
-- entry_price 必須在收盤價的 ±5% 範圍內
-- target_price 必須在 entry_price 的 +3% ~ +20% 範圍內
-- stop_loss 必須在 entry_price 的 -3% ~ -10% 範圍內
+- entry_price 必須在收盤價 ±5% 範圍內
+- target_price 必須在 entry_price +3%~+20% 範圍內
+- stop_loss 必須在 entry_price -3%~-10% 範圍內
 - 禁止使用訓練資料的歷史股價，只能用表格提供的收盤價
 
 只能回傳純 JSON，不含 markdown、不含任何說明文字。所有字串值必須用英文半形雙引號，數字不加引號。
 格式：
 {
-  "market_summary": "市場總結（含主導力量分析）",
+  "market_summary": "今日整體市場判斷（2-3句，指數表現+主導力量+氛圍）",
+  "market_context": "盤勢背景（2-3句，含總經：SOX/DXY/聯準會/殖利率曲線影響、與上週比較）",
+  "key_risks": ["風險1（具體來源與影響）", "風險2", "風險3（最多3項）"],
+  "sector_focus": [
+    { "name": "產業名稱", "reason": "為何今日值得關注", "sentiment": "強勢或中性或弱勢" }
+  ],
   "market_mood": "樂觀或中性或謹慎或悲觀",
   "dominant_player": "今日主導者：外資或自營商或投信或散戶或混沌",
   "retail_signal": "散戶訊號：偏多警戒或偏空機會或中性",
-  "suggest_cash": true或false（若市場方向不明建議空手則為true）,
+  "suggest_cash": true或false,
   "cash_reason": "空手理由（suggest_cash=true時填寫，否則空字串）",
-  "margin_alert": "融資警示：正常或偏高注意或危機（根據融資餘額變化判斷）",
+  "margin_alert": "融資警示：正常或偏高注意或危機",
   "recommendations": [
     {
       "stock_id": "4碼",
@@ -1147,15 +1333,18 @@ async function collectAlphaReport() {
       "expected_return_pct": 數字,
       "holding_days": 數字,
       "confidence": "高或中或低",
-      "signal_source": "籌碼面或基本面或事件面或供需面",
-      "reason": "操作理由（含供需邏輯）",
-      "risk": "風險提示"
+      "signal_source": "籌碼面或基本面或事件面或供需面或總經面",
+      "reason": "操作理由（含供需邏輯，至少2句）",
+      "risk": "風險提示（具體）"
     }
   ],
-  "alpha_note": "今日一句話警語（巨人傑風格：直接、不廢話）"
+  "alpha_note": "今日一句話警語（直接、有觀點，像機構交易台開盤提醒）"
 }
 若 suggest_cash=true，recommendations 可以只有 0-2 檔觀察標的。
-若 suggest_cash=false，recommendations 包含 3-5 檔，action=買進 至少 2 檔。`;
+若 suggest_cash=false，recommendations 包含 3-5 檔，action=買進 至少 2 檔。
+market_context 必須填寫，提及聯準會利率與殖利率曲線狀態。
+key_risks 必須 2-3 項，每項 15 字以上。
+sector_focus 必須 2-3 個產業。`;
 
     // 整理籌碼摘要給 AI
     let chipsBlock = '【今日籌碼面板】\n（資料暫無）';
@@ -1180,6 +1369,14 @@ async function collectAlphaReport() {
 
 ${chipsBlock}
 
+${optBlock}
+
+${sectorBlock}
+
+${macroBlock}
+
+${fearGreedBlock}
+
 【台股最新收盤（${latestDate}）前50大成交量】
 ${stockTable}
 
@@ -1197,7 +1394,7 @@ ${pttTitles}
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-        max_tokens: 2000,
+        max_tokens: 3000,
         temperature: 0.3,
       }),
       signal: AbortSignal.timeout(60000),
@@ -1251,13 +1448,23 @@ ${pttTitles}
         Prefer: 'resolution=merge-duplicates',
       },
       body: JSON.stringify({
-        report_date:    today,
-        market_mood:    result.market_mood || '中性',
-        market_summary: result.market_summary || '',
-        alpha_note:     result.alpha_note || '',
-        recommendations: result.recommendations || [],
-        data_sources:   { stocks: stocks.length, news: Array.isArray(news) ? news.length : 0, ptt: (pttTitles && pttTitles !== '無法取得') ? pttTitles.split('\n').filter(l => l.trim()).length : 0 },
-        generated_at:   new Date().toISOString(),
+        report_date:     today,
+        market_mood:     result.market_mood     || '中性',
+        market_summary:  result.market_summary  || '',
+        market_context:  result.market_context  || '',
+        key_risks:       Array.isArray(result.key_risks)    ? result.key_risks    : [],
+        sector_focus:    Array.isArray(result.sector_focus) ? result.sector_focus : [],
+        alpha_note:      result.alpha_note       || '',
+        dominant_player: result.dominant_player  || '',
+        retail_signal:   result.retail_signal    || '',
+        suggest_cash:    result.suggest_cash     || false,
+        cash_reason:     result.cash_reason      || '',
+        margin_alert:    result.margin_alert     || '',
+        recommendations: result.recommendations  || [],
+        macro_data:      Object.keys(macroData).length ? macroData : null,
+        fear_greed:      fearGreedData,
+        data_sources:    { stocks: stocks.length, news: Array.isArray(news) ? news.length : 0, ptt: (pttTitles && pttTitles !== '無法取得') ? pttTitles.split('\n').filter(l => l.trim()).length : 0 },
+        generated_at:    new Date().toISOString(),
       }),
     });
 
