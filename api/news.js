@@ -1672,6 +1672,29 @@ ${redditTitles || '無'}
     }
   }
 
+
+  // ── TWSE MIS 即時報價 Proxy（解決前端 CORS 問題）──
+  if (endpoint === 'mis') {
+    const exCh = req.query.ex_ch || '';
+    if (!exCh) return res.status(400).json({ error: 'missing ex_ch' });
+    try {
+      const url = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${encodeURIComponent(exCh)}&_=${Date.now()}`;
+      const r = await fetch(url, {
+        headers: {
+          'Referer': 'https://mis.twse.com.tw/',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!r.ok) return res.status(502).json({ error: `TWSE HTTP ${r.status}` });
+      const json = await r.json();
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(json);
+    } catch(e) {
+      return res.status(502).json({ error: e.message });
+    }
+  }
+
   // ── 股東紀念品 ──
   if (endpoint === 'gifts') {
     const SB_URL = process.env.SUPABASE_URL;
