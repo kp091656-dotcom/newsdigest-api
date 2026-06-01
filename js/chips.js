@@ -132,7 +132,7 @@ async function loadChipsPanel() {
 
         function makeCanvasChart(title, unit, seriesDef) {
           const CSS_H = 110;
-          const PL = 46, PR = 18, PT = 10, PB = 20;
+          const PL = 46, PR = 32, PT = 10, PB = 20;
 
           const wrap = document.createElement('div');
           wrap.style.cssText = 'background:var(--surface);border-radius:12px;padding:0.8rem 0.9rem;box-shadow:0 0 0 1px var(--border-dark);margin-bottom:0.75rem;position:relative;overflow:hidden;box-sizing:border-box;height:185px;';
@@ -273,7 +273,7 @@ async function loadChipsPanel() {
 
         function makeCumulativeChart(title) {
           const CSS_H = 110;
-          const PL = 52, PR = 18, PT = 10, PB = 20;
+          const PL = 52, PR = 35, PT = 10, PB = 20;
 
           const cumSeries = [
             { label: '外資', color: '#6366f1', key: 'spot_foreign_net' },
