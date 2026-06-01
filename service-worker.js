@@ -3,8 +3,8 @@
  * 策略：靜態資源 Cache First，API 請求 Network First
  */
 
-const CACHE_NAME    = 'alphascope-20260505-134816';
-const STATIC_CACHE  = 'alphascope-static-20260505-134816';
+const CACHE_NAME    = 'alphascope-__SW_VERSION__';
+const STATIC_CACHE  = 'alphascope-static-__SW_VERSION__';
 
 // 靜態資源：優先從快取讀取
 const STATIC_ASSETS = [
@@ -41,6 +41,9 @@ self.addEventListener('activate', e => {
 // 攔截請求
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // TWSE MIS 即時報價：不攔截，讓瀏覽器直接送出（需保留 Referer，SW 會剝除導致 CORS 錯誤）
+  if (url.hostname.includes('mis.twse.com.tw')) return;
 
   // API 請求（Supabase、Vercel API、FinMind）→ Network First，失敗才回傳快取
   const isAPI = url.hostname.includes('supabase.co')
