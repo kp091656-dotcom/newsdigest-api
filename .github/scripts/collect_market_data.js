@@ -1445,7 +1445,7 @@ ${pttTitles}
     }
 
     // ── 7. 存入 Supabase alpha_daily_report ──
-    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/alpha_daily_report`, {
+    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/alpha_daily_report?on_conflict=report_date`, {
       method: 'POST',
       headers: {
         apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
