@@ -21,5 +21,6 @@ jobs:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           GROQ_API_KEY:         ${{ secrets.GROQ_API_KEY }}
+          FINMIND_TOKEN:        ${{ secrets.FINMIND_TOKEN }}
           COLLECT_MODE:         alpha
         run: node .github/scripts/collect_market_data.js
