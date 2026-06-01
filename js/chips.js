@@ -460,7 +460,7 @@ async function loadChipsPanel() {
         // 🔒 ResizeObserver：第一次拿到真實寬度才畫，之後 < 4px 變化不觸發
         let lastW = 0;
         let rafId = null;
-        const roTarget = chartEl.parentElement || chartEl;
+        const roTarget = chartEl;
         const ro = new ResizeObserver(entries => {
           if (!entries || !entries[0]) return;
           const w = Math.floor(entries[0].contentRect.width);
