@@ -157,6 +157,37 @@ async function loadDailySummary() {
       note.textContent = '今日 Alpha 報告尚未生成，請稍後再查看。';
     }
 
+    // ── 盤勢背景 / 關鍵風險 / 今日重點產業 ──
+    const ctxEl     = document.getElementById('dsbContext');
+    const risksEl   = document.getElementById('dsbRisks');
+    const riskList  = document.getElementById('dsbRiskList');
+    const sectorsEl = document.getElementById('dsbSectors');
+    const sectorList= document.getElementById('dsbSectorList');
+
+    if (ctxEl && alpha?.market_context && alpha.market_context.trim()) {
+      ctxEl.textContent = alpha.market_context;
+      ctxEl.style.display = 'block';
+    }
+
+    if (risksEl && riskList && Array.isArray(alpha?.key_risks) && alpha.key_risks.length) {
+      riskList.innerHTML = alpha.key_risks.map(r =>
+        `<li>${r}</li>`
+      ).join('');
+      risksEl.style.display = 'block';
+    }
+
+    if (sectorsEl && sectorList && Array.isArray(alpha?.sector_focus) && alpha.sector_focus.length) {
+      const SENT_CLR = { '強勢': ['#dc2626','rgba(220,38,38,0.08)'], '中性': ['var(--muted)','rgba(148,163,184,0.1)'], '弱勢': ['#16a34a','rgba(22,163,74,0.08)'] };
+      sectorList.innerHTML = alpha.sector_focus.map(s => {
+        const [tc, bg] = SENT_CLR[s.sentiment] || SENT_CLR['中性'];
+        return `<div style="background:${bg};border:1px solid ${tc};border-radius:5px;padding:0.25rem 0.55rem;font-size:0.7rem;">
+          <span style="color:${tc};font-weight:600;">${s.name}</span>
+          <span style="color:var(--muted);margin-left:0.3rem;font-size:0.65rem;">${s.reason||''}</span>
+        </div>`;
+      }).join('');
+      sectorsEl.style.display = 'block';
+    }
+
     // 法人籌碼警示
     await loadInstAlert();
 
