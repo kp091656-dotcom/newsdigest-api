@@ -447,17 +447,7 @@ async function loadChipsPanel() {
           return { wrap, resize };
         }
 
-        // 💡 先建 DOM，不畫圖
-        chartEl.innerHTML = '';
-        const header = document.createElement('div');
-        header.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;";
-        header.innerHTML = `
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">近期趨勢</span>
-          <div style="display:flex;gap:4px;">
-            <button id="chips-days-10" onclick="window._switchTrendDays(10)" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;">10日</button>
-            <button id="chips-days-30" onclick="window._switchTrendDays(30)" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:2px 8px;border-radius:4px;border:1px solid var(--border-dark);background:transparent;color:var(--muted);cursor:pointer;">30日</button>
-          </div>`;
-        chartEl.appendChild(header);
+        // 💡 先掛圖表卡片（header 已在外部建立，不重建）
 
         const charts = [
           makeCumulativeChart('🏢 三大法人現貨買賣超'),
