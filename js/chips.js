@@ -105,10 +105,14 @@ async function loadChipsPanel() {
 
     // ── 近N日趨勢圖（Canvas + Hover Tooltip）──
     try {
-      const histRes  = await fetch('/api/news?endpoint=chips&limit=10&order=date.desc');
-      const histJson = await histRes.json();
-      const histRaw  = histJson.data || [];
-      const chartEl  = document.getElementById('chips-trend-chart');
+      const chartEl = document.getElementById('chips-trend-chart');
+      let _trendDays = 10;
+      let _trendRO = null;
+
+      async function loadTrendCharts(days) {
+        const histRes  = await fetch(`/api/news?endpoint=chips&limit=${days}&order=date.desc`);
+        const histJson = await histRes.json();
+        const histRaw  = histJson.data || [];
 
       if (chartEl && histRaw.length >= 2) {
         const rows = [...histRaw].reverse();
@@ -431,8 +435,13 @@ async function loadChipsPanel() {
         // 💡 先建 DOM，不畫圖
         chartEl.innerHTML = '';
         const header = document.createElement('div');
-        header.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;margin-bottom:0.75rem;";
-        header.textContent = '近期趨勢';
+        header.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;";
+        header.innerHTML = `
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">近期趨勢</span>
+          <div style="display:flex;gap:4px;">
+            <button id="chips-days-10" onclick="window._switchTrendDays(10)" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;">10日</button>
+            <button id="chips-days-30" onclick="window._switchTrendDays(30)" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:2px 8px;border-radius:4px;border:1px solid var(--border-dark);background:transparent;color:var(--muted);cursor:pointer;">30日</button>
+          </div>`;
         chartEl.appendChild(header);
 
         const charts = [
@@ -461,6 +470,7 @@ async function loadChipsPanel() {
         let lastW = 0;
         let rafId = null;
         const roTarget = chartEl;
+        if (_trendRO) _trendRO.disconnect();
         const ro = new ResizeObserver(entries => {
           if (!entries || !entries[0]) return;
           const w = Math.floor(entries[0].contentRect.width);
@@ -472,7 +482,36 @@ async function loadChipsPanel() {
           });
         });
         ro.observe(roTarget);
+        _trendRO = ro;
       }
+      } // end loadTrendCharts
+
+      window._switchTrendDays = async function(days) {
+        if (days === _trendDays) return;
+        _trendDays = days;
+        const btn10 = document.getElementById('chips-days-10');
+        const btn30 = document.getElementById('chips-days-30');
+        if (btn10) {
+          btn10.style.background = days === 10 ? 'var(--accent)' : 'transparent';
+          btn10.style.color      = days === 10 ? '#fff' : 'var(--muted)';
+          btn10.style.border     = days === 10 ? '1px solid var(--accent)' : '1px solid var(--border-dark)';
+        }
+        if (btn30) {
+          btn30.style.background = days === 30 ? 'var(--accent)' : 'transparent';
+          btn30.style.color      = days === 30 ? '#fff' : 'var(--muted)';
+          btn30.style.border     = days === 30 ? '1px solid var(--accent)' : '1px solid var(--border-dark)';
+        }
+        // 保留 header，清除圖表
+        const chartEl2 = document.getElementById('chips-trend-chart');
+        if (chartEl2) {
+          const hdr = chartEl2.querySelector('div');
+          chartEl2.innerHTML = '';
+          if (hdr) chartEl2.appendChild(hdr);
+        }
+        await loadTrendCharts(days);
+      };
+
+      await loadTrendCharts(_trendDays);
     } catch(chartErr) {
       console.warn('[chips trend] 圖表載入失敗：', chartErr.message);
     }
