@@ -1,10 +1,10 @@
 name: Collect Alpha Report
 
 on:
-  schedule:
-    # 台灣時間 06:50（UTC 前一天 22:50）
-    # 預留 20 分鐘讓 FinMind job 跑完（FinMind 06:30 啟動，timeout 15 分鐘）
-    - cron: '50 22 * * 0-4'
+  workflow_run:
+    workflows: ["Collect FinMind"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
