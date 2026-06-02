@@ -109,7 +109,22 @@ async function loadChipsPanel() {
       let _trendDays = 10;
       let _trendRO = null;
 
+      // Header（含按鈕）只建一次
+      chartEl.innerHTML = '';
+      const _trendHeader = document.createElement('div');
+      _trendHeader.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;";
+      _trendHeader.innerHTML = `
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">近期趨勢</span>
+        <div style="display:flex;gap:4px;">
+          <button id="chips-days-10" onclick="window._switchTrendDays(10)" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;">10日</button>
+          <button id="chips-days-30" onclick="window._switchTrendDays(30)" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;padding:2px 8px;border-radius:4px;border:1px solid var(--border-dark);background:transparent;color:var(--muted);cursor:pointer;">30日</button>
+        </div>`;
+      chartEl.appendChild(_trendHeader);
+
       async function loadTrendCharts(days) {
+        // 清除舊圖表卡片，保留 header
+        Array.from(chartEl.children).forEach(el => { if (el !== _trendHeader) el.remove(); });
+
         const histRes  = await fetch(`/api/news?endpoint=chips&limit=${days}&order=date.desc`);
         const histJson = await histRes.json();
         const histRaw  = histJson.data || [];
@@ -500,13 +515,6 @@ async function loadChipsPanel() {
           btn30.style.background = days === 30 ? 'var(--accent)' : 'transparent';
           btn30.style.color      = days === 30 ? '#fff' : 'var(--muted)';
           btn30.style.border     = days === 30 ? '1px solid var(--accent)' : '1px solid var(--border-dark)';
-        }
-        // 保留 header，清除圖表
-        const chartEl2 = document.getElementById('chips-trend-chart');
-        if (chartEl2) {
-          const hdr = chartEl2.querySelector('div');
-          chartEl2.innerHTML = '';
-          if (hdr) chartEl2.appendChild(hdr);
         }
         await loadTrendCharts(days);
       };
